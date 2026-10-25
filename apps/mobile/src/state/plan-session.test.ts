@@ -193,7 +193,7 @@ describe('refresh', () => {
   });
 });
 
-describe('select and getItinerary', () => {
+describe('select', () => {
   it('makes the chosen option the active trip, with its request and mode', async () => {
     const { session, storage, trips } = setUp();
     const request = planRequest();
@@ -210,18 +210,6 @@ describe('select and getItinerary', () => {
       mode: 'demo',
     });
     expect(session.select('not-an-option')).toBeNull();
-  });
-
-  it('finds an itinerary in the latest results first, then in the active trip', async () => {
-    const { session, storage } = setUp();
-    storage.activeTrip.start({
-      request: planRequest(),
-      itinerary: parkAndRide,
-      plannedAt: START.toISOString(),
-      mode: 'live',
-    });
-    expect(session.getItinerary(parkAndRide.id)).toEqual(parkAndRide);
-    expect(session.getItinerary(transit.id)).toBeNull();
   });
 });
 
@@ -322,11 +310,5 @@ describe('reset', () => {
     lastPending(trips.pending).resolve(planResponse([transit]));
     await expect(outcome).resolves.toEqual({ status: 'superseded' });
     expect(session.getState().response).toBeNull();
-  });
-
-  it('remembers the chosen sort until results are reset', () => {
-    const { session } = setUp();
-    session.setSort('least-walking');
-    expect(session.getState().sort).toBe('least-walking');
   });
 });

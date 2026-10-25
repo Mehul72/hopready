@@ -4,7 +4,6 @@ import type { ActiveTrip } from '@/storage';
 import { parkAndRideItinerary, planRequest, transitItinerary } from '@/test-support/trips';
 
 import { matchItinerary } from './itinerary-match';
-import { sortItineraries } from './itinerary-sort';
 import {
   manualRefreshAvailability,
   refreshableRequest,
@@ -121,24 +120,5 @@ describe('matchItinerary', () => {
 
   it('reports nothing when the chosen option is no longer offered', () => {
     expect(matchItinerary(chosen, [transitItinerary({ departAt: NOW.toISOString() })])).toBeNull();
-  });
-});
-
-describe('sortItineraries', () => {
-  const quick = parkAndRideItinerary({ departAt: '2026-10-26T21:20:00.000Z' });
-  const walking = transitItinerary({ departAt: '2026-10-26T21:00:00.000Z' });
-
-  it('keeps the planner order for "best"', () => {
-    expect(sortItineraries([walking, quick], 'best')).toEqual([walking, quick]);
-  });
-
-  it('sorts by walking time and keeps the input untouched', () => {
-    const input = [walking, quick];
-    expect(sortItineraries(input, 'least-walking')).toEqual([quick, walking]);
-    expect(input).toEqual([walking, quick]);
-  });
-
-  it('keeps the planner order between options that tie', () => {
-    expect(sortItineraries([walking, quick], 'fewest-changes')).toEqual([walking, quick]);
   });
 });

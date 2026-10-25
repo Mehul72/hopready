@@ -1,11 +1,5 @@
 export { type ItineraryMatch, matchItinerary } from './itinerary-match';
 export {
-  ITINERARY_SORT_LABELS,
-  ITINERARY_SORTS,
-  type ItinerarySort,
-  sortItineraries,
-} from './itinerary-sort';
-export {
   PLACE_SEARCH_DEBOUNCE_MS,
   tripQueryKeys,
   useCarParks,

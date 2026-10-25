@@ -6,18 +6,11 @@ import {
   systemClock,
   toIso,
 } from '@hopready/core';
-import { useMemo, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import { type ApiError, toApiError } from '@/api';
-import {
-  type ActiveTrip,
-  type AppStorage,
-  appStorage,
-  useActiveTrip,
-  useSettings,
-} from '@/storage';
+import { type AppStorage, appStorage, useActiveTrip, useSettings } from '@/storage';
 import { matchItinerary } from '@/trip/itinerary-match';
-import { type ItinerarySort, sortItineraries } from '@/trip/itinerary-sort';
 import {
   manualRefreshAvailability,
   refreshableRequest,
@@ -58,7 +51,6 @@ export interface PlanSessionState {
   status: PlanStatus;
   error: ApiError | null;
   plannedAt: string | null;
-  sort: ItinerarySort;
   selectedItineraryId: string | null;
   activeTripRefresh: ActiveTripRefresh;
 }
@@ -84,9 +76,6 @@ export interface PlanSession {
   refresh: () => Promise<RefreshOutcome>;
   // Makes an option from the latest results the active trip. Returns null if it is not there.
   select: (itineraryId: string) => Itinerary | null;
-  // Looks in the latest results first, then in the active trip.
-  getItinerary: (itineraryId: string) => Itinerary | null;
-  setSort: (sort: ItinerarySort) => void;
   // Re-plans the active trip when the refresh-on-resume rule says so; the outcome lands in
   // `activeTripRefresh`. Never rejects.
   refreshActiveTrip: () => Promise<void>;
@@ -113,7 +102,6 @@ const INITIAL_STATE: PlanSessionState = {
   status: 'idle',
   error: null,
   plannedAt: null,
-  sort: 'best',
   selectedItineraryId: null,
   activeTripRefresh: IDLE_ACTIVE_TRIP_REFRESH,
 };
@@ -124,16 +112,6 @@ function reportUnexpected(error: ApiError) {
   const cause = error.cause;
   const name = cause instanceof Error ? cause.name : typeof cause;
   console.error(`HopReady: unexpected ${name} while planning a trip.`);
-}
-
-export function findItinerary(
-  response: PlanResponse | null,
-  activeTrip: ActiveTrip | null,
-  itineraryId: string,
-): Itinerary | null {
-  const fromResults = response?.itineraries.find((itinerary) => itinerary.id === itineraryId);
-  if (fromResults) return fromResults;
-  return activeTrip?.itinerary.id === itineraryId ? activeTrip.itinerary : null;
 }
 
 export function createPlanSession(dependencies: PlanSessionDependencies): PlanSession {
@@ -305,11 +283,6 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
       setState({ selectedItineraryId: itineraryId, activeTripRefresh: IDLE_ACTIVE_TRIP_REFRESH });
       return itinerary;
     },
-    getItinerary: (itineraryId) =>
-      findItinerary(state.response, storage.activeTrip.get(), itineraryId),
-    setSort: (sort) => {
-      if (sort !== state.sort) setState({ sort });
-    },
     refreshActiveTrip,
     reset,
   };
@@ -323,20 +296,6 @@ export const planSession = createPlanSession({
 
 export function usePlanSession(): PlanSessionState {
   return useSyncExternalStore(planSession.subscribe, planSession.getState, planSession.getState);
-}
-
-// The latest results in the order the person picked.
-export function useSortedItineraries(): Itinerary[] {
-  const { response, sort } = usePlanSession();
-  return useMemo(() => sortItineraries(response?.itineraries ?? [], sort), [response, sort]);
-}
-
-// For screens opened with an itinerary id, such as itinerary/[id]. Re-renders when either the
-// results or the active trip change.
-export function useItinerary(itineraryId: string | null): Itinerary | null {
-  const { response } = usePlanSession();
-  const activeTrip = useActiveTrip();
-  return itineraryId === null ? null : findItinerary(response, activeTrip, itineraryId);
 }
 
 // True while anything on screen may be sample data: demo mode is on, or the API itself answered

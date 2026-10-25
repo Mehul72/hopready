@@ -2,7 +2,6 @@ export {
   type ActiveTripRefresh,
   type ActiveTripRefreshStatus,
   createPlanSession,
-  findItinerary,
   type PlanOutcome,
   type PlanSession,
   type PlanSessionDependencies,
@@ -10,8 +9,6 @@ export {
   type PlanStatus,
   planSession,
   type RefreshOutcome,
-  useItinerary,
   usePlanSession,
   useShowsDemoData,
-  useSortedItineraries,
 } from './plan-session';
