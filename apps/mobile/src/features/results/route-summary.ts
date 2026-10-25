@@ -233,6 +233,7 @@ export function describeItinerary(itinerary: Itinerary, now: Date): string {
     parking?.rulesNote ? parking.rulesNote.replace(/\.$/, '') : null,
     TIMING_SUMMARY_WORDING[timingSummary(itinerary)].spoken,
     alerts?.wording.spoken ?? null,
+    ...itinerary.notes.map((note) => note.replace(/\.$/, '')),
   ];
   return `${sentences.filter((sentence): sentence is string => sentence !== null).join('. ')}.`;
 }

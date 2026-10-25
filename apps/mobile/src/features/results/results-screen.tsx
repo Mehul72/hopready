@@ -3,6 +3,7 @@ import {
   type Itinerary,
   type PlanRequest,
   type PlanResponse,
+  type Strategy,
 } from '@hopready/core';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -67,6 +68,13 @@ function endpointsOf(request: PlanRequest): MapPoint[] {
       label: request.destination.name,
     },
   ];
+}
+
+// "Public transport not included" would read as false next to a Drive and park card that uses the
+// metro, so the public-transport-only strategy is named for what is actually missing.
+function unavailableTitle(strategy: Strategy): string {
+  if (strategy === 'transit-only') return 'Public transport the whole way: not included';
+  return `${STRATEGY_LABELS[strategy]} not included`;
 }
 
 function uniqueUnavailable(entries: PlanResponse['unavailable']): PlanResponse['unavailable'] {
@@ -250,7 +258,7 @@ export function ResultsScreen() {
           <Banner
             key={`${entry.strategy}:${entry.reason}`}
             tone="info"
-            title={`${STRATEGY_LABELS[entry.strategy]} not included`}
+            title={unavailableTitle(entry.strategy)}
             message={entry.reason}
             testID={`unavailable-${entry.strategy}`}
           />

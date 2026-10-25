@@ -130,7 +130,7 @@ describe('when nothing works', () => {
 
     expect(
       screen.getByLabelText(
-        'Information. Public transport not included. No public transport journeys were found for this time.',
+        'Information. Public transport the whole way: not included. No public transport journeys were found for this time.',
       ),
     ).toBeOnTheScreen();
   });

@@ -54,6 +54,17 @@ function driveOnly(): Itinerary {
 }
 
 describe('describeItinerary', () => {
+  it("reads the planner's caveats too, such as parking left out of a drive", () => {
+    const itinerary = {
+      ...driveOnly(),
+      notes: ['Parking at your destination is not included in this time.'],
+    };
+
+    expect(describeItinerary(itinerary, NOW)).toMatch(
+      /Parking at your destination is not included in this time\.$/,
+    );
+  });
+
   it('reads a whole option as one sentence, in the order it looks', () => {
     const itinerary = withFreshCount(parkAndRideItinerary({ departAt: DEPART, realtime: true }));
 

@@ -162,6 +162,12 @@ export function RouteCard({ itinerary, now, selected, onPress }: RouteCardProps)
             {factLine}
           </AppText>
         ) : null}
+        {/* Caveats the planner attached, such as a drive time that leaves out parking. */}
+        {itinerary.notes.map((note) => (
+          <AppText key={note} variant="footnote" tone="secondary">
+            {note}
+          </AppText>
+        ))}
         {parking ? (
           <View style={[styles.parking, { backgroundColor: colours.surfaceMuted }]}>
             <ModeIcon mode="park" size={18} />
