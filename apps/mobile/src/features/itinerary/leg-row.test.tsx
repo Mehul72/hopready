@@ -160,6 +160,14 @@ describe('LegRow', () => {
     expect(screen.queryByText(/ m$/)).not.toBeOnTheScreen();
   });
 
+  it('shows a change between services with no walking time as a change, not a 0 min walk', async () => {
+    await renderLeg({ ...walkLeg(null), to: PLACES.chatswoodStation, end: START });
+
+    expect(screen.getByText(`Change to ${PLACES.chatswoodStation.name}`)).toBeOnTheScreen();
+    expect(screen.getByText('Walking time not given')).toBeOnTheScreen();
+    expect(screen.queryByText(/Walk 0 min/)).not.toBeOnTheScreen();
+  });
+
   it('says when no platform is provided, and labels timetable times', async () => {
     await renderLeg(transitLeg());
 

@@ -68,10 +68,12 @@ function spokenStep(leg: MovingLeg, duration: Wording): string {
 }
 
 // The steps that move the traveller, in order. Waiting, parking and drop-off happen in place and
-// are covered by the times and the parking line.
+// are covered by the times and the parking line. A change between services with no walking time
+// given is not a step of its own: the next service already shows it.
 export function legSteps(itinerary: Itinerary): LegStep[] {
   return itinerary.legs.flatMap((leg, index) => {
     if (!isMoving(leg)) return [];
+    if (leg.kind === 'walk' && legSeconds(leg) === 0) return [];
     const duration = legDuration(legSeconds(leg));
     return [
       {

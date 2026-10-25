@@ -95,6 +95,36 @@ describe('card pieces', () => {
     ]);
   });
 
+  it('leaves out a change between services that has no walking time', () => {
+    const itinerary = parkAndRideItinerary({ departAt: DEPART });
+    const metroIndex = itinerary.legs.findIndex((leg) => leg.kind === 'transit');
+    const metro = itinerary.legs[metroIndex]!;
+    const change = {
+      ...metro,
+      id: 'interchange-1',
+      kind: 'walk' as const,
+      start: metro.end,
+      end: metro.end,
+      timing: 'estimated' as const,
+      distanceMetres: null,
+    };
+    const withChange = {
+      ...itinerary,
+      legs: [
+        ...itinerary.legs.slice(0, metroIndex + 1),
+        change,
+        ...itinerary.legs.slice(metroIndex + 1),
+      ],
+    };
+
+    expect(legSteps(withChange).map((step) => step.kind)).toEqual([
+      'drive',
+      'walk',
+      'metro',
+      'walk',
+    ]);
+  });
+
   it('gives driving, walking and changes for the summary line', () => {
     const facts = tripFacts(parkAndRideItinerary({ departAt: DEPART }));
     expect(facts.total.text).toBe('1 h 2 min');

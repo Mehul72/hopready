@@ -173,7 +173,20 @@ function RideRow({ leg }: { leg: RideLeg }) {
 }
 
 function WalkRow({ leg }: { leg: WalkLeg }) {
-  const time = duration(legSeconds(leg));
+  const seconds = legSeconds(leg);
+  // Transport for NSW marks a change of platform or stop without always giving a walking time.
+  // "Walk 0 min" would read as no walk at all, so the change itself is the step.
+  if (seconds === 0) {
+    return (
+      <LegCard
+        leg={leg}
+        title={`Change to ${leg.to.name}`}
+        spoken={`Change to ${leg.to.name}. Walking time not given.`}
+        details={<Detail>Walking time not given</Detail>}
+      />
+    );
+  }
+  const time = duration(seconds);
   const length = leg.distanceMetres === null ? null : distance(leg.distanceMetres);
   return (
     <LegCard
