@@ -31,8 +31,8 @@
         Home and work, favourite places and routes, recent searches, trip preferences, the location
         of your parked car, parking spots you saved, the trip you are on, and a random install
         identifier. This is stored in the app's own storage. Parts of it leave the phone only inside
-        a request you make, as listed below, and never as a set. Settings &gt; Delete all HopReady
-        data erases it, as does deleting the app.
+        a request you make, or in the check of a trip you follow, as listed below, and never as a
+        set. Settings &gt; Delete all HopReady data erases it, as does deleting the app.
       </p>
 
       <h2>What is sent, and why</h2>
@@ -56,6 +56,14 @@
               HopReady's server, which sends positions and times, not names, to Transport for NSW
               (public transport) and Apple Maps (drive times)
             </td>
+          </tr>
+          <tr>
+            <td>You follow a trip, then open or return to HopReady</td>
+            <td>
+              The same details as when you planned it, so the trip can be checked again (at most
+              once a minute)
+            </td>
+            <td>HopReady's server, which passes them on as for a plan</td>
           </tr>
           <tr>
             <td>You search for a place</td>
@@ -102,9 +110,12 @@
       <h2>Location</h2>
       <p>
         HopReady uses your location only while the app is open, and only after you allow it. It
-        reads your position when you tap <em>Use current location</em>, and, once you have allowed
-        access, to show nearby places first when you search. It never tracks you in the background.
-        You can always type a start point instead.
+        reads your position when you ask it to start from where you are:
+        <em>Current location</em> or <em>Use current location</em>, <em>Take me home</em>, a
+        favourite place in Saved, or a saved route or recent trip that starts from your current
+        location. It also reads it when you choose your current position as where you parked, to
+        show nearby places first when you search, and to show where you are on its maps. It never
+        tracks you in the background. You can always type a start point instead.
       </p>
 
       <h2>What HopReady's server keeps</h2>
