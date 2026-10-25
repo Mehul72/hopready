@@ -14,6 +14,7 @@ export {
   RESUME_REFRESH_MIN_AGE_SECONDS,
   shouldRefreshActiveTripOnResume,
 } from './refresh-policy';
+export { returnTripFor } from './return-trip';
 export {
   createTripService,
   type DataMode,

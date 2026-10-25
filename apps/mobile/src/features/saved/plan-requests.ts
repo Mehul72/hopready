@@ -15,14 +15,13 @@ import {
   type ParkedCarState,
   recentRequestKey,
 } from '@/storage';
+import { returnTripFor } from '@/trip';
 
 type Access = PlanRequest['access'];
 
 // HopReady exists to combine driving and public transport, so shortcuts consider both unless the
 // person's latest search for the same trip said otherwise.
 export const DEFAULT_ACCESS: Access = { transit: true, drive: true, dropOff: false };
-const PUBLIC_TRANSPORT_ONLY: Access = { transit: true, drive: false, dropOff: false };
-const VIA_PARKED_CAR: Access = { transit: true, drive: true, dropOff: false };
 
 export interface SavedTripSettings {
   preferences: AppPreferences;
@@ -66,21 +65,6 @@ export function leaveNowRequest(trip: LeaveNowTrip, saved: SavedTripSettings): P
     ...(offersOwnParking ? { savedParkingSpots: [...saved.parkingSpots] } : {}),
     trip: trip.trip,
   };
-}
-
-// Going back after the outbound trip: through the car only when the person confirmed parking it.
-// After a drop-off, or with no car recorded, the way back is public transport only.
-export function returnTripFor(parkedCar: ParkedCarState): { trip: TripKind; access: Access } {
-  switch (parkedCar.status) {
-    case 'parked':
-      return {
-        trip: { kind: 'return-via-car', parkedCar: parkedCar.parkedCar },
-        access: VIA_PARKED_CAR,
-      };
-    case 'dropped-off':
-    case 'none':
-      return { trip: { kind: 'return-without-car' }, access: PUBLIC_TRANSPORT_ONLY };
-  }
 }
 
 // A recent search, planned again for now. A trip home follows where the car is today, not where it

@@ -3,11 +3,12 @@ import { useState } from 'react';
 
 import { Button, Chip } from '@/components';
 import { appStorage, type ParkedCarState } from '@/storage';
+import { returnTripFor } from '@/trip';
 
 import { findCurrentPlace } from '../saved/current-location';
 import { asFixedPlace } from '../saved/place-labels';
 import { PlacePickerSheet } from '../saved/place-picker-sheet';
-import { leaveNowRequest, returnTripFor, showResultsFor } from '../saved/plan-requests';
+import { leaveNowRequest, showResultsFor } from '../saved/plan-requests';
 import { writeOrAlert } from '../saved/storage-writes';
 
 type Step =
