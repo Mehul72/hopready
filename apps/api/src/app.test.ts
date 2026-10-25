@@ -598,7 +598,7 @@ describe('GET /v1/carparks', () => {
     expect(carParks.calls).toEqual({ listFacilities: 2, occupancy: 0 });
   });
 
-  it('asks again next time after an empty list, instead of keeping it', async () => {
+  it('reports an empty list as a provider failure, then asks again next time', async () => {
     const answers: CarParkFacility[][] = [[], [tallawong]];
     const carParks = fakeCarParks({
       facilities: [],
@@ -607,13 +607,12 @@ describe('GET /v1/carparks', () => {
     });
     const { app } = testApp({ providers: { carParks } });
 
-    const empty = (await (await app.request('/v1/carparks')).json()) as { carParks: unknown[] };
-    const recovered = (await (await app.request('/v1/carparks')).json()) as {
-      carParks: unknown[];
-    };
+    const empty = await app.request('/v1/carparks');
+    const recovered = await app.request('/v1/carparks');
 
-    expect(empty.carParks).toEqual([]);
-    expect(recovered.carParks).toHaveLength(1);
+    expect(empty.status).toBe(502);
+    expect((await errorOf(empty)).code).toBe('provider-unavailable');
+    expect(((await recovered.json()) as { carParks: unknown[] }).carParks).toHaveLength(1);
     expect(carParks.calls.listFacilities).toBe(2);
   });
 

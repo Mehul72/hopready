@@ -1,4 +1,5 @@
 import {
+  ProviderError,
   toIso,
   type CarParkFacility,
   type CarParkProvider,
@@ -70,16 +71,18 @@ export class CarParkCatalogue {
       (signal) => provider.listFacilities(signal),
       { timeoutMs: this.#timeoutMs, onLateOutcome: this.#onLateOutcome },
     );
+    // Sydney always has Park&Ride car parks, so an empty answer is a provider hiccup, not data.
+    // Reported as a failure, the app offers Try again; kept, it would leave an empty picker for ten
+    // minutes after the provider recovers.
+    if (facilities.length === 0) {
+      throw new ProviderError(provider.name, 'unavailable', 'The car park list came back empty');
+    }
     const fetchedAt = this.#clock.now();
     const listing: CarParkListing = {
       fetchedAt: toIso(fetchedAt),
       carParks: facilities.map((facility) => ({ ...facility, occupancy: OCCUPANCY_NOT_CHECKED })),
     };
-    // Sydney always has Park&Ride car parks, so an empty answer is a provider hiccup. Keeping it
-    // for ten minutes would leave everyone with an empty picker long after the provider recovers.
-    if (listing.carParks.length > 0) {
-      this.#cached = { listing, expiresAtMs: fetchedAt.getTime() + this.#ttlMs };
-    }
+    this.#cached = { listing, expiresAtMs: fetchedAt.getTime() + this.#ttlMs };
     return listing;
   }
 }
