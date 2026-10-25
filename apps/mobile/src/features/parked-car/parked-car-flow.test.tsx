@@ -8,6 +8,7 @@ import { planSession } from '@/state';
 import { appStorage, createAppStorage, sqliteBackend } from '@/storage';
 import {
   driveOnlyItinerary,
+  dropOffItinerary,
   parkAndRideItinerary,
   planRequest,
   PLACES,
@@ -227,10 +228,73 @@ describe('confirming where the car is', () => {
 
     expect(
       await screen.findByLabelText(
-        'Warning. Location access is off for HopReady. You can turn it on in Settings. Choose a car park or saved spot instead.',
+        'Warning. Location access is off for HopReady. You can turn it on in Settings. Choose Somewhere else to put a pin where you parked, or choose a car park or saved spot.',
       ),
     ).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Save where I parked' })).toBeDisabled();
+  });
+
+  it('pins a searched street when neither a trip nor the location says where the car is', async () => {
+    denyLocation(false);
+    await renderApp('/car');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Tell HopReady where you parked' }));
+    await user.press(await screen.findByRole('radio', { name: /^Where I am now/ }));
+    expect(await screen.findByLabelText(/Choose Somewhere else/)).toBeOnTheScreen();
+    await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+    expect(
+      screen.getByRole('radio', {
+        name: 'Somewhere else, Search for where you parked, then move the pin to your car.',
+      }),
+    ).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Save where I parked' })).toBeDisabled();
+
+    await user.press(screen.getByRole('button', { name: 'Search for a street or place' }));
+    await user.type(screen.getByLabelText('Search for a place'), 'Example Avenue');
+    await user.press(await screen.findByRole('button', { name: /^27 Example Avenue, Kellyville/ }));
+    expect(
+      await screen.findByRole('radio', {
+        name: 'Somewhere else, Pin at 27 Example Avenue, Kellyville.',
+      }),
+    ).toBeChecked();
+    await user.press(screen.getByRole('button', { name: 'Move pin west' }));
+    await user.press(screen.getByRole('button', { name: 'Save where I parked' }));
+
+    const state = appStorage.parkedCar.get();
+    if (state.status !== 'parked') throw new Error('Expected the car to be parked');
+    expect(state).toMatchObject({
+      parkedCar: { location: { name: 'Pinned location', kind: 'parked-car' }, carParkId: null },
+      carParkName: null,
+    });
+    const street = DEMO_PLACES.kellyvilleHome.coordinate;
+    expect(state.parkedCar.location.coordinate.lat).toBeCloseTo(street.lat, 9);
+    expect(
+      (street.lon - state.parkedCar.location.coordinate.lon) *
+        111_320 *
+        Math.cos((street.lat * Math.PI) / 180),
+    ).toBeCloseTo(NUDGE_METRES, 3);
+  });
+
+  it('starts the pin where the ride ended for someone who drove after all', async () => {
+    appStorage.parkedCar.markDroppedOff('2026-10-26T20:40:00.000Z');
+    follow(dropOffItinerary({ departAt: '2026-10-26T20:30:00.000Z' }));
+    await renderApp('/car');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'I drove after all' }));
+    await user.press(await screen.findByRole('radio', { name: /^Somewhere else/ }));
+
+    expect(
+      screen.getByRole('radio', {
+        name: 'Somewhere else, Pin at Tallawong Station. Move it to where you parked.',
+      }),
+    ).toBeChecked();
+    const { lat, lon } = PLACES.tallawongStation.coordinate;
+    expect(screen.getByTestId('map-marker')).toHaveProp('coordinate', {
+      latitude: lat,
+      longitude: lon,
+    });
   });
 
   it('saves a pinned spot when the location cannot be used', async () => {
@@ -377,14 +441,20 @@ describe('confirming where the car is', () => {
     // Friday's drive and park, still stored on Tuesday morning.
     follow(parkAndRideItinerary({ departAt: '2026-10-22T20:40:00.000Z' }));
     await renderApp('/car');
+    const user = userEvent.setup();
 
-    await userEvent
-      .setup()
-      .press(screen.getByRole('button', { name: 'Tell HopReady where you parked' }));
+    await user.press(screen.getByRole('button', { name: 'Tell HopReady where you parked' }));
 
     expect(await screen.findByTestId('confirm-parking')).toBeOnTheScreen();
     expect(screen.queryByRole('radio', { name: /Suggested by your trip/ })).toBeNull();
-    expect(screen.queryByRole('radio', { name: /^Somewhere else/ })).toBeNull();
+    // The pin waits for a search instead of opening on Friday's car park.
+    await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+    expect(
+      screen.getByRole('radio', {
+        name: 'Somewhere else, Search for where you parked, then move the pin to your car.',
+      }),
+    ).toBeChecked();
+    expect(screen.queryByTestId('map-view')).toBeNull();
   });
 
   it('offers saved parking spots', async () => {

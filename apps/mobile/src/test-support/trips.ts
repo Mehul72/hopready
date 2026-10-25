@@ -209,6 +209,46 @@ export function driveOnlyItinerary({ departAt }: Pick<ItineraryOptions, 'departA
   });
 }
 
+// Ride 6 min to Tallawong Station, drop-off 2 min, metro 40 min, walk 5 min.
+export function dropOffItinerary({ departAt }: Pick<ItineraryOptions, 'departAt'>): Itinerary {
+  const droppedAt = addMinutes(departAt, 6);
+  const readyAt = addMinutes(droppedAt, 2);
+  const alightAt = addMinutes(readyAt, 40);
+  return buildItinerary({
+    strategy: 'drop-off',
+    legs: [
+      {
+        id: 'ride-to-station',
+        kind: 'ride',
+        from: PLACES.rouseHillHome,
+        to: PLACES.tallawongStation,
+        start: departAt,
+        end: droppedAt,
+        source: 'apple-maps',
+        timing: 'estimated',
+        distanceMetres: 2_600,
+        trafficAware: true,
+      },
+      {
+        id: 'drop-off-tallawong',
+        kind: 'drop-off',
+        from: PLACES.tallawongStation,
+        to: PLACES.tallawongStation,
+        start: droppedAt,
+        end: readyAt,
+        source: 'hopready',
+        timing: 'buffer',
+      },
+      transitLeg(PLACES.tallawongStation, PLACES.chatswoodStation, readyAt, 40, {
+        name: 'M1',
+        mode: 'metro',
+        realtime: false,
+      }),
+      walkLeg('walk-to-office', PLACES.chatswoodStation, PLACES.chatswoodOffice, alightAt, 5),
+    ],
+  });
+}
+
 export function planResponse(
   itineraries: Itinerary[],
   options: { mode?: 'live' | 'demo'; generatedAt?: string } = {},

@@ -10,11 +10,13 @@ import { useCarParks } from '@/trip';
 import type { Wording } from '../itinerary/trip-text';
 import { ChoiceRow } from '../settings/choice-row';
 import { findCurrentPlace } from '../saved/current-location';
+import { PlacePickerSheet } from '../saved/place-picker-sheet';
 import { writeOrAlert } from '../saved/storage-writes';
 import {
   choiceKey,
   type ParkingChoice,
   PINNED_LOCATION_NAME,
+  type PlacedPin,
   pinPosition,
   type PinStart,
   type SuggestedCarPark,
@@ -25,12 +27,13 @@ import { PinDropMap } from './pin-drop-map';
 const FILTER_FROM_COUNT = 8;
 
 export interface PinOption {
-  // Where the pin starts: where the trip expected the car to be left.
-  start: PinStart;
+  // Where the trip expected the car to be left. Null when no trip says, so the person searches for
+  // the street first.
+  start: PinStart | null;
   // Where the person last put the pin. The screen keeps it, so trying another choice, or switching
   // to "I was dropped off" and back, never loses it.
-  placed: Coordinate | null;
-  onPlace: (coordinate: Coordinate) => void;
+  placed: PlacedPin | null;
+  onPlace: (pin: PlacedPin) => void;
 }
 
 export interface ParkingLocationPickerProps {
@@ -40,8 +43,8 @@ export interface ParkingLocationPickerProps {
   // a full car park. Without it, that choice is left out.
   pin?: PinOption;
   selected: ParkingChoice | null;
-  // Null while "Somewhere else" is chosen but its pin has not been moved yet, so there is nothing
-  // to save.
+  // Null while "Somewhere else" is chosen but its pin has not been put anywhere yet, so there is
+  // nothing to save.
   onSelect: (choice: ParkingChoice | null) => void;
   // Goes up each time the place is chosen outside this list, such as by moving a pin, so a
   // location lookup still running is dropped instead of overriding that choice.
@@ -56,15 +59,21 @@ function pinAt(coordinate: Coordinate): ParkingChoice {
   return { kind: 'pin', name: PINNED_LOCATION_NAME, coordinate };
 }
 
-// What "Somewhere else" says: where the pin is once the person has moved it, or else what to do.
+// Before the pin is put anywhere: what "Somewhere else" offers, and once chosen, what to do next.
+function unplacedPinText(pin: PinOption, chosen: boolean): string {
+  if (!chosen) return 'Put a pin on a map where you parked.';
+  if (pin.start) return `Pin at ${pin.start.name}. Move it to where you parked.`;
+  return 'Search for where you parked, then move the pin to your car.';
+}
+
+// What "Somewhere else" says: where the pin is once the person has put it somewhere, or else what
+// to do.
 function somewhereElseWording(pin: PinOption, chosen: boolean): Wording {
   if (pin.placed) {
-    const position = pinPosition(pin.placed, pin.start);
+    const position = pinPosition(pin.placed.coordinate, pin.placed.from);
     return { text: `${position.text}.`, spoken: `${position.spoken}.` };
   }
-  const text = chosen
-    ? `Pin at ${pin.start.name}. Move it to where you parked.`
-    : 'Put a pin on a map where you parked.';
+  const text = unplacedPinText(pin, chosen);
   return { text, spoken: text };
 }
 
@@ -72,12 +81,17 @@ interface SomewhereElseProps {
   pin: PinOption;
   chosen: boolean;
   onChoose: () => void;
-  onMovePin: (coordinate: Coordinate) => void;
+  onPlace: (placed: PlacedPin) => void;
 }
 
-// "Somewhere else": a pin the person moves from where the trip expected the car to where it is.
-function SomewhereElse({ pin, chosen, onChoose, onMovePin }: SomewhereElseProps) {
+// "Somewhere else": a pin the person puts where the car is, moving it from where the trip expected
+// the car, or from a street they search for when no trip says or the guess is far off.
+function SomewhereElse({ pin, chosen, onChoose, onPlace }: SomewhereElseProps) {
+  const [searching, setSearching] = useState(false);
+  const [placesPicked, setPlacesPicked] = useState(0);
   const wording = somewhereElseWording(pin, chosen);
+  const shown =
+    pin.placed ?? (pin.start ? { coordinate: pin.start.coordinate, from: pin.start } : null);
   return (
     <>
       <ChoiceRow
@@ -87,9 +101,35 @@ function SomewhereElse({ pin, chosen, onChoose, onMovePin }: SomewhereElseProps)
         selected={chosen}
         onPress={onChoose}
       />
-      {chosen ? (
-        <PinDropMap coordinate={pin.placed ?? pin.start.coordinate} onMove={onMovePin} />
+      {chosen && shown ? (
+        <PinDropMap
+          // A place picked from the search re-centres the map; moving the pin by hand never does.
+          key={placesPicked}
+          coordinate={shown.coordinate}
+          onMove={(coordinate) => onPlace({ coordinate, from: shown.from })}
+        />
       ) : null}
+      {chosen ? (
+        <Button
+          variant="secondary"
+          label="Search for a street or place"
+          symbol="magnifyingglass"
+          accessibilityHint="Puts the pin at the place you choose"
+          onPress={() => setSearching(true)}
+        />
+      ) : null}
+      <PlacePickerSheet
+        visible={searching}
+        title="Where did you park?"
+        allowCurrentLocation={false}
+        onPick={(place) => {
+          setSearching(false);
+          setPlacesPicked((count) => count + 1);
+          const from = { name: place.name, coordinate: place.coordinate };
+          onPlace({ coordinate: place.coordinate, from });
+        }}
+        onClose={() => setSearching(false)}
+      />
     </>
   );
 }
@@ -206,7 +246,7 @@ export function ParkingLocationPicker({
   const [locating, setLocating] = useState(false);
   const [locationProblem, setLocationProblem] = useState<string | null>(null);
   const [showsAllCarParks, setShowsAllCarParks] = useState(false);
-  // "Somewhere else" is chosen, but its pin is still where the trip expected the car.
+  // "Somewhere else" is chosen, but its pin has not been put anywhere yet.
   const [placingPin, setPlacingPin] = useState(false);
   const selectedKey = selected ? choiceKey(selected) : null;
   // A position fix can take several seconds. A choice made meanwhile, or leaving the screen, makes
@@ -228,16 +268,18 @@ export function ParkingLocationPicker({
   const choose = (choice: ParkingChoice | null) => {
     locateRun.current += 1;
     setLocating(false);
-    // Only "Somewhere else" chooses nothing, while its pin waits to be moved.
+    // Only "Somewhere else" chooses nothing, while its pin waits to be put somewhere.
     setPlacingPin(choice === null);
     onSelect(choice);
   };
 
-  const placePin = (option: PinOption, coordinate: Coordinate) => {
-    option.onPlace(coordinate);
-    choose(pinAt(coordinate));
+  const placePin = (option: PinOption, placed: PlacedPin) => {
+    option.onPlace(placed);
+    choose(pinAt(placed.coordinate));
     // Only the map shows where the pin went, so VoiceOver hears it after every move.
-    AccessibilityInfo.announceForAccessibility(`${pinPosition(coordinate, option.start).spoken}.`);
+    AccessibilityInfo.announceForAccessibility(
+      `${pinPosition(placed.coordinate, placed.from).spoken}.`,
+    );
   };
 
   const chooseCurrentLocation = async () => {
@@ -303,10 +345,10 @@ export function ParkingLocationPicker({
         <SomewhereElse
           pin={pin}
           chosen={selectedKey === 'pin' || (placingPin && selected === null)}
-          // A pin already moved comes back where it was left. An unmoved pin is not saved: it
-          // would only repeat where the trip expected the car, under another name.
-          onChoose={() => choose(pin.placed ? pinAt(pin.placed) : null)}
-          onMovePin={(coordinate) => placePin(pin, coordinate)}
+          // A pin already put somewhere comes back where it was left. An unmoved pin is not saved:
+          // it would only repeat where the trip expected the car, under another name.
+          onChoose={() => choose(pin.placed ? pinAt(pin.placed.coordinate) : null)}
+          onPlace={(placed) => placePin(pin, placed)}
         />
       ) : null}
 

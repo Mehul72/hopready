@@ -67,12 +67,20 @@ export interface PinStart {
   coordinate: Coordinate;
 }
 
+// Where the person put the pin, and the place it started from: the trip's guess, or a street they
+// searched for.
+export interface PlacedPin {
+  coordinate: Coordinate;
+  from: PinStart;
+}
+
 // Where the trip expected the car to be left: its Park&Ride car park, or else where its drive ends.
+// After a drop-off trip it is where the ride ended, the likely spot for someone who drove after all.
 export function pinStartOf(itinerary: Itinerary | null | undefined): PinStart | null {
   const carPark = suggestedCarParkOf(itinerary);
   if (carPark) return { name: carPark.name, coordinate: carPark.coordinate };
-  const drive = itinerary?.legs.find((leg) => leg.kind === 'drive');
-  return drive ? { name: drive.to.name, coordinate: drive.to.coordinate } : null;
+  const carLeg = itinerary?.legs.find((leg) => leg.kind === 'drive' || leg.kind === 'ride');
+  return carLeg ? { name: carLeg.to.name, coordinate: carLeg.to.coordinate } : null;
 }
 
 const COMPASS_POINTS = [
