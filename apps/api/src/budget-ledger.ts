@@ -1,7 +1,12 @@
 import type { DurableObjectNamespace, SqlStorageValue } from '@cloudflare/workers-types';
 import { z } from 'zod';
 
-import { BUDGET_NAMES, type BudgetLedger, type BudgetName } from './budget';
+import {
+  BUDGET_NAMES,
+  type BudgetLedger,
+  type BudgetName,
+  MAX_CALLS_PER_LEDGER_REPORT,
+} from './budget';
 import { runWithDeadline, type LateOutcomeHandler } from './deadline';
 
 // The subset of the Durable Object SQL API the ledger uses, so tests can run it on node:sqlite.
@@ -15,7 +20,6 @@ export interface SqlExecutor {
 // Enough history to compare recent days while investigating, small enough to never matter.
 const RETAINED_DAYS = 14;
 const MS_PER_DAY = 86_400_000;
-const MAX_CALLS_PER_REPORT = 10_000;
 
 export function prepareLedger(sql: SqlExecutor): void {
   sql.exec(
@@ -31,7 +35,7 @@ export function prepareLedger(sql: SqlExecutor): void {
 const ledgerReportSchema = z.object({
   budget: z.enum(BUDGET_NAMES),
   dayKey: z.iso.date(),
-  calls: z.number().int().min(0).max(MAX_CALLS_PER_REPORT),
+  calls: z.number().int().min(0).max(MAX_CALLS_PER_LEDGER_REPORT),
 });
 type LedgerReport = z.infer<typeof ledgerReportSchema>;
 

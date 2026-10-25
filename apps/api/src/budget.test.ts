@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   budgetDayKey,
   DailyCallBudget,
+  MAX_CALLS_PER_LEDGER_REPORT,
   secondsUntilNextBudgetDay,
   type BudgetLedger,
   type BudgetName,
@@ -172,6 +173,21 @@ describe('DailyCallBudget with a shared ledger', () => {
       failure: 'rate-limited',
     });
     expect(onLedgerError).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends a backlog bigger than one report over several flushes', async () => {
+    const shared = memoryLedger();
+    const { subject } = budget({ dailyLimit: 50_000, ledger: shared.ledger });
+
+    await useOnce(subject, MAX_CALLS_PER_LEDGER_REPORT + 500);
+    await subject.flush();
+    await subject.flush();
+
+    expect(shared.reports.slice(-2).map((report) => report.calls)).toEqual([
+      MAX_CALLS_PER_LEDGER_REPORT,
+      500,
+    ]);
+    expect(subject.usedToday()).toBe(MAX_CALLS_PER_LEDGER_REPORT + 500);
   });
 
   it('does nothing on flush when there is nothing to report', async () => {

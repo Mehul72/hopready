@@ -2,6 +2,9 @@ import { ProviderError, type Clock, type ProviderName } from '@hopready/core';
 
 // One budget per provider account, because the provider's daily quota is per account or key.
 export const BUDGET_NAMES = ['tfnsw', 'apple-maps'] as const;
+// The most calls the ledger accepts in one report. A larger backlog, built up while the ledger
+// was unreachable, goes over several flushes instead of being refused every time.
+export const MAX_CALLS_PER_LEDGER_REPORT = 10_000;
 export type BudgetName = (typeof BUDGET_NAMES)[number];
 
 const MS_PER_DAY = 86_400_000;
@@ -96,8 +99,8 @@ export class DailyCallBudget {
     const ledger = this.#options.ledger;
     const day = this.#today();
     if (!ledger || day.unreported === 0) return;
-    const calls = day.unreported;
-    day.unreported = 0;
+    const calls = Math.min(day.unreported, MAX_CALLS_PER_LEDGER_REPORT);
+    day.unreported -= calls;
     day.reporting += calls;
     try {
       const total = await ledger.add(this.name, day.key, calls);
