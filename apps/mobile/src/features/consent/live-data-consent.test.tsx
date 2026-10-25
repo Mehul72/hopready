@@ -1,4 +1,5 @@
-import { act, renderRouter, screen, testRouter, userEvent } from 'expo-router/testing-library';
+import { userEvent } from '@testing-library/react-native';
+import { act, renderRouter, screen, testRouter } from 'expo-router/testing-library';
 import { Linking, Text } from 'react-native';
 
 import TabsLayout from '@/app/(tabs)/_layout';
@@ -85,7 +86,7 @@ describe('live data consent', () => {
   });
 
   it('opens the privacy policy in Safari, not inside the app', async () => {
-    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     const user = userEvent.setup();
     await renderRouter(ROUTES, { initialUrl: '/' });
 
