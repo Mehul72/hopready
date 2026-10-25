@@ -159,3 +159,17 @@ export function formatDurationMinutes(totalSeconds: number): string {
   const remainder = minutes % 60;
   return remainder === 0 ? `${hours} h` : `${hours} h ${remainder} min`;
 }
+
+const MS_PER_FLOOR_MINUTE = 60_000;
+
+// TfNSW works in whole minutes. Rounding a "leave after" time up and an "arrive by" time down
+// keeps legs from overlapping by a few seconds after the round trip through the provider.
+export function ceilToMinute(value: string | Date): string {
+  const ms = toInstant(value).getTime();
+  return new Date(Math.ceil(ms / MS_PER_FLOOR_MINUTE) * MS_PER_FLOOR_MINUTE).toISOString();
+}
+
+export function floorToMinute(value: string | Date): string {
+  const ms = toInstant(value).getTime();
+  return new Date(Math.floor(ms / MS_PER_FLOOR_MINUTE) * MS_PER_FLOOR_MINUTE).toISOString();
+}

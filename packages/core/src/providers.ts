@@ -74,6 +74,12 @@ export interface TransitProvider {
   planJourneys(query: TransitQuery, signal: AbortSignal): Promise<TransitJourney[]>;
 }
 
+// Apple's routing takes either a departure or an arrival time and predicts traffic for it.
+export interface DriveTime {
+  type: 'depart' | 'arrive';
+  at: string;
+}
+
 export interface DriveEstimate {
   durationSeconds: number;
   distanceMetres: number;
@@ -86,23 +92,25 @@ export interface DriveRoute extends DriveEstimate {
 
 export interface DrivingProvider {
   readonly name: ProviderName;
-  // One origin to several destinations leaving at `departAt`. A null entry means no drivable route.
+  // One origin to several destinations. A null entry means there is no drivable route to it.
   estimateDrives(
     origin: Coordinate,
     destinations: readonly Coordinate[],
-    departAt: string,
+    time: DriveTime,
     signal: AbortSignal,
   ): Promise<(DriveEstimate | null)[]>;
   routeDrive(
     from: Coordinate,
     to: Coordinate,
-    departAt: string,
+    time: DriveTime,
     signal: AbortSignal,
   ): Promise<DriveRoute>;
 }
 
 export interface CarParkFacility extends CarPark {
   rules: ParkingRules;
+  // The station the car park serves, used as the drop-off point and for "preferred station" matching.
+  station: Place | null;
 }
 
 export interface CarParkProvider {

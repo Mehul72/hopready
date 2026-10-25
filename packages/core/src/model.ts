@@ -260,7 +260,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   maxWalkMinutes: 15,
   parkingBufferMinutes: 8,
   dropOffBufferMinutes: 2,
-  transferBufferMinutes: 4,
+  transferBufferMinutes: 3,
   carRetrievalBufferMinutes: 5,
   walkingSpeed: 'normal',
   excludedTransitModes: [],
@@ -294,6 +294,7 @@ export const planRequestSchema = z.object({
   access: z.object({ transit: z.boolean(), drive: z.boolean(), dropOff: z.boolean() }),
   preferences: preferencesSchema,
   preferredCarParkId: z.string().max(64).optional(),
+  preferredStop: placeSchema.optional(),
   savedParkingSpots: z.array(savedParkingSpotSchema).max(10).optional(),
   trip: tripSchema,
 });
