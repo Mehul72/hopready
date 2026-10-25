@@ -1,5 +1,5 @@
+import type { Walk } from '../walking';
 import type { ConnectionTable, ScheduledTrip, TimetableWindow } from './timetable';
-import type { Walk } from './walking';
 
 // Journey search over the demo timetable with the Connection Scan Algorithm (Dibbelt, Pajor,
 // Strasser and Wagner, 2013). Connections are hops between consecutive stops of one trip.

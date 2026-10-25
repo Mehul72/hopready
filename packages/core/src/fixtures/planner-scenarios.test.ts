@@ -118,6 +118,13 @@ function expectSoundItinerary(
         expect(leg.source).toBe('demo-fixture');
         expect(leg.timing).toBe('estimated');
         expect(leg.trafficAware).toBe(true);
+        // The drive home from a parked car cannot be avoided, so a long one is noted, not rejected.
+        if (itinerary.strategy === 'return-via-car') {
+          expect(itinerary.notes.includes(longDriveHomeNote(preferences))).toBe(
+            legSeconds(leg) > preferences.maxDriveMinutes * 60,
+          );
+          return;
+        }
         expect(legSeconds(leg)).toBeLessThanOrEqual(preferences.maxDriveMinutes * 60);
         return;
       case 'walk':
@@ -160,6 +167,10 @@ function expectSoundItinerary(
       expect(occupancy.spacesAvailable).toBeLessThanOrEqual(occupancy.totalSpaces);
     }
   }
+}
+
+function longDriveHomeNote(preferences: Preferences): string {
+  return `The drive home is longer than your ${preferences.maxDriveMinutes} min driving limit.`;
 }
 
 // The itinerary's live-times label must match its transit legs.
@@ -330,6 +341,55 @@ describe('getting home', () => {
         DEFAULT_PREFERENCES.carRetrievalBufferMinutes * 60,
       );
     }
+  });
+
+  it('still goes home through the car when the evening drive is over the driving limit', async () => {
+    const preferences = { ...DEFAULT_PREFERENCES, maxDriveMinutes: 10 };
+    const response = await plan(
+      request({
+        origin: DEMO_PLACES.chatswoodOffice,
+        destination: DEMO_PLACES.boxHillHome,
+        at: TUESDAY_1730,
+        preferences,
+        trip: { kind: 'return-via-car', parkedCar },
+      }),
+      { now: TUESDAY_1730 },
+    );
+    expectSoundResponse(response, preferences);
+
+    expect(response.itineraries.length).toBeGreaterThan(0);
+    for (const itinerary of response.itineraries) {
+      expect(itinerary.notes).toEqual([longDriveHomeNote(preferences)]);
+    }
+  });
+
+  it('goes home from beside the car, or a short walk away, without public transport', async () => {
+    const car = parkedCar.location.coordinate;
+    const currentLocation = (lat: number) => ({
+      name: 'Current location',
+      coordinate: { lat, lon: car.lon },
+      kind: 'current-location' as const,
+    });
+    // Beside the car, then about 600 m north of it: a 10 minute walk that no demo service beats.
+    const origins = [currentLocation(car.lat), currentLocation(car.lat + 0.0054)];
+    const legsFrom = await Promise.all(
+      origins.map(async (origin) => {
+        const response = await plan(
+          request({
+            origin,
+            destination: DEMO_PLACES.boxHillHome,
+            at: TUESDAY_1730,
+            trip: { kind: 'return-via-car', parkedCar },
+          }),
+          { now: TUESDAY_1730 },
+        );
+        expectSoundResponse(response);
+        expect(response.unavailable).toEqual([]);
+        return response.itineraries.map((itinerary) => kinds(itinerary.legs));
+      }),
+    );
+
+    expect(legsFrom).toEqual([[['car-retrieval', 'drive']], [['walk', 'car-retrieval', 'drive']]]);
   });
 
   it('is dropped off on the way in and never sent back for a car on the way home', async () => {

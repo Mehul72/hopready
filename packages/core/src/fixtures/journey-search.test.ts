@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { Place } from '../model';
 import type { TransitQuery } from '../providers';
+import { walkBetween, type WalkingSpeed } from '../walking';
 import { DEMO_PLACES } from './places';
 import { scenarioSettings } from './scenarios';
 import { NETWORK_STOPS, STOPS, WALKING_LINKS, type NetworkStop } from './stops';
 import { stopIndexOf, timetableWindowAround, type TimetableWindow } from './timetable';
 import { createDemoTransitProvider } from './transit-provider';
-import { walkBetween, type WalkingSpeed } from './walking';
 
 // Checks the connection scan against a separate, slower search over the same trips: Dijkstra on
 // (stop, arrived on foot or on a vehicle) states. If both agree on the earliest arrival for many

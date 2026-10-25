@@ -1,11 +1,11 @@
 import type { Coordinate } from '../geo';
 import type { Leg, Place, ServiceAlert, TransitLeg, WalkLeg } from '../model';
 import type { TransitJourney } from '../providers';
+import type { Walk } from '../walking';
 import { DEMO_PROVIDER_NAME } from './abort';
 import type { JourneyPart, JourneyPlan } from './journey-search';
 import { NETWORK_STOPS, type NetworkStop } from './stops';
 import type { ScheduledTrip, TimetableWindow } from './timetable';
-import type { Walk } from './walking';
 
 // Turns a planned journey into the walk and transit legs a TfNSW adapter would return.
 
@@ -50,6 +50,17 @@ export function journeyFromPlan(plan: JourneyPlan, context: LegContext): Transit
     }
   });
 
+  return { legs, fare: { status: 'unknown' }, alerts: [] };
+}
+
+export function walkOnlyJourney(
+  from: Place,
+  to: Place,
+  startMs: number,
+  walk: Walk,
+): TransitJourney {
+  const legs: Leg[] = [];
+  pushWalk(legs, from, to, startMs, walk);
   return { legs, fare: { status: 'unknown' }, alerts: [] };
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { haversineMetres } from './geo';
-import { findContinuityIssues } from './itinerary';
+import { findContinuityIssues, legSeconds, transitLegsOf } from './itinerary';
 import {
   DEFAULT_PREFERENCES,
   type Leg,
@@ -114,8 +114,14 @@ function rideMinutes(from: Place, to: Place) {
   return Math.max(3, Math.round((haversineMetres(from.coordinate, to.coordinate) * 1.3) / 583));
 }
 
-// Every origin connects to every destination by: walk 4 min, metro every 6 min, walk 5 min.
-function metroJourney(from: Place, to: Place, metroDeparts: string): TransitJourney {
+// Every origin connects to every destination by: walk 4 min, metro every 6 min, walk 5 min. A slower
+// service can be asked for by name.
+function metroJourney(
+  from: Place,
+  to: Place,
+  metroDeparts: string,
+  slower: { name: string; extraRideMinutes: number } | null = null,
+): TransitJourney {
   const station = place(
     `${from.name} station`,
     from.coordinate.lat,
@@ -123,11 +129,14 @@ function metroJourney(from: Place, to: Place, metroDeparts: string): TransitJour
     'stop',
   );
   const alight = place(`${to.name} station`, to.coordinate.lat, to.coordinate.lon - 0.001, 'stop');
-  const metroArrives = addMinutes(metroDeparts, rideMinutes(from, to));
+  const metroArrives = addMinutes(
+    metroDeparts,
+    rideMinutes(from, to) + (slower?.extraRideMinutes ?? 0),
+  );
   return {
     legs: [
       walk(from, station, addMinutes(metroDeparts, -WALK_TO_STOP_MINUTES), metroDeparts),
-      transit(station, alight, metroDeparts, metroArrives, { realtime: true }),
+      transit(station, alight, metroDeparts, metroArrives, { realtime: true, name: slower?.name }),
       walk(
         alight,
         to,
@@ -139,6 +148,12 @@ function metroJourney(from: Place, to: Place, metroDeparts: string): TransitJour
     fare: { status: 'unknown' },
     alerts: [],
   };
+}
+
+// The metro journey that reaches `to` at exactly `arrival`, such as a late-running one.
+function journeyArrivingAt(from: Place, to: Place, arrival: string): TransitJourney {
+  const departs = addMinutes(arrival, -rideMinutes(from, to) - WALK_FROM_STOP_MINUTES);
+  return metroJourney(from, to, departs);
 }
 
 function alignToHeadway(iso: string, direction: 'up' | 'down'): string {
@@ -363,9 +378,58 @@ describe('arrive by', () => {
   it('rejects options that would have needed to leave in the past', async () => {
     const tooSoon = addMinutes(NOW, 20);
     const response = await planTrip(request({ time: { type: 'arrive', at: tooSoon } }), deps());
+    const outcomes = response.checkedCarParks.map((carPark) => carPark.outcome);
 
     expect(response.itineraries).toEqual([]);
     expect(response.rejected.map((entry) => entry.reason)).toContain('departs-in-past');
+    expect(outcomes).toContain('no-workable-connection');
+    expect(outcomes).not.toContain('used');
+  });
+
+  it('counts a car park whose drive runs past the limit in traffic as too far, not used', async () => {
+    const jammed = fakeDriving({
+      async routeDrive(from, to) {
+        return {
+          durationSeconds: 35 * 60,
+          distanceMetres: haversineMetres(from, to) * 1.35,
+          trafficAware: true,
+          path: [from, to],
+        };
+      },
+    });
+    // Arrive-by, so no car park is dropped earlier for missing its first service in the jam.
+    const response = await planTrip(
+      request({ time: { type: 'arrive', at: '2026-10-26T23:00:00Z' } }),
+      deps({ driving: jammed }),
+    );
+    const outcomes = response.checkedCarParks.map((carPark) => carPark.outcome);
+
+    expect(response.itineraries.some((it) => it.strategy === 'park-and-ride')).toBe(false);
+    expect(response.rejected.map((entry) => entry.reason)).toContain('drive-too-long');
+    expect(outcomes).toContain('too-far-to-drive');
+    expect(outcomes).not.toContain('used');
+  });
+
+  it('skips a service now expected after the arrive-by time for one that arrives in time', async () => {
+    const runningLate = fakeTransit((query) =>
+      query.from.kind === 'car-park'
+        ? [
+            ...metroTimetable(query),
+            journeyArrivingAt(query.from, query.to, addMinutes(query.time.at, 3)),
+          ]
+        : [],
+    );
+    const response = await planTrip(
+      request({ time: { type: 'arrive', at: target } }),
+      deps({ transit: runningLate }),
+    );
+    const parkAndRide = response.itineraries.filter((it) => it.strategy === 'park-and-ride');
+
+    expect(parkAndRide.length).toBeGreaterThan(0);
+    for (const itinerary of parkAndRide) {
+      expect(secondsBetween(itinerary.arriveAt, target)).toBeGreaterThanOrEqual(0);
+    }
+    expect(response.rejected.map((entry) => entry.reason)).not.toContain('arrives-after-target');
   });
 });
 
@@ -431,6 +495,69 @@ describe('transfer strategies need public transport', () => {
   });
 });
 
+describe('choosing which journey to take from a car park', () => {
+  it('takes the journey that arrives first, even when a slower one leaves earlier', async () => {
+    const slowerFirst = fakeTransit((query) =>
+      query.from.kind === 'car-park'
+        ? [
+            metroJourney(query.from, query.to, addMinutes(query.time.at, WALK_TO_STOP_MINUTES), {
+              name: 'Slow',
+              extraRideMinutes: 40,
+            }),
+            metroJourney(query.from, query.to, addMinutes(query.time.at, 10)),
+          ]
+        : [],
+    );
+    const response = await planTrip(request(), deps({ transit: slowerFirst }));
+    const parkAndRide = response.itineraries.filter((it) => it.strategy === 'park-and-ride');
+
+    expect(parkAndRide.length).toBeGreaterThan(0);
+    for (const itinerary of parkAndRide) {
+      expect(transitLegsOf(itinerary.legs).map((leg) => leg.service.name)).toEqual(['M1']);
+    }
+  });
+
+  it('catches a later service when the drive leaving on time misses the first one', async () => {
+    // Each route takes a minute longer than the estimate the car park was ranked on.
+    const slowerThanEstimated = fakeDriving({
+      async routeDrive(from, to) {
+        return {
+          durationSeconds: driveSeconds(from, to) + 60,
+          distanceMetres: haversineMetres(from, to) * 1.35,
+          trafficAware: true,
+          path: [from, to],
+        };
+      },
+    });
+    // The first service leaves just as the estimate has the traveller reach the platform.
+    const justInTime = fakeTransit((query) =>
+      query.from.kind === 'car-park'
+        ? [0, 1, 2].map((n) =>
+            metroJourney(
+              query.from,
+              query.to,
+              addMinutes(query.time.at, WALK_TO_STOP_MINUTES + n * METRO_HEADWAY_MINUTES),
+            ),
+          )
+        : [],
+    );
+    const response = await planTrip(
+      request(),
+      deps({ driving: slowerThanEstimated, transit: justInTime }),
+    );
+    const parkAndRide = response.itineraries.filter((it) => it.strategy === 'park-and-ride');
+
+    expect(parkAndRide.length).toBeGreaterThan(0);
+    for (const itinerary of parkAndRide) {
+      expect(secondsBetween(NOW, itinerary.departAt)).toBe(0);
+      expect(findContinuityIssues(itinerary.legs)).toEqual([]);
+    }
+    expect(response.rejected.map((entry) => entry.reason)).not.toContain(
+      'departs-before-requested',
+    );
+  });
+});
+
 describe('drop-off', () => {
   it('rides to a station without a parking leg', async () => {
     const response = await planTrip(
@@ -446,6 +573,39 @@ describe('drop-off', () => {
       expect(itinerary.parking).toBeNull();
     }
   });
+
+  it('says so when no station with drop-off access is within the driving limit', async () => {
+    const response = await planTrip(
+      request({
+        origin: ROUSE_HILL,
+        access: { transit: true, drive: false, dropOff: true },
+        preferences: { ...DEFAULT_PREFERENCES, maxDriveMinutes: 5 },
+      }),
+      deps(),
+    );
+
+    expect(response.itineraries.some((it) => it.strategy === 'drop-off')).toBe(false);
+    expect(response.unavailable).toContainEqual({
+      strategy: 'drop-off',
+      reason: 'No stations with drop-off access are within your 5 min driving limit.',
+    });
+  });
+
+  it('says so when no public transport connection works from the stations', async () => {
+    const nothingFromStations = fakeTransit((query) =>
+      query.from.kind === 'stop' ? [] : metroTimetable(query),
+    );
+    const response = await planTrip(
+      request({ origin: ROUSE_HILL, access: { transit: true, drive: false, dropOff: true } }),
+      deps({ transit: nothingFromStations }),
+    );
+
+    expect(response.itineraries.some((it) => it.strategy === 'drop-off')).toBe(false);
+    expect(response.unavailable).toContainEqual({
+      strategy: 'drop-off',
+      reason: 'No public transport connection worked from the stations checked.',
+    });
+  });
 });
 
 describe('getting home', () => {
@@ -459,17 +619,21 @@ describe('getting home', () => {
     carParkId: KELLYVILLE.id,
     confirmedAt: addMinutes(NOW, -600),
   };
+  const evening = '2026-10-27T06:30:00Z'; // 5.30 pm in Sydney
+  const homeBy = '2026-10-27T08:00:00Z'; // 7 pm in Sydney
+  const atEvening = (overrides: Partial<PlannerDeps> = {}) =>
+    deps({ clock: { now: () => new Date(evening) }, ...overrides });
+  const homeThroughCar = (overrides: Partial<PlanRequest> = {}) =>
+    request({
+      origin: CHATSWOOD_OFFICE,
+      destination: ROUSE_HILL,
+      time: { type: 'depart', at: evening },
+      trip: { kind: 'return-via-car', parkedCar },
+      ...overrides,
+    });
 
   it('goes back through the confirmed parked car before driving home', async () => {
-    const response = await planTrip(
-      request({
-        origin: CHATSWOOD_OFFICE,
-        destination: ROUSE_HILL,
-        time: { type: 'depart', at: '2026-10-27T06:30:00Z' },
-        trip: { kind: 'return-via-car', parkedCar },
-      }),
-      deps({ clock: { now: () => new Date('2026-10-27T06:30:00Z') } }),
-    );
+    const response = await planTrip(homeThroughCar(), atEvening());
 
     expect(response.itineraries.length).toBeGreaterThan(0);
     for (const itinerary of response.itineraries) {
@@ -480,7 +644,128 @@ describe('getting home', () => {
       expect(drive.from.coordinate).toEqual(parkedAt.coordinate);
       expect(itinerary.legs[retrieval - 1]!.to.coordinate).toEqual(parkedAt.coordinate);
       expect(findContinuityIssues(itinerary.legs)).toEqual([]);
+      expect(itinerary.notes).toEqual([]);
     }
+  });
+
+  it('still goes home through the car when the drive home is longer than the driving limit', async () => {
+    // The fake drive from the car to Rouse Hill takes 12 minutes.
+    const preferences = { ...DEFAULT_PREFERENCES, maxDriveMinutes: 10 };
+    const leaving = await planTrip(homeThroughCar({ preferences }), atEvening());
+    const arriving = await planTrip(
+      homeThroughCar({ preferences, time: { type: 'arrive', at: homeBy } }),
+      atEvening(),
+    );
+
+    for (const response of [leaving, arriving]) {
+      expect(response.itineraries.length).toBeGreaterThan(0);
+      expect(response.rejected).toEqual([]);
+      for (const itinerary of response.itineraries) {
+        expect(legSeconds(itinerary.legs.at(-1)!)).toBeGreaterThan(10 * 60);
+        expect(itinerary.notes).toEqual([
+          'The drive home is longer than your 10 min driving limit.',
+        ]);
+      }
+    }
+  });
+
+  it('goes home on the journeys that reach the car first, whatever order they come in', async () => {
+    const slowerFirst = fakeTransit((query) => [
+      metroJourney(query.from, query.to, addMinutes(query.time.at, 4), {
+        name: 'Slow 1',
+        extraRideMinutes: 40,
+      }),
+      metroJourney(query.from, query.to, addMinutes(query.time.at, 5), {
+        name: 'Slow 2',
+        extraRideMinutes: 40,
+      }),
+      metroJourney(query.from, query.to, addMinutes(query.time.at, 10)),
+    ]);
+    const response = await planTrip(homeThroughCar(), atEvening({ transit: slowerFirst }));
+    const services = response.itineraries.map(
+      (itinerary) => transitLegsOf(itinerary.legs)[0]!.service.name,
+    );
+
+    expect(services).toEqual(['M1', 'Slow 1']);
+  });
+
+  it('never shortens the car retrieval buffer for a service that reaches the car late', async () => {
+    const runningLate = fakeTransit((query) => [
+      ...metroTimetable(query),
+      journeyArrivingAt(query.from, query.to, addMinutes(query.time.at, 3)),
+    ]);
+    const response = await planTrip(
+      homeThroughCar({ time: { type: 'arrive', at: homeBy } }),
+      atEvening({ transit: runningLate }),
+    );
+
+    expect(response.itineraries).toHaveLength(1);
+    const legs = response.itineraries[0]!.legs;
+    const retrieval = legs.find((leg) => leg.kind === 'car-retrieval')!;
+    expect(legSeconds(retrieval)).toBe(DEFAULT_PREFERENCES.carRetrievalBufferMinutes * 60);
+    expect(findContinuityIssues(legs)).toEqual([]);
+    expect(secondsBetween(legs.at(-1)!.end, homeBy)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('starts at the car, without asking for public transport, when already there', async () => {
+    // Like the demo provider, this one has no journey for a trip this short.
+    const transit = fakeTransit(() => []);
+    const response = await planTrip(
+      homeThroughCar({
+        origin: { ...parkedAt, name: 'Current location', kind: 'current-location' },
+      }),
+      atEvening({ transit }),
+    );
+
+    expect(transit.queries).toEqual([]);
+    expect(response.unavailable).toEqual([]);
+    expect(response.itineraries).toHaveLength(1);
+    const itinerary = response.itineraries[0]!;
+    expect(kinds(itinerary.legs)).toEqual(['car-retrieval', 'drive']);
+    expect(secondsBetween(evening, itinerary.departAt)).toBe(0);
+  });
+
+  it('walks to a car close by at the traveller’s walking speed', async () => {
+    const transit = fakeTransit(() => []);
+    // About 200 m north of the car: 260 m on foot, so 4 minutes at a normal pace and 5 when slow.
+    const nearby = place('Café', parkedAt.coordinate.lat + 0.0018, parkedAt.coordinate.lon);
+    const plans = await Promise.all(
+      (['normal', 'slow'] as const).map((walkingSpeed) =>
+        planTrip(
+          homeThroughCar({
+            origin: nearby,
+            preferences: { ...DEFAULT_PREFERENCES, walkingSpeed },
+          }),
+          atEvening({ transit }),
+        ),
+      ),
+    );
+
+    expect(transit.queries).toEqual([]);
+    for (const response of plans) {
+      const [walkToCar, retrieval] = response.itineraries[0]!.legs;
+      expect(kinds(response.itineraries[0]!.legs)).toEqual(['walk', 'car-retrieval', 'drive']);
+      expect(walkToCar).toMatchObject({ from: nearby, to: { kind: 'parked-car' } });
+      expect(secondsBetween(evening, walkToCar!.start)).toBe(0);
+      expect(retrieval!.start).toBe(walkToCar!.end);
+    }
+    expect(plans.map((response) => legSeconds(response.itineraries[0]!.legs[0]!) / 60)).toEqual([
+      4, 5,
+    ]);
+  });
+
+  it('works back from an arrive-by time when the car is close by', async () => {
+    const nearby = place('Café', parkedAt.coordinate.lat + 0.0018, parkedAt.coordinate.lon);
+    const response = await planTrip(
+      homeThroughCar({ origin: nearby, time: { type: 'arrive', at: homeBy } }),
+      atEvening({ transit: fakeTransit(() => []) }),
+    );
+    const legs = response.itineraries[0]!.legs;
+
+    expect(kinds(legs)).toEqual(['walk', 'car-retrieval', 'drive']);
+    expect(legs[1]!.start).toBe(legs[0]!.end);
+    expect(legSeconds(legs[1]!)).toBe(DEFAULT_PREFERENCES.carRetrievalBufferMinutes * 60);
+    expect(secondsBetween(legs[2]!.end, homeBy)).toBe(0);
   });
 
   it('never sends a dropped-off traveller back for a car', async () => {
@@ -645,6 +930,46 @@ describe('when providers fail', () => {
 
     expect(parking?.occupancy.status).toBe('unknown');
     expect(response.notices).toContain('Car park occupancy figures are unavailable right now.');
+  });
+
+  describe('when the car park list fails', () => {
+    const listBusy = 'Car park details are busy right now. Try again shortly.';
+    const failingList: CarParkProvider = {
+      ...fakeCarParks(),
+      async listFacilities() {
+        throw new ProviderError('tfnsw-car-park', 'rate-limited', 'HTTP 429');
+      },
+    };
+
+    it('says the car park details are unavailable instead of that none are on the way', async () => {
+      const response = await planTrip(
+        request({ access: { transit: true, drive: true, dropOff: true } }),
+        deps({ carParks: failingList }),
+      );
+
+      expect(response.notices).toContain(listBusy);
+      expect(response.unavailable).toContainEqual({ strategy: 'park-and-ride', reason: listBusy });
+      expect(response.unavailable).toContainEqual({ strategy: 'drop-off', reason: listBusy });
+      expect(response.unavailable).toHaveLength(2);
+      expect(response.itineraries.map((it) => it.strategy)).toContain('transit-only');
+    });
+
+    it('still parks at a spot the traveller saved', async () => {
+      const savedSpot = {
+        id: 'saved-1',
+        name: 'Mum’s place, Kellyville',
+        coordinate: { lat: -33.7101, lon: 150.9562 },
+      };
+      const response = await planTrip(
+        request({ origin: ROUSE_HILL, savedParkingSpots: [savedSpot] }),
+        deps({ carParks: failingList }),
+      );
+
+      expect(response.notices).toContain(listBusy);
+      expect(response.unavailable).toEqual([]);
+      const parkAndRide = response.itineraries.filter((it) => it.strategy === 'park-and-ride');
+      expect(parkAndRide.map((it) => it.parking?.carPark.id)).toEqual(['saved-1']);
+    });
   });
 });
 

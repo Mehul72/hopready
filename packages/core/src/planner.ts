@@ -1,6 +1,12 @@
 import { combineSignals, mapSettled } from './async';
 import { haversineMetres } from './geo';
-import { buildItinerary, findContinuityIssues, legSeconds, transitLegsOf } from './itinerary';
+import {
+  buildItinerary,
+  findContinuityIssues,
+  legSeconds,
+  MAX_LOCATION_GAP_METRES,
+  transitLegsOf,
+} from './itinerary';
 import type {
   Itinerary,
   Leg,
@@ -33,6 +39,7 @@ import {
   secondsBetween,
   toIso,
 } from './time';
+import { walkBetween } from './walking';
 
 export interface PlannerLimits {
   maxEtaCandidates: number;
@@ -329,8 +336,16 @@ async function planViaTransferPoints(
       ? request.preferences.parkingBufferMinutes
       : request.preferences.dropOffBufferMinutes);
 
-  const points = await transferPoints(context, strategy);
+  const { points, listFailure } = await transferPoints(context, strategy);
   const shortlist = shortlistByGeometry(context, strategy, points);
+  // Without the car park list, "none on the way" would be a guess.
+  if (shortlist.length === 0 && listFailure) {
+    context.unavailable.push({
+      strategy,
+      reason: describeFailure(listFailure, 'Car park details'),
+    });
+    return { itineraries: [], failure: listFailure };
+  }
   if (shortlist.length === 0) {
     context.unavailable.push({
       strategy,
@@ -371,22 +386,46 @@ async function planViaTransferPoints(
   let firstFailure: ProviderError | undefined;
   outcomes.forEach((outcome, index) => {
     const point = reachable[index]!.point;
-    if (outcome.status === 'fulfilled') {
-      if (outcome.value) {
-        itineraries.push(outcome.value);
-        recordCarPark(context, strategy, point, 'used');
-      } else {
-        recordCarPark(context, strategy, point, 'no-workable-connection');
-      }
+    if (outcome.status === 'rejected') {
+      firstFailure ??= asProviderError(outcome.reason, context.deps.transit.name);
+      recordCarPark(context, strategy, point, 'provider-error');
       return;
     }
-    firstFailure ??= asProviderError(outcome.reason, context.deps.transit.name);
-    recordCarPark(context, strategy, point, 'provider-error');
+    const itinerary = outcome.value;
+    if (!itinerary) {
+      recordCarPark(context, strategy, point, 'no-workable-connection');
+      return;
+    }
+    // Checked here as well as when options are chosen, so a car park reads as used only when its
+    // option can be shown.
+    const problem = itineraryProblem(context, itinerary);
+    if (problem) {
+      reject(context, problem);
+      recordCarPark(
+        context,
+        strategy,
+        point,
+        problem === 'drive-too-long' ? 'too-far-to-drive' : 'no-workable-connection',
+      );
+      return;
+    }
+    itineraries.push(itinerary);
+    recordCarPark(context, strategy, point, 'used');
   });
 
   if (itineraries.length === 0 && firstFailure) {
     context.unavailable.push({ strategy, reason: describeFailure(firstFailure, 'Trip times') });
     return { itineraries, failure: firstFailure };
+  }
+  // Park and ride explains an empty result car park by car park; drop-off has no such list.
+  if (itineraries.length === 0 && strategy === 'drop-off') {
+    context.unavailable.push({
+      strategy,
+      reason:
+        reachable.length === 0
+          ? `No stations with drop-off access are within your ${request.preferences.maxDriveMinutes} min driving limit.`
+          : 'No public transport connection worked from the stations checked.',
+    });
   }
   return { itineraries };
 }
@@ -409,13 +448,17 @@ async function planThroughPoint(
   // Parking or being dropped off only makes sense with a public transport leg after it, and
   // Park&Ride is only free with one. A walk-only answer means the destination is simply nearby.
   const journeys = (await queryTransit(context, point.place, destination, transitTime)).filter(
-    (journey) => transitLegsOf(journey.legs).length > 0 && keepJourney(context, journey),
+    (journey) =>
+      transitLegsOf(journey.legs).length > 0 &&
+      (time.type === 'depart' || arrivesBy(journey, time.at)) &&
+      keepJourney(context, journey),
   );
-  const journey = time.type === 'depart' ? earliestJourney(journeys) : latestJourney(journeys);
+  // Depart-at wants the journey that arrives first, arrive-by the one that leaves last.
+  const ranked = [...journeys].sort(time.type === 'depart' ? byArrival : byLatestStart);
+  let journey: TransitJourney | undefined = ranked[0];
   if (!journey) return null;
 
-  const transitStart = journey.legs[0]!.start;
-  const mustArriveAt = addSeconds(transitStart, -bufferSeconds);
+  const mustArriveAt = addSeconds(journeyStart(journey), -bufferSeconds);
   let route = await routeDrive(context, driving, origin, point.place, {
     type: 'arrive',
     at: mustArriveAt,
@@ -424,14 +467,17 @@ async function planThroughPoint(
   let arriveAt = mustArriveAt;
 
   if (time.type === 'depart' && isBefore(leaveAt, time.at)) {
-    // Traffic at the later time is worse than the first estimate: leave when asked and check it still works.
+    // Traffic at the later time is worse than the first estimate: leave when asked, and take the
+    // journey that arrives first among those that can still be caught.
     route = await routeDrive(context, driving, origin, point.place, {
       type: 'depart',
       at: time.at,
     });
     leaveAt = time.at;
     arriveAt = addSeconds(time.at, route.durationSeconds);
-    if (isBefore(transitStart, addSeconds(arriveAt, bufferSeconds))) {
+    const walkFrom = addSeconds(arriveAt, bufferSeconds);
+    journey = ranked.find((candidate) => !isBefore(journeyStart(candidate), walkFrom));
+    if (!journey) {
       reject(context, 'departs-before-requested');
       return null;
     }
@@ -500,6 +546,9 @@ async function planReturnViaCar(
   const { origin, destination, time, preferences } = context.request;
   const car: Place = { ...parkedCar.location, kind: 'parked-car' };
   const retrievalSeconds = preferences.carRetrievalBufferMinutes * 60;
+  // Within the gap the planner already accepts between legs, public transport cannot bring the
+  // traveller any closer to the car, and providers often have no journey for a trip that short.
+  const isNearCar = haversineMetres(origin.coordinate, car.coordinate) <= MAX_LOCATION_GAP_METRES;
 
   const noWayBack = () =>
     context.unavailable.push({
@@ -509,20 +558,23 @@ async function planReturnViaCar(
 
   try {
     if (time.type === 'depart') {
-      const journeys = (await queryTransit(context, origin, car, time))
-        .filter((journey) => keepJourney(context, journey))
-        .sort(byFirstStart)
-        .slice(0, 2);
-      if (journeys.length === 0) noWayBack();
+      const waysToCar = isNearCar
+        ? [walkToNearbyCar(context, car, time)]
+        : (await queryTransit(context, origin, car, time))
+            .filter((journey) => keepJourney(context, journey))
+            .sort(byArrival)
+            .slice(0, 2);
+      if (waysToCar.length === 0) noWayBack();
       const itineraries = await Promise.all(
-        journeys.map(async (journey) => {
-          const atCar = journey.legs[journey.legs.length - 1]!.end;
+        waysToCar.map(async (toCar) => {
+          // Already at the car, retrieval starts at the requested time.
+          const atCar = toCar.legs.at(-1)?.end ?? time.at;
           const leaveCarAt = addSeconds(atCar, retrievalSeconds);
           const route = await routeDrive(context, driving, car, destination, {
             type: 'depart',
             at: leaveCarAt,
           });
-          return returnItinerary(driving, car, destination, journey, atCar, leaveCarAt, route);
+          return returnItinerary(context, driving, car, toCar, leaveCarAt, route);
         }),
       );
       return { itineraries };
@@ -531,20 +583,19 @@ async function planReturnViaCar(
     const route = await routeDrive(context, driving, car, destination, time);
     const leaveCarAt = addSeconds(time.at, -route.durationSeconds);
     const reachCarBy = addSeconds(leaveCarAt, -retrievalSeconds);
-    const journeys = (
-      await queryTransit(context, origin, car, { type: 'arrive', at: reachCarBy })
-    ).filter((journey) => keepJourney(context, journey));
-    const journey = latestJourney(journeys);
-    if (!journey) {
+    const toCar = isNearCar
+      ? walkToNearbyCar(context, car, { type: 'arrive', at: reachCarBy })
+      : latestJourney(
+          (await queryTransit(context, origin, car, { type: 'arrive', at: reachCarBy })).filter(
+            // A journey that reaches the car any later would cut into the retrieval buffer.
+            (journey) => arrivesBy(journey, reachCarBy) && keepJourney(context, journey),
+          ),
+        );
+    if (!toCar) {
       noWayBack();
       return { itineraries: [] };
     }
-    const atCar = journey.legs[journey.legs.length - 1]!.end;
-    return {
-      itineraries: [
-        returnItinerary(driving, car, destination, journey, atCar, leaveCarAt, route, reachCarBy),
-      ],
-    };
+    return { itineraries: [returnItinerary(context, driving, car, toCar, leaveCarAt, route)] };
   } catch (error) {
     const failure = asProviderError(error, context.deps.transit.name);
     context.unavailable.push({
@@ -555,27 +606,31 @@ async function planReturnViaCar(
   }
 }
 
+// The legs to the car, then the full car retrieval buffer, then the drive home.
 function returnItinerary(
+  context: PlanContext,
   driving: DrivingProvider,
   car: Place,
-  destination: Place,
-  journey: TransitJourney,
-  atCar: string,
+  toCar: TransitJourney,
   leaveCarAt: string,
   route: DriveRoute,
-  retrievalStart = atCar,
 ): Itinerary {
-  const retrievalStartsAt = isBefore(atCar, retrievalStart) ? retrievalStart : atCar;
+  const { destination, preferences } = context.request;
+  // The drive home cannot be avoided, so a long one is pointed out instead of rejected.
+  const notes =
+    route.durationSeconds > preferences.maxDriveMinutes * 60
+      ? [`The drive home is longer than your ${preferences.maxDriveMinutes} min driving limit.`]
+      : [];
   return buildItinerary({
     strategy: 'return-via-car',
     legs: [
-      ...journey.legs,
+      ...toCar.legs,
       {
         id: 'car-retrieval',
         kind: 'car-retrieval',
         from: car,
         to: car,
-        start: retrievalStartsAt,
+        start: addSeconds(leaveCarAt, -preferences.carRetrievalBufferMinutes * 60),
         end: leaveCarAt,
         source: 'hopready',
         timing: 'buffer',
@@ -590,9 +645,40 @@ function returnItinerary(
         route,
       ),
     ],
-    fare: journey.fare,
-    alerts: journey.alerts,
+    fare: toCar.fare,
+    alerts: toCar.alerts,
+    notes,
   });
+}
+
+// The walk to a car close by, estimated from distance at the traveller's walking speed and shaped
+// like a public transport journey. Already at the car, there is no walk at all.
+function walkToNearbyCar(
+  context: PlanContext,
+  car: Place,
+  time: { type: 'depart' | 'arrive'; at: string },
+): TransitJourney {
+  const { origin, preferences } = context.request;
+  const walk = walkBetween(origin.coordinate, car.coordinate, preferences.walkingSpeed);
+  if (walk.durationSeconds === 0) return { legs: [], fare: { status: 'unknown' }, alerts: [] };
+  const start = time.type === 'depart' ? time.at : addSeconds(time.at, -walk.durationSeconds);
+  return {
+    legs: [
+      {
+        id: 'walk-to-car',
+        kind: 'walk',
+        from: origin,
+        to: car,
+        start,
+        end: addSeconds(start, walk.durationSeconds),
+        source: 'hopready',
+        timing: 'estimated',
+        distanceMetres: Math.round(walk.distanceMetres),
+      },
+    ],
+    fare: { status: 'unknown' },
+    alerts: [],
+  };
 }
 
 // ---------- transfer point selection ----------
@@ -600,16 +686,17 @@ function returnItinerary(
 async function transferPoints(
   context: PlanContext,
   strategy: TransferStrategy,
-): Promise<TransferPoint[]> {
+): Promise<{ points: TransferPoint[]; listFailure?: ProviderError }> {
   const { request } = context;
   let facilities: CarParkFacility[] = [];
+  let listFailure: ProviderError | undefined;
   if (context.deps.carParks) {
     const carParks = context.deps.carParks;
     try {
       facilities = await withProviderTimeout(context, (signal) => carParks.listFacilities(signal));
     } catch (error) {
-      const failure = asProviderError(error, carParks.name);
-      context.notices.push(describeFailure(failure, 'Car park details'));
+      listFailure = asProviderError(error, carParks.name);
+      context.notices.push(describeFailure(listFailure, 'Car park details'));
     }
   }
 
@@ -648,7 +735,7 @@ async function transferPoints(
         preferred: spot.id === request.preferredCarParkId,
       };
     });
-    return [...documented, ...saved];
+    return { points: [...documented, ...saved], listFailure };
   }
 
   const stations = new Map<string, TransferPoint>();
@@ -676,7 +763,7 @@ async function transferPoints(
       preferred: true,
     });
   }
-  return [...stations.values()];
+  return { points: [...stations.values()], listFailure };
 }
 
 function roughTransitMinutes(fromPlace: Place, toPlace: Place): number {
@@ -898,16 +985,30 @@ function startWalkingWhenReady(legs: Leg[], readyAt: string): Leg[] {
   return [{ ...first, start: readyAt, end: addSeconds(readyAt, walkSeconds) }, ...rest];
 }
 
-function byFirstStart(a: TransitJourney, b: TransitJourney): number {
-  return secondsBetween(b.legs[0]!.start, a.legs[0]!.start);
+function journeyStart(journey: TransitJourney): string {
+  return journey.legs[0]!.start;
 }
 
-function earliestJourney(journeys: TransitJourney[]): TransitJourney | undefined {
-  return [...journeys].sort(byFirstStart)[0];
+function journeyEnd(journey: TransitJourney): string {
+  return journey.legs[journey.legs.length - 1]!.end;
+}
+
+function arrivesBy(journey: TransitJourney, at: string): boolean {
+  return !isBefore(at, journeyEnd(journey));
+}
+
+function byLatestStart(a: TransitJourney, b: TransitJourney): number {
+  return secondsBetween(journeyStart(a), journeyStart(b));
+}
+
+// Providers do not promise any order. Of two journeys that arrive together, the one that leaves
+// later means less waiting.
+function byArrival(a: TransitJourney, b: TransitJourney): number {
+  return secondsBetween(journeyEnd(b), journeyEnd(a)) || byLatestStart(a, b);
 }
 
 function latestJourney(journeys: TransitJourney[]): TransitJourney | undefined {
-  return [...journeys].sort(byFirstStart).at(-1);
+  return [...journeys].sort(byLatestStart)[0];
 }
 
 function laterOfIso(a: string, b: string): string {
@@ -969,7 +1070,14 @@ function itineraryProblem(context: PlanContext, itinerary: Itinerary): Rejection
     0,
     ...itinerary.legs.filter((leg) => leg.kind === 'drive' || leg.kind === 'ride').map(legSeconds),
   );
-  if (longestDriveSeconds > preferences.maxDriveMinutes * 60) return 'drive-too-long';
+  // The drive home from a parked car is the only way to get the car home; returnItinerary notes a
+  // long one instead.
+  if (
+    itinerary.strategy !== 'return-via-car' &&
+    longestDriveSeconds > preferences.maxDriveMinutes * 60
+  ) {
+    return 'drive-too-long';
+  }
   if (secondsBetween(context.now, itinerary.departAt) < -TIME_GRACE_SECONDS)
     return 'departs-in-past';
   if (time.type === 'depart' && secondsBetween(time.at, itinerary.departAt) < -TIME_GRACE_SECONDS) {

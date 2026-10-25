@@ -182,12 +182,34 @@ describe('walking', () => {
     expect(secondsBetween(transfer.end, metro!.start)).toBeGreaterThanOrEqual(0);
   });
 
-  it('does not offer a ride that is slower than walking the whole way', async () => {
-    const journeys = await plan(
-      query({ from: DEMO_PLACES.chatswoodOffice, to: stopPlace(STOPS.chatswood) }),
+  it('offers the walk itself, not a ride that is slower than walking the whole way', async () => {
+    const station = stopPlace(STOPS.chatswood);
+    const leaving = await plan(query({ from: DEMO_PLACES.chatswoodOffice, to: station }));
+    const arriving = await plan(
+      query({
+        from: DEMO_PLACES.chatswoodOffice,
+        to: station,
+        time: { type: 'arrive', at: TUESDAY_0900 },
+      }),
     );
 
-    expect(journeys).toEqual([]);
+    expect(leaving.map((journey) => journey.legs.map((leg) => leg.kind))).toEqual([['walk']]);
+    expect(firstLeg(leaving[0]!)).toMatchObject({
+      from: DEMO_PLACES.chatswoodOffice,
+      to: station,
+      start: '2026-10-26T20:40:00.000Z',
+      source: 'demo-fixture',
+      timing: 'estimated',
+    });
+    expect(arriving.map((journey) => journey.legs.map((leg) => leg.kind))).toEqual([['walk']]);
+    expect(lastLeg(arriving[0]!).end).toBe('2026-10-26T22:00:00.000Z');
+    expect(legSeconds(lastLeg(arriving[0]!))).toBe(legSeconds(firstLeg(leaving[0]!)));
+  });
+
+  it('has no journey for a trip that is already there', async () => {
+    const station = stopPlace(STOPS.chatswood);
+
+    expect(await plan(query({ from: station, to: station }))).toEqual([]);
   });
 });
 

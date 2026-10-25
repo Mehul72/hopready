@@ -15,8 +15,15 @@ import {
   type TransitProvider,
   type TransitQuery,
 } from '../providers';
+import {
+  maxStraightLineMetres,
+  NO_WALK,
+  walkBetween,
+  type Walk,
+  type WalkingSpeed,
+} from '../walking';
 import { DEMO_PROVIDER_NAME, throwIfAborted, waitUntilAborted } from './abort';
-import { journeyFromPlan } from './journey-legs';
+import { journeyFromPlan, walkOnlyJourney } from './journey-legs';
 import {
   searchJourneys,
   type JourneyPlan,
@@ -31,13 +38,6 @@ import {
   timetableWindowAround,
   type ScheduledTrip,
 } from './timetable';
-import {
-  maxStraightLineMetres,
-  NO_WALK,
-  walkBetween,
-  type Walk,
-  type WalkingSpeed,
-} from './walking';
 
 export interface DemoTransitOptions {
   clock: Clock;
@@ -116,11 +116,29 @@ function planDemoJourneys(
   settings: ScenarioSettings,
   nowMs: number,
 ): TransitJourney[] {
-  const atMs = Date.parse(query.time.at);
   const directWalk = walkBetween(query.from.coordinate, query.to.coordinate, query.walkingSpeed);
-  // Already there: no public transport journey makes sense.
+  // Already there: no journey makes sense.
   if (directWalk.durationSeconds === 0) return [];
 
+  const walkable = directWalk.durationSeconds <= query.maxWalkMinutes * SECONDS_PER_MINUTE;
+  const rides = planRides(query, settings, nowMs, walkable ? directWalk : null);
+  if (!walkable || rides.length > 0) return rides;
+
+  // A trip short enough to walk is answered with the walk itself when no ride beats it, as the
+  // journey contract allows. Depart-at walks from the requested time; arrive-by gets there at it.
+  const atMs = Date.parse(query.time.at);
+  const startMs =
+    query.time.type === 'depart' ? atMs : atMs - directWalk.durationSeconds * MS_PER_SECOND;
+  return [walkOnlyJourney(query.from, query.to, startMs, directWalk)];
+}
+
+function planRides(
+  query: TransitQuery,
+  settings: ScenarioSettings,
+  nowMs: number,
+  walkToBeat: Walk | null,
+): TransitJourney[] {
+  const atMs = Date.parse(query.time.at);
   const access = stopsWithinWalk(query.from, query.maxWalkMinutes, query.walkingSpeed);
   const egress = stopsWithinWalk(query.to, query.maxWalkMinutes, query.walkingSpeed);
   if (access.length === 0 || egress.length === 0) return [];
@@ -139,7 +157,6 @@ function planDemoJourneys(
   };
 
   const plans = searchJourneys(search, { type: query.time.type, atMs }, query.maxJourneys);
-  const walkable = directWalk.durationSeconds <= query.maxWalkMinutes * SECONDS_PER_MINUTE;
   const alertsFor = (trip: ScheduledTrip) =>
     settings.timetable.cancelMorningMetro &&
     startsInMorningCancellationWindow(trip.route, trip.departureMinute)
@@ -147,7 +164,7 @@ function planDemoJourneys(
       : [];
 
   return plans
-    .filter((plan) => !walkable || beatsWalking(plan, query, atMs, directWalk))
+    .filter((plan) => !walkToBeat || beatsWalking(plan, query, atMs, walkToBeat))
     .map((plan) =>
       journeyFromPlan(plan, {
         window,
