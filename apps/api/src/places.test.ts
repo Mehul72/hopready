@@ -43,6 +43,31 @@ describe('mergePlaceSuggestions', () => {
     expect(merged).toHaveLength(MAX_PLACE_RESULTS);
     expect(merged[0]?.place.name).toBe('Stop 0');
   });
+
+  it('keeps room for addresses when there are many stops, then fills spare slots with stops', () => {
+    const stops = Array.from({ length: 12 }, (_, index) =>
+      suggestion(`Stop ${index}`, -33.87 - index * 0.01, 151.2, 'stop'),
+    );
+    const addresses = [
+      suggestion('1 Help St, Chatswood', -33.7975, 151.1832, 'address'),
+      suggestion('2 Help St, Chatswood', -33.7976, 151.1833, 'address'),
+    ];
+
+    const names = mergePlaceSuggestions([stops, addresses]).map((merged) => merged.place.name);
+
+    expect(names).toEqual([
+      'Stop 0',
+      'Stop 1',
+      'Stop 2',
+      'Stop 3',
+      'Stop 4',
+      '1 Help St, Chatswood',
+      '2 Help St, Chatswood',
+      'Stop 5',
+      'Stop 6',
+      'Stop 7',
+    ]);
+  });
 });
 
 describe('searchPlaces', () => {

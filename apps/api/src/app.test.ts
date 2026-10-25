@@ -523,14 +523,10 @@ describe('GET /v1/carparks', () => {
   const tallawong = facility('26', 'Tallawong P1', -33.6913, 150.9061);
   const kellyville = facility('29', 'Kellyville (north)', -33.7135, 150.9353);
 
-  function knownOccupancy(observedAt: string): Occupancy {
-    return { status: 'known', spacesAvailable: 42, totalSpaces: 121, observedAt };
-  }
-
-  it('lists facilities with occupancy and caches them for 60 seconds', async () => {
+  it('lists facilities without asking for space counts, and caches the list for ten minutes', async () => {
     const carParks = fakeCarParks({
       facilities: [tallawong, kellyville],
-      occupancy: async () => new Map([['26', knownOccupancy(NOW)]]),
+      occupancy: async () => new Map(),
     });
     const { app, clock } = testApp({ providers: { carParks } });
 
@@ -548,53 +544,18 @@ describe('GET /v1/carparks', () => {
     expect(listing.mode).toBe('live');
     expect(listing.fetchedAt).toBe(NOW);
     expect(listing.notices).toEqual([]);
-    expect(listing.carParks.map((carPark) => [carPark.id, carPark.occupancy.status])).toEqual([
-      ['26', 'known'],
-      ['29', 'unknown'],
+    expect(listing.carParks.map((carPark) => [carPark.id, carPark.occupancy])).toEqual([
+      ['26', { status: 'unknown', reason: 'Space counts are checked when you plan a trip.' }],
+      ['29', { status: 'unknown', reason: 'Space counts are checked when you plan a trip.' }],
     ]);
 
-    clock.advanceMs(59_000);
+    clock.advanceMs(9 * 60_000);
     expect((await app.request('/v1/carparks')).status).toBe(200);
-    expect(carParks.calls).toEqual({ listFacilities: 1, occupancy: 1 });
+    expect(carParks.calls).toEqual({ listFacilities: 1, occupancy: 0 });
 
-    clock.advanceMs(2_000);
+    clock.advanceMs(2 * 60_000);
     expect((await app.request('/v1/carparks')).status).toBe(200);
-    expect(carParks.calls).toEqual({ listFacilities: 2, occupancy: 2 });
-  });
-
-  it('marks cached counts stale once they are older than 15 minutes', async () => {
-    const carParks = fakeCarParks({
-      facilities: [tallawong],
-      occupancy: async () => new Map([['26', knownOccupancy('2026-10-26T20:14:00.000Z')]]),
-    });
-    const { app } = testApp({ providers: { carParks } });
-
-    const listing = (await (await app.request('/v1/carparks')).json()) as {
-      carParks: { occupancy: Occupancy }[];
-    };
-    expect(listing.carParks[0]?.occupancy.status).toBe('stale');
-  });
-
-  it('shows facilities with unknown occupancy when the counts fail, and does not cache that', async () => {
-    const carParks = fakeCarParks({
-      facilities: [tallawong],
-      occupancy: async () => {
-        throw new ProviderError('tfnsw-car-park', 'unavailable', 'HTTP 503', { status: 503 });
-      },
-    });
-    const { app } = testApp({ providers: { carParks } });
-
-    const response = await app.request('/v1/carparks');
-    expect(response.status).toBe(200);
-    const listing = (await response.json()) as {
-      carParks: { occupancy: Occupancy }[];
-      notices: string[];
-    };
-    expect(listing.carParks[0]?.occupancy.status).toBe('unknown');
-    expect(listing.notices).toEqual(['Car park occupancy figures are unavailable right now.']);
-
-    await app.request('/v1/carparks');
-    expect(carParks.calls.listFacilities).toBe(2);
+    expect(carParks.calls).toEqual({ listFacilities: 2, occupancy: 0 });
   });
 
   it('maps a facility list failure like any provider failure', async () => {

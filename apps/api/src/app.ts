@@ -13,7 +13,7 @@ import { methodNotAllowed } from 'hono/method-not-allowed';
 import { routePath } from 'hono/route';
 import type { z } from 'zod';
 
-import { CarParkCatalogue, OCCUPANCY_UNAVAILABLE_NOTICE, withCurrentFreshness } from './car-parks';
+import { CarParkCatalogue } from './car-parks';
 import type { ApiConfig } from './config';
 import { DeadlineExceededError, runWithDeadline, type LateOutcomeHandler } from './deadline';
 import {
@@ -50,7 +50,8 @@ export const SERVICE_NAME = 'hopready-api';
 const PLAN_BODY_MAX_BYTES = 32 * 1024;
 const PLACE_SEARCH_BODY_MAX_BYTES = 4 * 1024;
 const PLACE_PROVIDER_TIMEOUT_MS = 5_000;
-const CAR_PARK_CACHE_TTL_MS = 60_000;
+// The facility list changes rarely; ten minutes keeps a busy picker to a handful of TfNSW requests.
+const CAR_PARK_LIST_CACHE_TTL_MS = 10 * 60_000;
 // Provider calls are aborted this long before the plan deadline, so the planner can still return
 // the options it already has. The deadline itself covers a provider that ignores the abort.
 const PLAN_SETTLE_MAX_MS = 1_000;
@@ -96,7 +97,7 @@ export function createApp(deps: AppDeps) {
   const clientAddress = deps.clientAddress ?? cloudflareClientAddress;
   const carParkCatalogue = new CarParkCatalogue({
     clock,
-    ttlMs: CAR_PARK_CACHE_TTL_MS,
+    ttlMs: CAR_PARK_LIST_CACHE_TTL_MS,
     timeoutMs: DEFAULT_PLANNER_LIMITS.providerTimeoutMs,
     onLateOutcome: lateOutcomeLogger(logger),
   });
@@ -338,15 +339,11 @@ export function createApp(deps: AppDeps) {
       const { listing, cache } = await carParkCatalogue.read(provider);
       state.logFields.cache = cache;
       state.logFields.resultCount = listing.carParks.length;
-      const now = clock.now();
       return c.json({
         mode: config.mode,
         fetchedAt: listing.fetchedAt,
-        carParks: listing.carParks.map((carPark) => ({
-          ...carPark,
-          occupancy: withCurrentFreshness(carPark.occupancy, now),
-        })),
-        notices: listing.occupancyAvailable ? [] : [OCCUPANCY_UNAVAILABLE_NOTICE],
+        carParks: listing.carParks,
+        notices: [],
       });
     } catch (error) {
       if (error instanceof ProviderError) return sendProviderError(c, error);

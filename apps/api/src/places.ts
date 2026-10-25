@@ -29,6 +29,8 @@ const placeSuggestionSchema = z.object({
 
 export const MAX_PLACE_RESULTS = 10;
 export const DUPLICATE_PLACE_RADIUS_METRES = 150;
+// Stops are listed first, but a long stop list must not push every address out.
+const FIRST_SHARE_PER_SOURCE = 5;
 
 // "St. Leonards Station" and "st leonards station" name the same place.
 export function normalisePlaceName(name: string): string {
@@ -46,8 +48,16 @@ export function normalisePlaceName(name: string): string {
 export function mergePlaceSuggestions(
   lists: readonly (readonly PlaceSuggestion[])[],
 ): PlaceSuggestion[] {
+  const sources = lists.filter((list) => list.length > 0);
+  const ordered =
+    sources.length > 1
+      ? [
+          ...sources.flatMap((list) => list.slice(0, FIRST_SHARE_PER_SOURCE)),
+          ...sources.flatMap((list) => list.slice(FIRST_SHARE_PER_SOURCE)),
+        ]
+      : sources.flat();
   const merged: { suggestion: PlaceSuggestion; name: string }[] = [];
-  for (const suggestion of lists.flat()) {
+  for (const suggestion of ordered) {
     if (merged.length === MAX_PLACE_RESULTS) break;
     if (!isWithinGreaterSydney(suggestion.place.coordinate)) continue;
     const name = normalisePlaceName(suggestion.place.name);

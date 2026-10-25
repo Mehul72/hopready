@@ -1,7 +1,4 @@
 import {
-  DEFAULT_PLANNER_LIMITS,
-  ProviderError,
-  secondsBetween,
   toIso,
   type CarParkFacility,
   type CarParkProvider,
@@ -18,7 +15,6 @@ export interface CarParkWithOccupancy extends CarParkFacility {
 export interface CarParkListing {
   fetchedAt: string;
   carParks: CarParkWithOccupancy[];
-  occupancyAvailable: boolean;
 }
 
 export interface CatalogueRead {
@@ -26,11 +22,16 @@ export interface CatalogueRead {
   cache: 'hit' | 'miss';
 }
 
-export const OCCUPANCY_UNAVAILABLE_NOTICE = 'Car park occupancy figures are unavailable right now.';
+// The picker answers "which car park did you use?", so live space counts add nothing there. Counting
+// every facility would cost one TfNSW request each, about 40 a refresh, so this list never asks for
+// them; plans fetch counts for the few car parks they actually use.
+const OCCUPANCY_NOT_CHECKED: Occupancy = {
+  status: 'unknown',
+  reason: 'Space counts are checked when you plan a trip.',
+};
 
-// Facilities and their occupancy for the "which car park did you use?" picker. One cached copy per
-// isolate for a minute, which matches how often TfNSW updates most counters, and one upstream
-// fetch at a time however many requests arrive while it runs.
+// Facilities for the "which car park did you use?" picker. One cached copy per isolate, and one
+// upstream fetch at a time however many requests arrive while it runs.
 export class CarParkCatalogue {
   readonly #clock: Clock;
   readonly #ttlMs: number;
@@ -64,58 +65,17 @@ export class CarParkCatalogue {
   }
 
   async #fetch(provider: CarParkProvider): Promise<CarParkListing> {
-    const callOptions = { timeoutMs: this.#timeoutMs, onLateOutcome: this.#onLateOutcome };
     const facilities = await callProvider(
       provider.name,
       (signal) => provider.listFacilities(signal),
-      callOptions,
+      { timeoutMs: this.#timeoutMs, onLateOutcome: this.#onLateOutcome },
     );
-
-    const liveIds = facilities
-      .filter((facility) => facility.kind === 'transport-park-and-ride')
-      .map((facility) => facility.id);
-    let occupancy: Map<string, Occupancy> | null;
-    try {
-      occupancy =
-        liveIds.length === 0
-          ? new Map()
-          : await callProvider(
-              provider.name,
-              (signal) => provider.occupancy(liveIds, signal),
-              callOptions,
-            );
-    } catch (error) {
-      if (!(error instanceof ProviderError)) throw error;
-      // The facilities are still worth showing; each one says its occupancy is unknown.
-      occupancy = null;
-    }
-
     const fetchedAt = this.#clock.now();
     const listing: CarParkListing = {
       fetchedAt: toIso(fetchedAt),
-      carParks: facilities.map((facility) => ({
-        ...facility,
-        occupancy: occupancy
-          ? (occupancy.get(facility.id) ?? {
-              status: 'unknown',
-              reason: 'No occupancy figures are published for this car park.',
-            })
-          : { status: 'unknown', reason: 'Occupancy figures are unavailable right now.' },
-      })),
-      occupancyAvailable: occupancy !== null,
+      carParks: facilities.map((facility) => ({ ...facility, occupancy: OCCUPANCY_NOT_CHECKED })),
     };
-    // A listing without occupancy is not kept, so the next request tries the counts again.
-    if (occupancy) this.#cached = { listing, expiresAtMs: fetchedAt.getTime() + this.#ttlMs };
+    this.#cached = { listing, expiresAtMs: fetchedAt.getTime() + this.#ttlMs };
     return listing;
   }
-}
-
-// Counts older than the planner's freshness limit are shown as stale, judged when they are served
-// rather than when they were cached.
-export function withCurrentFreshness(occupancy: Occupancy, now: Date): Occupancy {
-  if (occupancy.status !== 'known') return occupancy;
-  const ageMinutes = secondsBetween(occupancy.observedAt, now) / 60;
-  return ageMinutes > DEFAULT_PLANNER_LIMITS.occupancyFreshMinutes
-    ? { ...occupancy, status: 'stale' }
-    : occupancy;
 }
