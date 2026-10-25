@@ -40,7 +40,7 @@ async function openPrivacyPolicy(url: string): Promise<void> {
     console.warn(
       `HopReady: could not open the privacy policy (${error instanceof Error ? error.name : 'unknown error'}).`,
     );
-    Alert.alert("Couldn't open the privacy policy", 'Check your connection, then try again.');
+    Alert.alert("Couldn't open the privacy policy", "Safari didn't open. Try again.");
   }
 }
 

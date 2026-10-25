@@ -1,15 +1,15 @@
-import { openBrowserAsync } from 'expo-web-browser';
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 import { errorName } from '../saved/storage-writes';
 
-// Opens a web page (parking rules, alerts, privacy policy) in an in-app Safari view, so the person
-// comes straight back to HopReady. `pageName` is for the log and the alert, never the URL.
+// Opens a web page (parking rules, alerts, privacy policy) in Safari. An in-app browser would let
+// people browse the web inside HopReady, which the App Store age rating says the app does not do.
+// `pageName` is for the log and the alert, never the URL.
 export async function openLink(url: string, pageName: string): Promise<void> {
   try {
-    await openBrowserAsync(url);
+    await Linking.openURL(url);
   } catch (error) {
     console.warn(`HopReady: could not open ${pageName} (${errorName(error)}).`);
-    Alert.alert(`Couldn't open ${pageName}`, 'Check your connection, then try again.');
+    Alert.alert(`Couldn't open ${pageName}`, "Safari didn't open. Try again.");
   }
 }

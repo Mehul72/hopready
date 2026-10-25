@@ -10,16 +10,16 @@ import {
   type WalkLeg,
 } from '@hopready/core';
 import { render, screen, userEvent, within } from '@testing-library/react-native';
-import { openBrowserAsync } from 'expo-web-browser';
+import { Linking } from 'react-native';
 
 import { PLACES, TALLAWONG_PARKING } from '@/test-support/trips';
 
 import { LegRow } from './leg-row';
 import { PLATFORM_NOT_PROVIDED, SPACES_CAN_FILL_NOTE } from './trip-text';
 
-jest.mock('expo-web-browser', () => ({
-  openBrowserAsync: jest.fn(async () => ({ type: 'opened' })),
-}));
+beforeEach(() => {
+  jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+});
 
 const NOW = new Date('2026-10-26T20:30:00.000Z');
 const START = '2026-10-26T20:35:00.000Z';
@@ -204,7 +204,7 @@ describe('LegRow', () => {
     ).toBeOnTheScreen();
 
     await userEvent.setup().press(screen.getByRole('button', { name: 'More about this alert' }));
-    expect(openBrowserAsync).toHaveBeenCalledWith('https://transportnsw.info/alerts/lift');
+    expect(Linking.openURL).toHaveBeenCalledWith('https://transportnsw.info/alerts/lift');
   });
 
   it('explains the parking buffer and keeps occupancy and rules apart', async () => {
@@ -240,7 +240,7 @@ describe('LegRow', () => {
       .press(
         screen.getByRole('button', { name: 'Source: transportnsw.info, checked 25 Oct 2026' }),
       );
-    expect(openBrowserAsync).toHaveBeenCalledWith(
+    expect(Linking.openURL).toHaveBeenCalledWith(
       'https://transportnsw.info/travel-info/ways-to-get-around/drive/parking/transport-parkride-car-parks',
     );
   });
