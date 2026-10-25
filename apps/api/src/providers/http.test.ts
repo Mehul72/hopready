@@ -112,6 +112,27 @@ describe('requestJson', () => {
     ).rejects.toMatchObject({ failure: 'timeout' });
   });
 
+  it('reports a timeout that fires while the body is still arriving as a timeout', async () => {
+    const controller = new AbortController();
+    const stalledBody = new ReadableStream<Uint8Array>({
+      start(stream) {
+        stream.enqueue(new TextEncoder().encode('{"greeting": "hel'));
+        controller.signal.addEventListener('abort', () => {
+          stream.error(new DOMException('aborted', 'AbortError'));
+        });
+      },
+    });
+    const pending = requestJson({
+      ...baseRequest,
+      signal: controller.signal,
+      fetchImpl: respondWith(new Response(stalledBody, { status: 200 })),
+    });
+
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ failure: 'timeout', status: 200 });
+  });
+
   it('lets a provider classify its own error responses', async () => {
     await expect(
       requestJson({

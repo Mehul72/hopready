@@ -120,6 +120,16 @@ async function attemptRequest<T>(request: ProviderRequest<T>): Promise<T> {
   try {
     body = await response.json();
   } catch (error) {
+    // The timer can fire while a large body is still arriving. That is a slow provider, worth a
+    // retry, not one that sent bad data.
+    if (request.signal.aborted) {
+      throw new ProviderError(
+        request.provider,
+        'timeout',
+        `${request.provider} did not finish answering in time`,
+        { status: response.status, cause: error },
+      );
+    }
     throw new ProviderError(
       request.provider,
       'malformed-response',
