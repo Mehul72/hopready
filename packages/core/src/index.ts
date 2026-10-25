@@ -1,1 +1,5 @@
 export * from './geo';
+export * from './itinerary';
+export * from './model';
+export * from './providers';
+export * from './time';
