@@ -348,6 +348,21 @@ describe('recent searches', () => {
 });
 
 describe('parking spots', () => {
+  it('says a spot is already saved next to the Add button, not at the top of the list', async () => {
+    appStorage.parkingSpots.add('Pinned location', { lat: -33.7, lon: 150.94 });
+    grantLocationAt({ lat: -33.7, lon: 150.94 });
+    await renderApp('/saved');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Add a parking spot' }));
+    await user.press(screen.getByRole('button', { name: 'Use my current location' }));
+
+    const notice = 'This parking spot is already saved.';
+    expect(await screen.findByText(notice)).toBeOnTheScreen();
+    const page = JSON.stringify(screen.toJSON());
+    expect(page.indexOf(notice)).toBeGreaterThan(page.indexOf('Parking spots'));
+  });
+
   it('adds a spot from the current location and deletes it after confirming', async () => {
     grantLocationAt({ lat: -33.7, lon: 150.94 }, { name: '9 Example Road', city: 'Kellyville' });
     await renderApp('/saved');

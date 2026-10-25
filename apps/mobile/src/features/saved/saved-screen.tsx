@@ -38,6 +38,9 @@ const PICKER_TITLES: Readonly<Record<PickerPurpose, string>> = {
 interface Notice {
   tone: BannerTone;
   message: string;
+  // Shown next to the control that led to it: the Add buttons sit far down the list, where a
+  // notice at the top would be out of sight.
+  near: PickerPurpose;
 }
 
 function placeLabel(place: Place): string {
@@ -78,16 +81,17 @@ function SectionTitle({ children }: { children: string }) {
   );
 }
 
-function addedNotice<T>(result: AddResult<T>, what: string): Notice {
+function addedNotice<T>(result: AddResult<T>, what: string, near: PickerPurpose): Notice {
   switch (result.status) {
     case 'added':
-      return { tone: 'info', message: `${what} saved.` };
+      return { tone: 'info', message: `${what} saved.`, near };
     case 'already-saved':
-      return { tone: 'info', message: `${what} is already saved.` };
+      return { tone: 'info', message: `${what} is already saved.`, near };
     case 'limit-reached':
       return {
         tone: 'warning',
         message: `You can save up to ${result.limit}. Delete one to add another.`,
+        near,
       };
   }
 }
@@ -101,6 +105,16 @@ export function SavedScreen() {
   const [picker, setPicker] = useState<PickerPurpose | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
 
+  const noticeFor = (...purposes: PickerPurpose[]) =>
+    notice && purposes.includes(notice.near) ? (
+      <Banner
+        tone={notice.tone}
+        message={notice.message}
+        announce
+        action={{ label: 'Dismiss', onPress: () => setNotice(null) }}
+      />
+    ) : null;
+
   // Feedback shows on the screen rather than in an alert, which iOS cannot show while the sheet
   // is still closing.
   const savePicked = (purpose: PickerPurpose, picked: Place) => {
@@ -108,12 +122,16 @@ export function SavedScreen() {
     switch (purpose) {
       case 'home': {
         const saved = writeOrAlert(() => appStorage.places.setHome(place), "Couldn't save Home");
-        if (saved.ok) setNotice({ tone: 'info', message: `Home set to ${place.name}.` });
+        if (saved.ok) {
+          setNotice({ tone: 'info', message: `Home set to ${place.name}.`, near: 'home' });
+        }
         return;
       }
       case 'work': {
         const saved = writeOrAlert(() => appStorage.places.setWork(place), "Couldn't save Work");
-        if (saved.ok) setNotice({ tone: 'info', message: `Work set to ${place.name}.` });
+        if (saved.ok) {
+          setNotice({ tone: 'info', message: `Work set to ${place.name}.`, near: 'work' });
+        }
         return;
       }
       case 'favourite': {
@@ -121,7 +139,7 @@ export function SavedScreen() {
           () => appStorage.places.addFavourite(favouriteLabelFor(place), place),
           "Couldn't save this favourite",
         );
-        if (saved.ok) setNotice(addedNotice(saved.value, place.name));
+        if (saved.ok) setNotice(addedNotice(saved.value, place.name, 'favourite'));
         return;
       }
       case 'parking-spot': {
@@ -129,7 +147,7 @@ export function SavedScreen() {
           () => appStorage.parkingSpots.add(parkingSpotNameFor(place), place.coordinate),
           "Couldn't save this parking spot",
         );
-        if (saved.ok) setNotice(addedNotice(saved.value, 'This parking spot'));
+        if (saved.ok) setNotice(addedNotice(saved.value, 'This parking spot', 'parking-spot'));
         return;
       }
     }
@@ -164,14 +182,7 @@ export function SavedScreen() {
       <AppText variant="largeTitle" accessibilityRole="header">
         Saved
       </AppText>
-      {notice ? (
-        <Banner
-          tone={notice.tone}
-          message={notice.message}
-          announce
-          action={{ label: 'Dismiss', onPress: () => setNotice(null) }}
-        />
-      ) : null}
+      {noticeFor('home', 'work')}
       {planner.locating ? <Banner tone="info" message="Finding your location…" /> : null}
 
       <SectionTitle>Home and work</SectionTitle>
@@ -234,6 +245,7 @@ export function SavedScreen() {
           />
         ))
       )}
+      {noticeFor('favourite')}
       <Button
         variant="secondary"
         symbol="plus"
@@ -318,6 +330,7 @@ export function SavedScreen() {
           }
         />
       ))}
+      {noticeFor('parking-spot')}
       <Button
         variant="secondary"
         symbol="plus"
