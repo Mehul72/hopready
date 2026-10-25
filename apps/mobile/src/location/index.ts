@@ -1,5 +1,6 @@
 export {
   CURRENT_LOCATION_LABEL,
+  type CurrentPlaceOptions,
   type CurrentPlaceResult,
   hasLocationPermission,
   labelFromAddress,

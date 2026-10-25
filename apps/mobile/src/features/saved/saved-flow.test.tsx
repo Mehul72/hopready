@@ -1,5 +1,6 @@
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { userEvent } from '@testing-library/react-native';
+import * as Location from 'expo-location';
 import { screen, within } from 'expo-router/testing-library';
 import { Alert, type AlertButton } from 'react-native';
 
@@ -60,7 +61,8 @@ describe('Home and Work', () => {
     ).toBeOnTheScreen();
   });
 
-  it('sets Work from the current location as a fixed address', async () => {
+  it('sets Work from the current location as a fixed address, named by its street in live mode', async () => {
+    appStorage.settings.setDemoMode(false);
     grantLocationAt(DEMO_PLACES.chatswoodOffice.coordinate);
     await renderApp('/saved');
     const user = userEvent.setup();
@@ -76,6 +78,23 @@ describe('Home and Work', () => {
       coordinate: DEMO_PLACES.chatswoodOffice.coordinate,
       kind: 'address',
     });
+  });
+
+  it('pins Work at the current location in demo mode, without asking Apple for the street', async () => {
+    grantLocationAt(DEMO_PLACES.chatswoodOffice.coordinate);
+    await renderApp('/saved');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Work, Not set' }));
+    await user.press(screen.getByRole('button', { name: 'Use my current location' }));
+
+    expect(await screen.findByRole('button', { name: 'Work, Pinned location' })).toBeOnTheScreen();
+    expect(appStorage.places.get().work).toEqual({
+      name: 'Pinned location',
+      coordinate: DEMO_PLACES.chatswoodOffice.coordinate,
+      kind: 'address',
+    });
+    expect(Location.reverseGeocodeAsync).not.toHaveBeenCalled();
   });
 
   it('removes Home only after confirming', async () => {
@@ -120,7 +139,8 @@ describe('favourite places', () => {
 
     expect(await screen.findByText('Results screen')).toBeOnTheScreen();
     expect(planSession.getState().request).toMatchObject({
-      origin: { name: '12 Example Street, Rouse Hill', kind: 'current-location' },
+      // Demo mode never asks Apple for the street name.
+      origin: { name: 'Current location', kind: 'current-location' },
       destination: DEMO_PLACES.macquarieUniversity,
       time: { type: 'depart', at: expect.stringMatching(/^2026-10-26T20:30:/) },
       access: { transit: true, drive: true, dropOff: false },
@@ -290,16 +310,13 @@ describe('parking spots', () => {
     await user.press(screen.getByRole('button', { name: 'Add a parking spot' }));
     await user.press(screen.getByRole('button', { name: 'Use my current location' }));
 
-    expect(await screen.findByLabelText('9 Example Road, Kellyville')).toBeOnTheScreen();
+    expect(await screen.findByLabelText('Pinned location')).toBeOnTheScreen();
     expect(appStorage.parkingSpots.get()).toEqual([
-      expect.objectContaining({
-        name: '9 Example Road, Kellyville',
-        coordinate: { lat: -33.7, lon: 150.94 },
-      }),
+      expect.objectContaining({ name: 'Pinned location', coordinate: { lat: -33.7, lon: 150.94 } }),
     ]);
 
     answerNextAlert('Delete');
-    await user.press(screen.getByRole('button', { name: 'Delete 9 Example Road, Kellyville' }));
+    await user.press(screen.getByRole('button', { name: 'Delete Pinned location' }));
     expect(appStorage.parkingSpots.get()).toEqual([]);
   });
 });

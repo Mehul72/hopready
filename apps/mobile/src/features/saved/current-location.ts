@@ -2,6 +2,7 @@ import type { Place } from '@hopready/core';
 import { Alert } from 'react-native';
 
 import { type CurrentPlaceResult, openLocationSettings, requestCurrentPlace } from '@/location';
+import { tripService } from '@/trip';
 
 import { errorName } from './storage-writes';
 
@@ -61,7 +62,9 @@ function problemFor(
 export async function findCurrentPlace(): Promise<CurrentPlaceOutcome> {
   let result: CurrentPlaceResult;
   try {
-    result = await requestCurrentPlace();
+    result = await requestCurrentPlace({
+      lookUpStreetName: tripService.currentMode() === 'live',
+    });
   } catch (error) {
     console.warn(`HopReady: could not get the current location (${errorName(error)}).`);
     return {

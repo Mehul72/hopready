@@ -2,6 +2,7 @@ import type { Place } from '@hopready/core';
 import { useEffect, useRef, useState } from 'react';
 
 import { type CurrentPlaceResult, requestCurrentPlace } from '@/location';
+import { tripService } from '@/trip';
 
 export type LocationAttempt =
   { status: 'idle' } | { status: 'locating' } | Exclude<CurrentPlaceResult, { status: 'granted' }>;
@@ -40,7 +41,9 @@ export function useCurrentPlace(): CurrentPlaceRequest {
     setAttempt({ status: 'locating' });
     let result: CurrentPlaceResult;
     try {
-      result = await requestCurrentPlace();
+      result = await requestCurrentPlace({
+        lookUpStreetName: tripService.currentMode() === 'live',
+      });
     } catch (error) {
       if (generation.current !== mine) return null;
       // The permission or position call itself failed. Typing a place still works, so this is

@@ -1,5 +1,7 @@
 import type { Place } from '@hopready/core';
 
+import { CURRENT_LOCATION_LABEL } from '@/location';
+
 // Storage accepts labels up to 60 characters (src/storage/schemas.ts).
 const LABEL_MAX_LENGTH = 60;
 const PARKING_SPOT_NAME_MAX_LENGTH = 120;
@@ -30,8 +32,14 @@ export function parkingSpotNameFor(place: Place): string {
   return place.name.trim().slice(0, PARKING_SPOT_NAME_MAX_LENGTH);
 }
 
+// What a saved copy of the current location is called when no street name was looked up (demo
+// mode, or the lookup failed). "Current location" would later read as "find me again".
+export const PINNED_LOCATION_NAME = 'Pinned location';
+
 // A saved place is a fixed spot. Kept as "current location" it would be re-located every time it
 // is used, so it becomes an address with the label found for it.
 export function asFixedPlace(place: Place): Place {
-  return place.kind === 'current-location' ? { ...place, kind: 'address' } : place;
+  if (place.kind !== 'current-location') return place;
+  const name = place.name === CURRENT_LOCATION_LABEL ? PINNED_LOCATION_NAME : place.name;
+  return { ...place, name, kind: 'address' };
 }

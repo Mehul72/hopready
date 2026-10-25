@@ -74,7 +74,7 @@ describe('requestCurrentPlace', () => {
     expect(mocked.position).not.toHaveBeenCalled();
   });
 
-  it('returns the position with a street label when permission is granted', async () => {
+  it('names the street when asked to, once permission is granted', async () => {
     mocked.request.mockResolvedValueOnce(permission(true, true));
     mocked.position.mockResolvedValueOnce(ROUSE_HILL);
     mocked.reverseGeocode.mockResolvedValueOnce([
@@ -86,7 +86,7 @@ describe('requestCurrentPlace', () => {
       }),
     ]);
 
-    await expect(requestCurrentPlace()).resolves.toEqual({
+    await expect(requestCurrentPlace({ lookUpStreetName: true })).resolves.toEqual({
       status: 'granted',
       place: {
         name: '12 Example St, Rouse Hill',
@@ -102,12 +102,25 @@ describe('requestCurrentPlace', () => {
     mocked.position.mockResolvedValueOnce(ROUSE_HILL);
     mocked.reverseGeocode.mockRejectedValueOnce(new Error('Geocoder rate limited'));
 
+    const result = await requestCurrentPlace({ lookUpStreetName: true });
+
+    expect(result).toEqual({
+      status: 'granted',
+      place: expect.objectContaining({ name: CURRENT_LOCATION_LABEL, kind: 'current-location' }),
+    });
+  });
+
+  it('sends the position nowhere unless asked to name the street', async () => {
+    mocked.request.mockResolvedValueOnce(permission(true, true));
+    mocked.position.mockResolvedValueOnce(ROUSE_HILL);
+
     const result = await requestCurrentPlace();
 
     expect(result).toEqual({
       status: 'granted',
       place: expect.objectContaining({ name: CURRENT_LOCATION_LABEL, kind: 'current-location' }),
     });
+    expect(mocked.reverseGeocode).not.toHaveBeenCalled();
   });
 
   it('does not use a position outside Greater Sydney', async () => {

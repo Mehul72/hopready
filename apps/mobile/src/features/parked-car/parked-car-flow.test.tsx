@@ -155,6 +155,8 @@ describe('confirming where the car is', () => {
   });
 
   it('can use the current location, labelled as only near the address', async () => {
+    // Live mode, where the street name is looked up; demo mode sends the position nowhere.
+    appStorage.settings.setDemoMode(false);
     grantLocationAt(
       { lat: -33.742, lon: 150.956 },
       { name: '5 Example Close', city: 'Bella Vista' },
@@ -360,7 +362,7 @@ describe('Take me home', () => {
     expect(await screen.findByText('Results screen')).toBeOnTheScreen();
     const { request } = planSession.getState();
     expect(request).toMatchObject({
-      origin: { name: '1 Example Street, Chatswood', kind: 'current-location' },
+      origin: { name: 'Current location', kind: 'current-location' },
       destination: DEMO_PLACES.rouseHillHome,
       time: { type: 'depart' },
       trip: {

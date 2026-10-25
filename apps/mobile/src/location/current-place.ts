@@ -70,9 +70,17 @@ async function labelFor(coordinate: Coordinate): Promise<string> {
   }
 }
 
+export interface CurrentPlaceOptions {
+  // Naming the street sends the position from the phone to Apple, through iOS. Only live mode,
+  // which the person has agreed to, may do that; demo mode sends nothing.
+  lookUpStreetName?: boolean;
+}
+
 // Call only from a person's action, such as tapping "Use my location": this is when iOS shows the
 // permission prompt. Nothing is logged, and the position is not stored by this function.
-export async function requestCurrentPlace(): Promise<CurrentPlaceResult> {
+export async function requestCurrentPlace({
+  lookUpStreetName = false,
+}: CurrentPlaceOptions = {}): Promise<CurrentPlaceResult> {
   const permission = await requestForegroundPermissionsAsync();
   if (!permission.granted) return { status: 'denied', canAskAgain: permission.canAskAgain };
 
@@ -99,7 +107,11 @@ export async function requestCurrentPlace(): Promise<CurrentPlaceResult> {
 
   return {
     status: 'granted',
-    place: { name: await labelFor(coordinate), coordinate, kind: 'current-location' },
+    place: {
+      name: lookUpStreetName ? await labelFor(coordinate) : CURRENT_LOCATION_LABEL,
+      coordinate,
+      kind: 'current-location',
+    },
   };
 }
 
