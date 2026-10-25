@@ -188,6 +188,27 @@ export function parkAndRideItinerary({
   });
 }
 
+// Drive 35 min, all the way to the destination.
+export function driveOnlyItinerary({ departAt }: Pick<ItineraryOptions, 'departAt'>): Itinerary {
+  return buildItinerary({
+    strategy: 'drive-only',
+    legs: [
+      {
+        id: 'drive-to-office',
+        kind: 'drive',
+        from: PLACES.rouseHillHome,
+        to: PLACES.chatswoodOffice,
+        start: departAt,
+        end: addMinutes(departAt, 35),
+        source: 'apple-maps',
+        timing: 'estimated',
+        distanceMetres: 31_000,
+        trafficAware: true,
+      },
+    ],
+  });
+}
+
 export function planResponse(
   itineraries: Itinerary[],
   options: { mode?: 'live' | 'demo'; generatedAt?: string } = {},

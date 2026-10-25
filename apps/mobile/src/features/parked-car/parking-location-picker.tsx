@@ -1,3 +1,4 @@
+import type { Coordinate } from '@hopready/core';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -9,7 +10,13 @@ import { useCarParks } from '@/trip';
 import { ChoiceRow } from '../settings/choice-row';
 import { findCurrentPlace } from '../saved/current-location';
 import { writeOrAlert } from '../saved/storage-writes';
-import { choiceKey, type ParkingChoice, type SuggestedCarPark } from './parking-choice';
+import {
+  choiceKey,
+  type ParkingChoice,
+  PINNED_LOCATION_NAME,
+  type SuggestedCarPark,
+} from './parking-choice';
+import { PinDropMap } from './pin-drop-map';
 
 // Lists longer than this get a filter field.
 const FILTER_FROM_COUNT = 8;
@@ -17,6 +24,9 @@ const FILTER_FROM_COUNT = 8;
 export interface ParkingLocationPickerProps {
   // The car park the trip planned to use. A suggestion only: the person still has to choose it.
   suggestion: SuggestedCarPark | null;
+  // Where the pin starts for "Somewhere else", a spot in none of the lists, such as a street near
+  // a full car park. Without it, that choice is left out.
+  pinStart?: Coordinate | null;
   selected: ParkingChoice | null;
   onSelect: (choice: ParkingChoice) => void;
   // Goes up each time the place is chosen outside this list, such as by moving a pin, so a
@@ -26,6 +36,10 @@ export interface ParkingLocationPickerProps {
 
 function normalise(text: string): string {
   return text.trim().toLowerCase();
+}
+
+function pinAt(coordinate: Coordinate): ParkingChoice {
+  return { kind: 'pin', name: PINNED_LOCATION_NAME, coordinate };
 }
 
 function DocumentedCarParks({
@@ -127,10 +141,11 @@ function DocumentedCarParks({
   );
 }
 
-// The ways to say where the car is: the trip's suggestion, the current location, a spot the
-// person saved, or any documented Park&Ride car park.
+// The ways to say where the car is: the trip's suggestion, the current location, a pin, a spot
+// the person saved, or any documented Park&Ride car park.
 export function ParkingLocationPicker({
   suggestion,
+  pinStart = null,
   selected,
   onSelect,
   choicesMadeElsewhere = 0,
@@ -175,8 +190,14 @@ export function ParkingLocationPicker({
       onSelect({ kind: 'current-location', place: outcome.place });
       return;
     }
-    setLocationProblem(`${outcome.message} Choose a car park or saved spot instead.`);
+    setLocationProblem(outcome.message);
   };
+
+  // Without the location, a pin is the only way left to give a spot in none of the lists, such as
+  // a street near a full car park.
+  const otherWays = pinStart
+    ? 'Choose Somewhere else to put a pin where you parked, or choose a car park or saved spot.'
+    : 'Choose a car park or saved spot instead.';
 
   return (
     <View style={styles.group}>
@@ -211,7 +232,27 @@ export function ParkingLocationPicker({
           void chooseCurrentLocation();
         }}
       />
-      {locationProblem ? <Banner tone="warning" message={locationProblem} announce /> : null}
+      {locationProblem ? (
+        <Banner tone="warning" message={`${locationProblem} ${otherWays}`} announce />
+      ) : null}
+
+      {pinStart ? (
+        <>
+          <ChoiceRow
+            title="Somewhere else"
+            subtitle="Put a pin on a map where you parked."
+            selected={selectedKey === 'pin'}
+            // Choosing it again keeps a pin that was already moved.
+            onPress={() => choose(selected?.kind === 'pin' ? selected : pinAt(pinStart))}
+          />
+          {selected?.kind === 'pin' ? (
+            <PinDropMap
+              coordinate={selected.coordinate}
+              onMove={(coordinate) => choose(pinAt(coordinate))}
+            />
+          ) : null}
+        </>
+      ) : null}
 
       {spots.length > 0 ? (
         <>

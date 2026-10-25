@@ -15,6 +15,7 @@ import {
   parkedCarFrom,
   parkedCarName,
   type ParkingChoice,
+  PINNED_LOCATION_NAME,
   suggestedCarParkOf,
 } from './parking-choice';
 import { ParkingLocationPicker } from './parking-location-picker';
@@ -24,7 +25,6 @@ type ParkedState = Extract<ParkedCarState, { status: 'parked' }>;
 
 // A pin moved this little is a nudge within the same car park or street, so it keeps its name.
 const SAME_SPOT_METRES = 300;
-const PINNED_LOCATION_NAME = 'Pinned location';
 
 // `onRemoved` runs after a successful removal, for screens that should then close.
 export function removeParkedCar(onRemoved?: () => void): void {

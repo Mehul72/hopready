@@ -28,6 +28,8 @@ export type ParkingChoice =
   | { kind: 'saved-spot'; spot: SavedParkingSpot }
   | { kind: 'pin'; name: string; coordinate: Coordinate };
 
+export const PINNED_LOCATION_NAME = 'Pinned location';
+
 // The documented car park a trip planned to use. Spots the person saved are listed separately.
 export interface SuggestedCarPark {
   carParkId: string;
@@ -41,6 +43,12 @@ export function suggestedCarParkOf(
   const carPark = itinerary?.parking?.carPark;
   if (!carPark || carPark.kind !== 'transport-park-and-ride') return null;
   return { carParkId: carPark.id, name: carPark.name, coordinate: carPark.coordinate };
+}
+
+// Where the trip's drive ends, which is where it expected the car to be left.
+export function driveEndOf(itinerary: Itinerary | null | undefined): Coordinate | null {
+  const drive = itinerary?.legs.find((leg) => leg.kind === 'drive');
+  return drive?.to.coordinate ?? null;
 }
 
 export interface ParkedCarRecord {

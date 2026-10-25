@@ -1,3 +1,4 @@
+import type { Itinerary } from '@hopready/core';
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { fireEvent, userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor } from 'expo-router/testing-library';
@@ -5,7 +6,12 @@ import { Alert, type AlertButton } from 'react-native';
 
 import { planSession } from '@/state';
 import { appStorage, createAppStorage, sqliteBackend } from '@/storage';
-import { parkAndRideItinerary, planRequest } from '@/test-support/trips';
+import {
+  driveOnlyItinerary,
+  parkAndRideItinerary,
+  planRequest,
+  PLACES,
+} from '@/test-support/trips';
 
 import {
   denyLocation,
@@ -37,6 +43,15 @@ function parkAtKellyvilleNorth() {
     },
     KELLYVILLE_NORTH.name,
   );
+}
+
+function follow(itinerary: Itinerary) {
+  appStorage.activeTrip.start({
+    request: planRequest(),
+    itinerary,
+    plannedAt: WEEKDAY_MORNING.toISOString(),
+    mode: 'demo',
+  });
 }
 
 // Presses the button with this text in the next alert, as a person would.
@@ -216,6 +231,73 @@ describe('confirming where the car is', () => {
       ),
     ).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Save where I parked' })).toBeDisabled();
+  });
+
+  it('saves a pinned spot when the location cannot be used', async () => {
+    denyLocation(false);
+    follow(parkAndRideItinerary({ departAt: '2026-10-26T20:40:00.000Z' }));
+    await renderApp('/parked-car/confirm');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('radio', { name: /^Where I am now/ }));
+    expect(
+      await screen.findByLabelText(
+        'Warning. Location access is off for HopReady. You can turn it on in Settings. Choose Somewhere else to put a pin where you parked, or choose a car park or saved spot.',
+      ),
+    ).toBeOnTheScreen();
+    // The pin starts at the trip's car park, and the arrows move it without dragging.
+    await user.press(
+      screen.getByRole('radio', { name: 'Somewhere else, Put a pin on a map where you parked.' }),
+    );
+    await user.press(screen.getByRole('button', { name: 'Move pin north' }));
+    await user.press(screen.getByRole('button', { name: 'Save where I parked' }));
+
+    const state = appStorage.parkedCar.get();
+    if (state.status !== 'parked') throw new Error('Expected the car to be parked');
+    // A pin is never taken for the suggested car park, however close to it.
+    expect(state).toMatchObject({
+      parkedCar: { location: { name: 'Pinned location', kind: 'parked-car' }, carParkId: null },
+      carParkName: null,
+    });
+    const carPark = PLACES.tallawongCarPark.coordinate;
+    expect(state.parkedCar.location.coordinate.lon).toBeCloseTo(carPark.lon, 9);
+    expect((state.parkedCar.location.coordinate.lat - carPark.lat) * 111_320).toBeCloseTo(
+      NUDGE_METRES,
+      3,
+    );
+  });
+
+  it("starts the pin where the followed trip's drive ends when it suggests no car park", async () => {
+    follow(driveOnlyItinerary({ departAt: '2026-10-26T20:00:00.000Z' }));
+    await renderApp('/parked-car/confirm');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+    await user.press(screen.getByRole('button', { name: 'Save where I parked' }));
+
+    expect(appStorage.parkedCar.get()).toMatchObject({
+      status: 'parked',
+      parkedCar: {
+        location: { name: 'Pinned location', coordinate: PLACES.chatswoodOffice.coordinate },
+      },
+    });
+  });
+
+  it('keeps a moved pin when Somewhere else is chosen again', async () => {
+    follow(parkAndRideItinerary({ departAt: '2026-10-26T20:40:00.000Z' }));
+    await renderApp('/parked-car/confirm');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+    await user.press(screen.getByRole('button', { name: 'Move pin east' }));
+    await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+    await user.press(screen.getByRole('button', { name: 'Save where I parked' }));
+
+    const state = appStorage.parkedCar.get();
+    if (state.status !== 'parked') throw new Error('Expected the car to be parked');
+    expect(state.parkedCar.location.coordinate.lon).toBeGreaterThan(
+      PLACES.tallawongCarPark.coordinate.lon,
+    );
   });
 
   it("suggests the followed trip's car park when opened from the Car tab", async () => {

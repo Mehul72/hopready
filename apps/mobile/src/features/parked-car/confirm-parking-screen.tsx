@@ -10,6 +10,7 @@ import { useDisplayedTrip } from '../itinerary/use-displayed-trip';
 import { writeOrAlert } from '../saved/storage-writes';
 import { closeParkingSheet } from './close-sheet';
 import {
+  driveEndOf,
   parkedCarFrom,
   parkedCarName,
   type ParkingChoice,
@@ -45,7 +46,10 @@ export function ConfirmParkingScreen({ itineraryId, initialArrival }: ConfirmPar
   const trip = useDisplayedTrip(itineraryId ?? '');
   const activeTrip = useActiveTrip();
   // Opened without a trip (from the Car tab), the trip being followed is the best guess.
-  const suggestion = suggestedCarParkOf(trip?.itinerary ?? activeTrip?.itinerary);
+  const itinerary = trip?.itinerary ?? activeTrip?.itinerary;
+  const suggestion = suggestedCarParkOf(itinerary);
+  // A pin for a spot in none of the lists starts where the trip expected to leave the car.
+  const pinStart = suggestion?.coordinate ?? driveEndOf(itinerary);
   const [arrival, setArrival] = useState<ArrivalKind>(initialArrival);
   const [choice, setChoice] = useState<ParkingChoice | null>(null);
   const canSave = arrival === 'dropped-off' || choice !== null;
@@ -102,7 +106,12 @@ export function ConfirmParkingScreen({ itineraryId, initialArrival }: ConfirmPar
           <AppText tone="secondary">
             Take me home plans your way back to the spot you choose here.
           </AppText>
-          <ParkingLocationPicker suggestion={suggestion} selected={choice} onSelect={setChoice} />
+          <ParkingLocationPicker
+            suggestion={suggestion}
+            pinStart={pinStart}
+            selected={choice}
+            onSelect={setChoice}
+          />
         </View>
       ) : (
         <View style={styles.section}>
