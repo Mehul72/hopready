@@ -145,8 +145,9 @@ export function describeStepNotes(
   transferBufferMinutes: number | null,
 ): StepNotes[] {
   const changes = changeNotes(legs, transferBufferMinutes);
+  const stationAccess = stationAccessNotes(legs);
   return legs.map((_, index) =>
-    [changes.get(index), stationAccessNote(legs, index)].filter(
+    [changes.get(index), stationAccess.get(index)].filter(
       (note): note is Wording => note !== undefined,
     ),
   );
@@ -191,34 +192,57 @@ function describeChange(
 }
 
 // Train and metro stations have several ways in and out, unlike bus, light rail and ferry stops.
-// Nothing HopReady reads from TfNSW names the one a walk uses, and an exit is never guessed.
+// Nothing HopReady reads from TfNSW names the one a person uses, and an exit is never guessed.
 const STATION_MODES: ReadonlySet<TransitMode> = new Set<TransitMode>(['train', 'metro']);
 
-function stationAccessNote(legs: readonly Leg[], index: number): Wording | undefined {
-  const walk = legs[index];
-  if (walk?.kind !== 'walk') return undefined;
-  const leavesStation = isStationService(legBeside(legs, index, -1));
-  const entersStation = isStationService(legBeside(legs, index, 1));
+type StationAccess = 'entrance' | 'exit';
+
+// Each way into or out of a station is noted once: on the walk through it, or on the train or
+// metro itself when no walk leads in or out, as after a drop-off or before a bus from a stop of
+// the same name.
+function stationAccessNotes(legs: readonly Leg[]): Map<number, Wording> {
+  const passed = new Map<number, StationAccess[]>();
+  const pass = (index: number | null, access: StationAccess) => {
+    if (index !== null) passed.set(index, [...(passed.get(index) ?? []), access]);
+  };
+  legs.forEach((leg, index) => {
+    if (!isStationService(leg)) return;
+    pass(stationAccessStep(legs, index, -1), 'entrance');
+    pass(stationAccessStep(legs, index, 1), 'exit');
+  });
+  const notes = new Map<number, Wording>();
+  passed.forEach((accesses, index) => {
+    const text = `${missingStationDetails(accesses)} not provided. Follow the station signs.`;
+    notes.set(index, { text, spoken: text });
+  });
+  return notes;
+}
+
+// The step that goes through the entrance (-1) or exit (1) of the station served at `index`: the
+// walk beside it, or else the service itself. Null when the person changes trains inside, or when
+// the trip starts or ends at the station itself and so passes no way in or out at that end.
+function stationAccessStep(legs: readonly Leg[], index: number, direction: -1 | 1): number | null {
+  const besideIndex = indexBeside(legs, index, direction);
+  const beside = legs[besideIndex];
+  if (beside === undefined || isStationService(beside)) return null;
+  if (beside.kind !== 'walk') return index;
   // A change of platform inside one station passes no entrance or exit.
-  if (leavesStation && entersStation && walk.from.name === walk.to.name) return undefined;
-  const missing = missingStationDetails(leavesStation, entersStation);
-  if (!missing) return undefined;
-  const text = `${missing} not provided. Follow the station signs.`;
-  return { text, spoken: text };
+  const across = legs[indexBeside(legs, besideIndex, direction)];
+  return isStationService(across) && beside.from.name === beside.to.name ? null : besideIndex;
 }
 
-function missingStationDetails(leavesStation: boolean, entersStation: boolean): string | null {
-  if (leavesStation && entersStation) return 'Exit and entrance details';
-  if (leavesStation) return 'Exit details';
-  if (entersStation) return 'Entrance details';
-  return null;
+// Named in the order they are passed: out of one station and into the next on a walk, in and then
+// out on a train or metro.
+function missingStationDetails(accesses: readonly StationAccess[]): string {
+  const named = accesses.join(' and ');
+  return `${named.charAt(0).toUpperCase()}${named.slice(1)} details`;
 }
 
-// The leg before (-1) or after (1) the one at `index`, looking past a wait at the same stop.
-function legBeside(legs: readonly Leg[], index: number, direction: -1 | 1): Leg | undefined {
+// Where the leg before (-1) or after (1) the one at `index` is, looking past a wait at the same stop.
+function indexBeside(legs: readonly Leg[], index: number, direction: -1 | 1): number {
   let position = index + direction;
   while (legs[position]?.kind === 'wait') position += direction;
-  return legs[position];
+  return position;
 }
 
 function isStationService(leg: Leg | undefined): boolean {

@@ -483,4 +483,25 @@ describe('LegRow', () => {
       ),
     ).toBeOnTheScreen();
   });
+
+  it('says on the service when no walk leads into the station, on screen and for VoiceOver', async () => {
+    const arrive = formatSydneyTime(addMinutes(START, 40));
+    await renderStepOf(
+      [
+        { ...bufferLeg('drop-off', 2), start: addMinutes(START, -2), end: START },
+        transitLeg(),
+        { ...walkLeg(488), start: addMinutes(START, 40), end: addMinutes(START, 47) },
+      ],
+      1,
+    );
+
+    expect(
+      screen.getByText('Entrance details not provided. Follow the station signs.'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        `${leaveTime}. Metro M1 towards Sydenham. From Tallawong Station, ${PLATFORM_NOT_PROVIDED}. To Chatswood Station, arriving ${arrive}. 13 stops. Timetable time, not live. Entrance details not provided. Follow the station signs.`,
+      ),
+    ).toBeOnTheScreen();
+  });
 });

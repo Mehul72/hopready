@@ -56,6 +56,10 @@ const STOPS = {
   martinPlace: place('Martin Place Station', -33.867648, 151.210583, 'stop'),
   barangaroo: place('Barangaroo Station', -33.859577, 151.202615, 'stop'),
   central: place('Central Station', -33.884024, 151.206203, 'stop'),
+  kellyville: place('Kellyville Station', -33.713514, 150.935304, 'stop'),
+  hornsby: place('Hornsby Station', -33.703, 151.0985, 'stop'),
+  gordon: place('Gordon Station', -33.7559, 151.1541, 'stop'),
+  frenchsForest: place('Frenchs Forest Rd Opp Nth Beaches Hospital', -33.7515, 151.2337, 'stop'),
 };
 
 // Legs are timed in minutes after the first service leaves, so each trip reads as a timeline.
@@ -105,6 +109,23 @@ function wait(stop: Place, minutes: [number, number]): Leg {
     end: at(minutes[1]),
     source: 'hopready',
     timing: 'scheduled',
+  };
+}
+
+function bufferStep(
+  kind: 'drop-off' | 'car-retrieval',
+  where: Place,
+  minutes: [number, number],
+): Leg {
+  return {
+    id: `${kind}-${minutes[0]}`,
+    kind,
+    from: where,
+    to: where,
+    start: at(minutes[0]),
+    end: at(minutes[1]),
+    source: 'hopready',
+    timing: 'buffer',
   };
 }
 
@@ -300,6 +321,68 @@ describe('station entrances and exits', () => {
       expect.objectContaining({ text: expect.stringMatching(/^Change at Central Station:/) }),
     ]);
     expect(describeStepNotes(byBus, 3)).toEqual([[], []]);
+  });
+
+  it('notes the entrance on the metro itself when a drop-off leads straight onto it', () => {
+    const legs = [
+      bufferStep('drop-off', STOPS.kellyville, [-4, -2]),
+      wait(STOPS.kellyville, [-2, 0]),
+      ride('M1', 'metro', STOPS.kellyville, PLACES.chatswoodStation, [0, 30]),
+      walk(PLACES.chatswoodStation, PLACES.chatswoodOffice, [30, 37]),
+    ];
+
+    expect(describeStepNotes(legs, 3)).toEqual([
+      [],
+      [],
+      [sentence('Entrance details not provided. Follow the station signs.')],
+      [sentence('Exit details not provided. Follow the station signs.')],
+    ]);
+  });
+
+  it('notes the exit on the train itself when the trip home goes straight to the car', () => {
+    const carPark = place('Gordon Henry St (north)', -33.756009, 151.154528, 'car-park');
+    const legs = [
+      walk(PLACES.chatswoodOffice, PLACES.chatswoodStation, [-7, 0]),
+      ride('T1', 'train', PLACES.chatswoodStation, STOPS.gordon, [0, 8]),
+      bufferStep('car-retrieval', carPark, [8, 13]),
+    ];
+
+    expect(describeStepNotes(legs, 3)).toEqual([
+      [sentence('Entrance details not provided. Follow the station signs.')],
+      [sentence('Exit details not provided. Follow the station signs.')],
+      [],
+    ]);
+  });
+
+  it('notes both on a metro between a drop-off and a bus from the stop of the same name', () => {
+    const legs = [
+      bufferStep('drop-off', STOPS.kellyville, [-2, 0]),
+      ride('M1', 'metro', STOPS.kellyville, PLACES.chatswoodStation, [0, 30]),
+      wait(PLACES.chatswoodStation, [30, 36]),
+      ride('280', 'bus', PLACES.chatswoodStation, STOPS.frenchsForest, [36, 52]),
+    ];
+    const notes = describeStepNotes(legs, 3);
+
+    expect(notes[1]).toEqual([
+      sentence('Entrance and exit details not provided. Follow the station signs.'),
+    ]);
+    expect(notes[2]).toEqual([
+      expect.objectContaining({ text: expect.stringMatching(/^Change at Chatswood Station:/) }),
+    ]);
+  });
+
+  it('says nothing at a station the trip starts or ends at, or between trains with a wait', () => {
+    const legs = [
+      ride('T1', 'train', STOPS.hornsby, PLACES.chatswoodStation, [0, 20]),
+      wait(PLACES.chatswoodStation, [20, 24]),
+      ride('M1', 'metro', PLACES.chatswoodStation, STOPS.barangaroo, [24, 40]),
+    ];
+
+    expect(describeStepNotes(legs, 3)).toEqual([
+      [],
+      [expect.objectContaining({ text: expect.stringMatching(/^Change at Chatswood Station:/) })],
+      [],
+    ]);
   });
 });
 

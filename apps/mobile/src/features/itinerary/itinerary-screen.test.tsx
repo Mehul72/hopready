@@ -99,6 +99,19 @@ describe('itinerary screen', () => {
     ).toBeOnTheScreen();
   });
 
+  it('says the station entrance is not provided when a drop-off leads straight onto the metro', async () => {
+    const itinerary = firstWithStrategy(await planDemoCommute(), 'drop-off');
+    await renderApp(`/itinerary/${itinerary.id}`);
+
+    const metro = screen.getByTestId('leg-transit');
+    expect(
+      within(metro).getByText('Entrance details not provided. Follow the station signs.'),
+    ).toBeOnTheScreen();
+    expect(
+      within(metro).getByLabelText(/Entrance details not provided\. Follow the station signs\.$/),
+    ).toBeOnTheScreen();
+  });
+
   it('credits Transport for NSW and Apple on live trips', async () => {
     appStorage.settings.setDemoMode(false);
     const live = parkAndRideItinerary({ departAt: '2026-10-26T20:40:00.000Z' });
