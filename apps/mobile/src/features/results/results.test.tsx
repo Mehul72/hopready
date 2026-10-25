@@ -160,6 +160,27 @@ describe('when nothing works', () => {
       screen.getByLabelText('Kellyville (north): A connection was found from here'),
     ).toBeOnTheScreen();
   });
+
+  it('says why a car park that worked has no card of its own', async () => {
+    const user = await planFromPlanTab(DEMO_PLACES.boxHillHome, DEMO_PLACES.chatswoodOffice);
+    await screen.findAllByTestId(/^route-card-/);
+
+    await user.press(screen.getByRole('button', { name: /^Car parks checked \(\d+\)$/ }));
+
+    expect(
+      screen.getByLabelText('Tallawong P2: A connection was found from here'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        'Kellyville (north): A car park shown above gets you there as early, with no more driving',
+      ),
+    ).toBeOnTheScreen();
+    expect(
+      shownItineraries().some(
+        (itinerary) => itinerary.parking?.carPark.name === 'Kellyville (north)',
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('error states', () => {

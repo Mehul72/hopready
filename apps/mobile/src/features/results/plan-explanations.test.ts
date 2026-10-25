@@ -65,5 +65,8 @@ describe('carParkOutcomeText', () => {
     );
     expect(carParkOutcomeText('provider-error', 25)).toBe("Couldn't be checked just now");
     expect(carParkOutcomeText('used', 25)).toBe('A connection was found from here');
+    expect(carParkOutcomeText('matched-by-another', 25)).toBe(
+      'A car park shown above gets you there as early, with no more driving',
+    );
   });
 });

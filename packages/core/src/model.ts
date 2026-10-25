@@ -316,6 +316,8 @@ export type RejectionReason = (typeof REJECTION_REASONS)[number];
 
 export const CAR_PARK_OUTCOMES = [
   'used',
+  // Its option worked but is left out: a car park shown with it is as good.
+  'matched-by-another',
   'too-far-to-drive',
   'not-towards-destination',
   'no-workable-connection',

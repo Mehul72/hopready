@@ -1170,7 +1170,16 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
     if (dominated) hidden.add(option);
     else shown.push(option);
   }
+  for (const option of hidden) recordMatchedCarPark(context, option);
   return options.filter((option) => !hidden.has(option));
+}
+
+// A hidden car park still worked, so the list of checked car parks says a shown one is as good,
+// instead of calling it used when the traveller cannot find its card.
+function recordMatchedCarPark(context: PlanContext, option: Itinerary) {
+  const checked = option.parking && context.checkedCarParks.get(option.parking.carPark.id);
+  if (!checked) return;
+  context.checkedCarParks.set(checked.id, { ...checked, outcome: 'matched-by-another' });
 }
 
 // At least as good on everything the results can be sorted by, read the way the app shows it, without

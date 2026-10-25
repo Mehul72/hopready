@@ -531,6 +531,20 @@ describe('leaving out car parks that are no better', () => {
     expect(await planWith(null)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
   });
 
+  it('says a hidden car park is matched by a shown one, rather than used', async () => {
+    const checkedWith = async (tallawongCount: Occupancy) =>
+      (await planTrip(request(), deps({ carParks: tallawongAndBellaVista(tallawongCount) })))
+        .checkedCarParks;
+    const bellaVista = (outcome: string) => ({
+      id: BELLA_VISTA.id,
+      name: BELLA_VISTA.name,
+      outcome,
+    });
+
+    expect(await checkedWith(count(60))).toContainEqual(bellaVista('matched-by-another'));
+    expect(await checkedWith(count(12))).toContainEqual(bellaVista('used'));
+  });
+
   describe('with a service alert or live times on one car park only', () => {
     const planWith = async (transit: TransitProvider) =>
       shownCarParks(

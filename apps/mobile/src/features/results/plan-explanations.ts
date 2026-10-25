@@ -8,6 +8,8 @@ export function carParkOutcomeText(outcome: CarParkOutcome, maxDriveMinutes: num
   switch (outcome) {
     case 'used':
       return 'A connection was found from here';
+    case 'matched-by-another':
+      return 'A car park shown above gets you there as early, with no more driving';
     case 'too-far-to-drive':
       return `Further than your ${maxDriveMinutes} min driving limit`;
     case 'not-towards-destination':

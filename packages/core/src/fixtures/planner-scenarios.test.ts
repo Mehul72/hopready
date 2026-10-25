@@ -712,16 +712,26 @@ describe('only real choices', () => {
 
   const carParksListed = (response: PlanResponse) =>
     byStrategy(response, 'park-and-ride').map((itinerary) => itinerary.parking!.carPark.name);
+  const checkedOutcomes = (response: PlanResponse) =>
+    Object.fromEntries(response.checkedCarParks.map(({ name, outcome }) => [name, outcome]));
 
-  it('lists Tallawong P2 from Box Hill at 7.30 am, without the slower Kellyville car parks behind it', async () => {
-    const response = await plan(request(), { now: TUESDAY_0730 });
-    expectSoundResponse(response);
+  // Each checked car park whose outcome disagrees with whether it has a card.
+  function misreadCarParks(response: PlanResponse): string[] {
+    const listed = new Set(
+      byStrategy(response, 'park-and-ride').map((itinerary) => itinerary.parking!.carPark.id),
+    );
+    return response.checkedCarParks.flatMap(({ id, name, outcome }) => {
+      if (outcome === 'used' && !listed.has(id)) return [`${name} reads as used with no card`];
+      if (outcome === 'matched-by-another' && listed.has(id)) {
+        return [`${name} has a card but reads as matched by another`];
+      }
+      return [];
+    });
+  }
 
-    expect(paddedOptions(response)).toEqual([]);
-    expect(carParksListed(response)).toEqual(['Tallawong P2']);
-  });
-
-  it('never lists a car park or station that a listed one matches or beats on every count', async () => {
+  // Three commutes by any means, every ten minutes through the morning and for three arrive-by
+  // times.
+  async function* planSampleCommutes() {
     const trips = [
       { origin: DEMO_PLACES.boxHillHome, destination: DEMO_PLACES.chatswoodOffice },
       { origin: DEMO_PLACES.collaroyPlateauHome, destination: DEMO_PLACES.waterlooOffice },
@@ -734,19 +744,48 @@ describe('only real choices', () => {
         now: TUESDAY_0700,
       })),
     ];
-    const padded: string[] = [];
     for (const trip of trips) {
       for (const { time, now } of times) {
-        const response = await plan(
-          request({ ...trip, time, access: { transit: true, drive: true, dropOff: true } }),
-          { now },
-        );
+        const planned = request({
+          ...trip,
+          time,
+          access: { transit: true, drive: true, dropOff: true },
+        });
         const when = `${time.type} ${formatSydneyTime(time.at)} from ${trip.origin.name}`;
-        padded.push(...paddedOptions(response).map((entry) => `${when}: ${entry}`));
+        yield { when, request: planned, now, response: await plan(planned, { now }) };
       }
+    }
+  }
+
+  it('lists Tallawong P2 from Box Hill at 7.30 am, without the slower Kellyville car parks behind it', async () => {
+    const response = await plan(request(), { now: TUESDAY_0730 });
+    expectSoundResponse(response);
+
+    expect(paddedOptions(response)).toEqual([]);
+    expect(carParksListed(response)).toEqual(['Tallawong P2']);
+    expect(checkedOutcomes(response)).toMatchObject({
+      'Tallawong P2': 'used',
+      'Kellyville (north)': 'matched-by-another',
+      'Kellyville (south)': 'matched-by-another',
+    });
+  });
+
+  it('never lists a car park or station that a listed one matches or beats on every count', async () => {
+    const padded: string[] = [];
+    for await (const { when, response } of planSampleCommutes()) {
+      padded.push(...paddedOptions(response).map((entry) => `${when}: ${entry}`));
     }
 
     expect(padded).toEqual([]);
+  });
+
+  it('reads a car park as used only with a card, and as matched by another only without', async () => {
+    const misread: string[] = [];
+    for await (const { when, response } of planSampleCommutes()) {
+      misread.push(...misreadCarParks(response).map((entry) => `${when}: ${entry}`));
+    }
+
+    expect(misread).toEqual([]);
   });
 
   it('keeps Kellyville (north) as somewhere else to park while Tallawong P2 is nearly full', async () => {
