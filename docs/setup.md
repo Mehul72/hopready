@@ -20,6 +20,7 @@ From a clean Mac to the app running in the iOS simulator, in demo mode first and
 
 ```sh
 git clone git@github.com:Mehul72/hopready.git && cd hopready
+git switch feat/hopready-v1   # until the branch is merged; main holds only the first commit
 CI=true pnpm install --frozen-lockfile --config.confirm-modules-purge=false < /dev/null
 pnpm check
 ```
