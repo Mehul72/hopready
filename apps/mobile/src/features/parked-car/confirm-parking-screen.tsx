@@ -1,4 +1,4 @@
-import { toIso } from '@hopready/core';
+import { type Coordinate, toIso } from '@hopready/core';
 import { useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 
@@ -54,6 +54,7 @@ export function ConfirmParkingScreen({ itineraryId, initialArrival }: ConfirmPar
   const pinStart = suggestion?.coordinate ?? driveEndOf(itinerary);
   const [arrival, setArrival] = useState<ArrivalKind>(initialArrival);
   const [choice, setChoice] = useState<ParkingChoice | null>(null);
+  const [placedPin, setPlacedPin] = useState<Coordinate | null>(null);
   const canSave = arrival === 'dropped-off' || choice !== null;
 
   const save = () => {
@@ -110,7 +111,9 @@ export function ConfirmParkingScreen({ itineraryId, initialArrival }: ConfirmPar
           </AppText>
           <ParkingLocationPicker
             suggestion={suggestion}
-            pinStart={pinStart}
+            pin={
+              pinStart ? { start: pinStart, placed: placedPin, onPlace: setPlacedPin } : undefined
+            }
             selected={choice}
             onSelect={setChoice}
           />

@@ -21,12 +21,21 @@ import { PinDropMap } from './pin-drop-map';
 // Lists longer than this get a filter field.
 const FILTER_FROM_COUNT = 8;
 
+export interface PinOption {
+  // Where the pin starts: where the trip expected the car to be left.
+  start: Coordinate;
+  // Where the person last put the pin. The screen keeps it, so trying another choice, or switching
+  // to "I was dropped off" and back, never loses it.
+  placed: Coordinate | null;
+  onPlace: (coordinate: Coordinate) => void;
+}
+
 export interface ParkingLocationPickerProps {
   // The car park the trip planned to use. A suggestion only: the person still has to choose it.
   suggestion: SuggestedCarPark | null;
-  // Where the pin starts for "Somewhere else", a spot in none of the lists, such as a street near
+  // Offers "Somewhere else", a pin on a map for a spot in none of the lists, such as a street near
   // a full car park. Without it, that choice is left out.
-  pinStart?: Coordinate | null;
+  pin?: PinOption;
   selected: ParkingChoice | null;
   onSelect: (choice: ParkingChoice) => void;
   // Goes up each time the place is chosen outside this list, such as by moving a pin, so a
@@ -145,7 +154,7 @@ function DocumentedCarParks({
 // the person saved, or any documented Park&Ride car park.
 export function ParkingLocationPicker({
   suggestion,
-  pinStart = null,
+  pin,
   selected,
   onSelect,
   choicesMadeElsewhere = 0,
@@ -195,7 +204,7 @@ export function ParkingLocationPicker({
 
   // Without the location, a pin is the only way left to give a spot in none of the lists, such as
   // a street near a full car park.
-  const otherWays = pinStart
+  const otherWays = pin
     ? 'Choose Somewhere else to put a pin where you parked, or choose a car park or saved spot.'
     : 'Choose a car park or saved spot instead.';
 
@@ -236,19 +245,22 @@ export function ParkingLocationPicker({
         <Banner tone="warning" message={`${locationProblem} ${otherWays}`} announce />
       ) : null}
 
-      {pinStart ? (
+      {pin ? (
         <>
           <ChoiceRow
             title="Somewhere else"
             subtitle="Put a pin on a map where you parked."
             selected={selectedKey === 'pin'}
-            // Choosing it again keeps a pin that was already moved.
-            onPress={() => choose(selected?.kind === 'pin' ? selected : pinAt(pinStart))}
+            // A pin already moved comes back where it was left.
+            onPress={() => choose(pinAt(pin.placed ?? pin.start))}
           />
           {selected?.kind === 'pin' ? (
             <PinDropMap
               coordinate={selected.coordinate}
-              onMove={(coordinate) => choose(pinAt(coordinate))}
+              onMove={(coordinate) => {
+                pin.onPlace(coordinate);
+                choose(pinAt(coordinate));
+              }}
             />
           ) : null}
         </>

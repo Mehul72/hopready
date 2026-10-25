@@ -300,6 +300,32 @@ describe('confirming where the car is', () => {
     );
   });
 
+  it('brings back a moved pin after other choices were tried', async () => {
+    follow(parkAndRideItinerary({ departAt: '2026-10-26T20:40:00.000Z' }));
+    await renderApp('/parked-car/confirm');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+    for (let presses = 0; presses < 5; presses += 1) {
+      await user.press(screen.getByRole('button', { name: 'Move pin west' }));
+    }
+    await user.press(screen.getByRole('radio', { name: 'I was dropped off' }));
+    await user.press(screen.getByRole('radio', { name: 'I parked my car' }));
+    await user.press(screen.getByRole('radio', { name: /^Tallawong P1, Suggested by your trip/ }));
+    await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+    await user.press(screen.getByRole('button', { name: 'Save where I parked' }));
+
+    const state = appStorage.parkedCar.get();
+    if (state.status !== 'parked') throw new Error('Expected the car to be parked');
+    const carPark = PLACES.tallawongCarPark.coordinate;
+    const { lat, lon } = state.parkedCar.location.coordinate;
+    expect(lat).toBeCloseTo(carPark.lat, 9);
+    expect((carPark.lon - lon) * 111_320 * Math.cos((carPark.lat * Math.PI) / 180)).toBeCloseTo(
+      5 * NUDGE_METRES,
+      3,
+    );
+  });
+
   it("suggests the followed trip's car park when opened from the Car tab", async () => {
     appStorage.activeTrip.start({
       request: planRequest(),
