@@ -10,11 +10,17 @@
       "environment": "development",
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "HOPREADY_DEMO_SCENARIOS": "1"
       }
     },
     "preview": {
       "distribution": "internal",
-      "environment": "preview"
+      "environment": "preview",
+      "env": {
+        "HOPREADY_DEMO_SCENARIOS": "1"
+      }
     },
     "production": {
       "autoIncrement": true,

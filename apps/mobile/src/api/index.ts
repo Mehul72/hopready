@@ -5,7 +5,12 @@ export {
   PLACE_QUERY_MAX_LENGTH,
   PLACE_QUERY_MIN_LENGTH,
 } from './client';
-export { readApiBaseUrl, readSupportLinks, type SupportLinks } from './config';
+export {
+  readApiBaseUrl,
+  readDemoScenariosAllowed,
+  readSupportLinks,
+  type SupportLinks,
+} from './config';
 export {
   API_ERROR_KINDS,
   ApiError,

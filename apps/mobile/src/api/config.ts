@@ -44,3 +44,19 @@ export function readSupportLinks(extra: unknown = Constants.expoConfig?.extra): 
     supportUrl: (parsed.success && parsed.data.supportUrl) || null,
   };
 }
+
+const buildOptionsSchema = z.object({
+  demoScenarios: z.boolean().optional().catch(undefined),
+});
+
+// The sample situations that fake failures (a timeout, a cancelled service) are for development
+// and internal test builds (HOPREADY_DEMO_SCENARIOS=1). Store builds keep demo mode without them,
+// so nobody mistakes a staged outage for a real one.
+export function readDemoScenariosAllowed(
+  extra: unknown = Constants.expoConfig?.extra,
+  developmentBuild: boolean = __DEV__,
+): boolean {
+  if (developmentBuild) return true;
+  const parsed = buildOptionsSchema.safeParse(extra ?? {});
+  return parsed.success && parsed.data.demoScenarios === true;
+}

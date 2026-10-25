@@ -23,6 +23,7 @@ import {
   describeWait,
   PLACE_QUERY_MIN_LENGTH,
   type PlaceSearchResults,
+  readDemoScenariosAllowed,
 } from '@/api';
 import { appStorage, type AppSettings } from '@/storage';
 
@@ -175,8 +176,19 @@ export function createTripService(dependencies: TripServiceDependencies): TripSe
   };
 }
 
+// A scenario chosen in a development build must not follow the install into a store build, where
+// nothing on screen would explain the staged failures.
+export function withAllowedDemoScenario(
+  settings: Pick<AppSettings, 'demoMode' | 'demoScenario'>,
+  demoScenariosAllowed: boolean,
+): Pick<AppSettings, 'demoMode' | 'demoScenario'> {
+  return demoScenariosAllowed ? settings : { ...settings, demoScenario: null };
+}
+
+const demoScenariosAllowed = readDemoScenariosAllowed();
+
 export const tripService = createTripService({
   api: apiClient,
-  settings: () => appStorage.settings.get(),
+  settings: () => withAllowedDemoScenario(appStorage.settings.get(), demoScenariosAllowed),
   clock: systemClock,
 });

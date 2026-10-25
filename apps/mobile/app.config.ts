@@ -115,6 +115,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? null,
     privacyPolicyUrl: process.env.HOPREADY_PRIVACY_POLICY_URL ?? DEFAULT_PRIVACY_POLICY_URL,
     supportUrl: process.env.HOPREADY_SUPPORT_URL ?? DEFAULT_SUPPORT_URL,
+    // Lets internal builds stage failures in demo mode; store builds leave it off.
+    demoScenarios: process.env.HOPREADY_DEMO_SCENARIOS === '1',
     ...easExtra(),
   },
 });

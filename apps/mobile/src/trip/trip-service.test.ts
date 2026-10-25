@@ -16,7 +16,7 @@ import {
 import type { AppSettings } from '@/storage';
 import { PLACES, planRequest, planResponse } from '@/test-support/trips';
 
-import { createTripService, OCCUPANCY_NOT_CHECKED } from './trip-service';
+import { createTripService, OCCUPANCY_NOT_CHECKED, withAllowedDemoScenario } from './trip-service';
 
 jest.mock('@hopready/core/fixtures', () => {
   const actual = jest.requireActual('@hopready/core/fixtures');
@@ -212,5 +212,14 @@ describe('request checks, the same in both modes', () => {
     });
     expect(api.searchPlaces).not.toHaveBeenCalled();
     expect(createDemoProvidersSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('demo scenarios in store builds', () => {
+  it('ignores a scenario chosen in a development build', () => {
+    const chosen = { demoMode: true, demoScenario: 'no-route' } as const;
+
+    expect(withAllowedDemoScenario(chosen, false)).toEqual({ demoMode: true, demoScenario: null });
+    expect(withAllowedDemoScenario(chosen, true)).toBe(chosen);
   });
 });

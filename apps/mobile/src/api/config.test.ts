@@ -1,4 +1,4 @@
-import { readApiBaseUrl, readSupportLinks } from './config';
+import { readApiBaseUrl, readDemoScenariosAllowed, readSupportLinks } from './config';
 
 describe('readApiBaseUrl', () => {
   it('reads the address and drops trailing slashes', () => {
@@ -47,5 +47,19 @@ describe('readSupportLinks', () => {
       privacyPolicyUrl: null,
       supportUrl: 'https://example.com/help',
     });
+  });
+});
+
+describe('readDemoScenariosAllowed', () => {
+  it('always allows them in a development build', () => {
+    expect(readDemoScenariosAllowed({}, true)).toBe(true);
+  });
+
+  it('allows them in a release build only when the build asks for them', () => {
+    expect(readDemoScenariosAllowed({ demoScenarios: true }, false)).toBe(true);
+    expect(readDemoScenariosAllowed({ demoScenarios: false }, false)).toBe(false);
+    expect(readDemoScenariosAllowed({}, false)).toBe(false);
+    expect(readDemoScenariosAllowed({ demoScenarios: 'yes' }, false)).toBe(false);
+    expect(readDemoScenariosAllowed(undefined, false)).toBe(false);
   });
 });

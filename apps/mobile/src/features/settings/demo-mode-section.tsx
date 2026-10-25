@@ -1,6 +1,7 @@
-import { DEMO_SCENARIOS } from '@hopready/core/fixtures';
+import { DEMO_SCENARIOS, type DemoScenario } from '@hopready/core/fixtures';
 import { Alert, StyleSheet, Switch, View } from 'react-native';
 
+import { readDemoScenariosAllowed } from '@/api';
 import { AppText, Banner } from '@/components';
 import { appStorage, useSettings } from '@/storage';
 import { MIN_TOUCH_TARGET, RADII, SPACING, useTheme } from '@/theme';
@@ -8,6 +9,8 @@ import { MIN_TOUCH_TARGET, RADII, SPACING, useTheme } from '@/theme';
 import { writeOrAlert } from '../saved/storage-writes';
 import { ChoiceRow } from './choice-row';
 import { SettingsSection } from './settings-section';
+
+const demoScenariosAllowed = readDemoScenariosAllowed();
 
 export const DEMO_MODE_EXPLANATION =
   "Demo mode plans trips with sample timetables, drive times and car park spaces built into the app. None of it is live, so don't use it to catch a real service.";
@@ -69,29 +72,37 @@ export function DemoModeSection() {
             title="Demo mode is on"
             message="Trips, times and car park spaces are sample data, not live information."
           />
-          <AppText variant="headline" style={styles.subheading}>
-            Sample situation
-          </AppText>
-          <AppText variant="footnote" tone="secondary">
-            Pick what the sample data should show. None of these describe a real disruption.
-          </AppText>
-          {DEMO_SCENARIOS.map((scenario) => (
-            <ChoiceRow
-              key={scenario.id}
-              title={scenario.title}
-              subtitle={scenario.description}
-              selected={selectedScenario === scenario.id}
-              onPress={() => {
-                writeOrAlert(
-                  () => appStorage.settings.setDemoScenario(scenario.id),
-                  "Couldn't change the sample situation",
-                );
-              }}
-            />
-          ))}
+          {demoScenariosAllowed ? <ScenarioPicker selected={selectedScenario} /> : null}
         </>
       ) : null}
     </SettingsSection>
+  );
+}
+
+function ScenarioPicker({ selected }: { selected: DemoScenario }) {
+  return (
+    <>
+      <AppText variant="headline" style={styles.subheading}>
+        Sample situation
+      </AppText>
+      <AppText variant="footnote" tone="secondary">
+        Pick what the sample data should show. None of these describe a real disruption.
+      </AppText>
+      {DEMO_SCENARIOS.map((scenario) => (
+        <ChoiceRow
+          key={scenario.id}
+          title={scenario.title}
+          subtitle={scenario.description}
+          selected={selected === scenario.id}
+          onPress={() => {
+            writeOrAlert(
+              () => appStorage.settings.setDemoScenario(scenario.id),
+              "Couldn't change the sample situation",
+            );
+          }}
+        />
+      ))}
+    </>
   );
 }
 
