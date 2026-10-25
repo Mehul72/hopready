@@ -61,3 +61,7 @@ Expo SDK 58 went stable on 2026-10-15, with React Native 0.88, React 19.3 and Ty
 - Expo moves iOS builds to Swift Package Manager by default.
 - `eslint-config-expo` supports ESLint 10.
 - A second client (web or Android) needs a different storage or map layer.
+
+## Correction (2026-10-26)
+
+End-to-end tests use XCUITest, not Maestro. Installing Maestro was refused by the permission policy of the session that built HopReady, and no Maestro flows were written. XCUITest comes with Xcode and runs the same journeys against a Release simulator build (docs/testing.md). The rest of the decision is unchanged.

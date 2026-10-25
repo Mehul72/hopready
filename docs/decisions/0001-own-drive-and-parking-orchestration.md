@@ -59,3 +59,7 @@ Constraints:
 - TfNSW documents a supported Park&Ride or car access parameter.
 - Users regularly report a better car park that HopReady did not check.
 - Plan volume makes per-plan provider calls a cost or quota problem. A self-hosted router becomes cheaper per plan at high volume.
+
+## Correction (2026-10-26)
+
+The research notes cited under Context (TfNSW claims Q3-01 to Q3-05) were not committed. The Trip Planner Swagger they rest on is named in `apps/api/src/providers/tfnsw/__fixtures__/README.md`, and docs/providers.md lists the pages every provider figure came from. The decision is unchanged.
