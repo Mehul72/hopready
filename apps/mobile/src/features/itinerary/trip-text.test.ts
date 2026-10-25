@@ -4,7 +4,6 @@ import { PLACES } from '@/test-support/trips';
 
 import {
   describeDelay,
-  describeOccupancy,
   describePlatform,
   describeRules,
   distance,
@@ -15,12 +14,6 @@ import {
   stopCount,
   UNKNOWN_RULES_TEXT,
 } from './trip-text';
-
-const NOW = new Date('2026-10-26T20:30:00.000Z');
-
-function observedMinutesAgo(minutes: number): string {
-  return addMinutes(NOW, -minutes);
-}
 
 function transitLeg(overrides: Partial<TransitLeg> = {}): TransitLeg {
   const start = '2026-10-26T20:53:00.000Z';
@@ -46,84 +39,6 @@ function transitLeg(overrides: Partial<TransitLeg> = {}): TransitLeg {
     ...overrides,
   };
 }
-
-describe('describeOccupancy', () => {
-  it('gives a recent count as approximate, with its age', () => {
-    const wording = describeOccupancy(
-      {
-        status: 'known',
-        spacesAvailable: 120,
-        totalSpaces: 400,
-        observedAt: observedMinutesAgo(3),
-      },
-      NOW.getTime(),
-    );
-    expect(wording).toEqual({
-      freshness: 'current',
-      summary: '~120 spaces free · updated 3 min ago',
-      detail: null,
-      spoken: 'About 120 spaces free, updated 3 minutes ago.',
-    });
-  });
-
-  it('says a full car park is full rather than "~0 spaces"', () => {
-    const wording = describeOccupancy(
-      { status: 'known', spacesAvailable: 0, totalSpaces: 400, observedAt: observedMinutesAgo(0) },
-      NOW.getTime(),
-    );
-    expect(wording.summary).toBe('Full · updated just now');
-  });
-
-  it('flags a stale count as possibly out of date, with its age in hours', () => {
-    const wording = describeOccupancy(
-      {
-        status: 'stale',
-        spacesAvailable: 40,
-        totalSpaces: 400,
-        observedAt: observedMinutesAgo(130),
-      },
-      NOW.getTime(),
-    );
-    expect(wording.freshness).toBe('stale');
-    expect(wording.summary).toBe('~40 spaces free when last counted');
-    expect(wording.detail).toBe('May be out of date (updated 2 h ago)');
-  });
-
-  it('treats a count that was fresh when planned, but has aged since, as stale', () => {
-    const wording = describeOccupancy(
-      {
-        status: 'known',
-        spacesAvailable: 75,
-        totalSpaces: 400,
-        observedAt: observedMinutesAgo(16),
-      },
-      NOW.getTime(),
-    );
-    expect(wording.freshness).toBe('stale');
-    expect(wording.detail).toBe('May be out of date (updated 16 min ago)');
-  });
-
-  it('keeps an unknown count unknown, never zero, and says why', () => {
-    const wording = describeOccupancy(
-      { status: 'unknown', reason: 'Occupancy figures are unavailable right now.' },
-      NOW.getTime(),
-    );
-    expect(wording).toEqual({
-      freshness: 'unknown',
-      summary: 'Occupancy unknown',
-      detail: 'Occupancy figures are unavailable right now.',
-      spoken: 'Occupancy unknown. Occupancy figures are unavailable right now.',
-    });
-  });
-
-  it('reads a count from slightly in the future as just now', () => {
-    const wording = describeOccupancy(
-      { status: 'known', spacesAvailable: 5, totalSpaces: 400, observedAt: addMinutes(NOW, 2) },
-      NOW.getTime(),
-    );
-    expect(wording.summary).toBe('~5 spaces free · updated just now');
-  });
-});
 
 describe('describeRules', () => {
   it('shows documented rules with where they come from and when they were checked', () => {

@@ -15,7 +15,8 @@ import { Linking } from 'react-native';
 import { PLACES, TALLAWONG_PARKING } from '@/test-support/trips';
 
 import { LegRow } from './leg-row';
-import { PLATFORM_NOT_PROVIDED, SPACES_CAN_FILL_NOTE } from './trip-text';
+import { SPACES_CAN_FILL_NOTE } from '../shared/occupancy-wording';
+import { PLATFORM_NOT_PROVIDED } from './trip-text';
 
 beforeEach(() => {
   jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);

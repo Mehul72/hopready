@@ -1,8 +1,6 @@
 import {
-  DEFAULT_PLANNER_LIMITS,
   formatDurationMinutes,
   type Itinerary,
-  type Occupancy,
   type ParkingRules,
   secondsBetween,
   type ServiceAlert,
@@ -16,11 +14,7 @@ import type { BannerTone } from '@/components';
 // Plain words for itinerary data. Everything a screen shows about a trip is worded here, so the
 // same fact reads the same everywhere, and VoiceOver gets whole words instead of abbreviations.
 
-const MS_PER_MINUTE = 60_000;
 const MINUTES_PER_HOUR = 60;
-// Occupancy older than this reads as possibly out of date, the same limit the planner applies.
-export const OCCUPANCY_FRESH_MINUTES = DEFAULT_PLANNER_LIMITS.occupancyFreshMinutes;
-export const SPACES_CAN_FILL_NOTE = 'Spaces can fill before you arrive.';
 export const UNKNOWN_RULES_TEXT = 'Check signs for parking rules';
 export const PLATFORM_NOT_PROVIDED = 'Platform not provided';
 
@@ -64,68 +58,6 @@ export function distance(metres: number): Wording {
   const tenths = Math.round(metres / 100) / 10;
   const value = tenths < 10 ? tenths.toFixed(1) : String(Math.round(metres / 1_000));
   return { text: `${value} km`, spoken: `${value} kilometres` };
-}
-
-export interface OccupancyWording {
-  freshness: 'current' | 'stale' | 'unknown';
-  // "~120 spaces free · updated 3 min ago", "~40 spaces free when last counted", "Occupancy unknown"
-  summary: string;
-  // "May be out of date (updated 2 h ago)" for an old count, or why the count is unknown.
-  detail: string | null;
-  spoken: string;
-}
-
-function updatedAgo(ageMinutes: number): Wording {
-  if (ageMinutes < 1) return { text: 'updated just now', spoken: 'updated just now' };
-  if (ageMinutes < MINUTES_PER_HOUR) {
-    return {
-      text: `updated ${ageMinutes} min ago`,
-      spoken: `updated ${plural(ageMinutes, 'minute')} ago`,
-    };
-  }
-  const hours = Math.floor(ageMinutes / MINUTES_PER_HOUR);
-  return { text: `updated ${hours} h ago`, spoken: `updated ${plural(hours, 'hour')} ago` };
-}
-
-function spacesFree(count: number): Wording {
-  if (count === 0) return { text: 'Full', spoken: 'Full' };
-  return {
-    text: `~${plural(count, 'space')} free`,
-    spoken: `About ${plural(count, 'space')} free`,
-  };
-}
-
-// Counts are a snapshot from when they were taken, so the age is always shown, and a count older
-// than the planner's freshness limit is flagged even if it was fresh when the trip was planned.
-export function describeOccupancy(occupancy: Occupancy, nowMs: number): OccupancyWording {
-  if (occupancy.status === 'unknown') {
-    return {
-      freshness: 'unknown',
-      summary: 'Occupancy unknown',
-      detail: occupancy.reason,
-      spoken: `Occupancy unknown. ${occupancy.reason}`,
-    };
-  }
-  const ageMinutes = Math.max(
-    0,
-    Math.floor((nowMs - new Date(occupancy.observedAt).getTime()) / MS_PER_MINUTE),
-  );
-  const age = updatedAgo(ageMinutes);
-  const spaces = spacesFree(occupancy.spacesAvailable);
-  if (occupancy.status === 'stale' || ageMinutes > OCCUPANCY_FRESH_MINUTES) {
-    return {
-      freshness: 'stale',
-      summary: `${spaces.text} when last counted`,
-      detail: `May be out of date (${age.text})`,
-      spoken: `${spaces.spoken} when last counted. May be out of date, ${age.spoken}.`,
-    };
-  }
-  return {
-    freshness: 'current',
-    summary: `${spaces.text} · ${age.text}`,
-    detail: null,
-    spoken: `${spaces.spoken}, ${age.spoken}.`,
-  };
 }
 
 export interface RulesWording {

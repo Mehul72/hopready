@@ -10,7 +10,7 @@ import {
 import { LEG_VISUALS, type LegVisualKind, legVisualKind } from '@/theme';
 
 import { selfDriveSeconds } from './itinerary-order';
-import { describeOccupancy, SPACES_CAN_FILL_NOTE, type Wording } from './occupancy-wording';
+import { describeOccupancy, SPACES_CAN_FILL_NOTE, type Wording } from '../shared/occupancy-wording';
 import { STRATEGY_LABELS } from './plan-explanations';
 
 const SECONDS_PER_MINUTE = 60;

@@ -15,17 +15,16 @@ import { StyleSheet, View } from 'react-native';
 import { AppText, Banner, Button, Card, ModeIcon, TIMING_STYLES, TimingBadge } from '@/components';
 import { LEG_VISUALS, legVisualKind, SPACING } from '@/theme';
 
+import { describeOccupancy, SPACES_CAN_FILL_NOTE } from '../shared/occupancy-wording';
 import { openLink } from './open-link';
 import {
   ALERT_TONES,
   describeDelay,
-  describeOccupancy,
   describePlatform,
   describeRules,
   distance,
   duration,
   serviceTitle,
-  SPACES_CAN_FILL_NOTE,
   stopCount,
   type Wording,
 } from './trip-text';
@@ -237,7 +236,7 @@ function BufferRow({
 function ParkRow({ leg, nowMs }: { leg: ParkLeg; nowMs: number }) {
   const { carPark, occupancy, rules } = leg.parking;
   const time = duration(legSeconds(leg));
-  const spaces = describeOccupancy(occupancy, nowMs);
+  const spaces = describeOccupancy(occupancy, new Date(nowMs));
   const parkingRules = describeRules(rules);
   const purpose = 'to find a space, park and reach the exit';
   const title = `Park at ${carPark.name}`;
@@ -246,7 +245,7 @@ function ParkRow({ leg, nowMs }: { leg: ParkLeg; nowMs: number }) {
     <LegCard
       leg={leg}
       title={title}
-      spoken={`${title}. ${time.spoken} ${purpose}, your parking buffer. Spaces: ${spaces.spoken} ${SPACES_CAN_FILL_NOTE} ${parkingRules.spoken}`}
+      spoken={`${title}. ${time.spoken} ${purpose}, your parking buffer. Spaces: ${spaces.spoken}. ${SPACES_CAN_FILL_NOTE} ${parkingRules.spoken}`}
       details={
         <>
           <Detail>{`${time.text} ${purpose} (your parking buffer).`}</Detail>
