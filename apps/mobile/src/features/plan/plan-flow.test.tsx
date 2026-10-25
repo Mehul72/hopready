@@ -100,7 +100,7 @@ describe('planning a trip from the Plan tab', () => {
     expect(label).toContain('Live times.');
   });
 
-  it('opens the chosen option and makes it the active trip', async () => {
+  it('opens the chosen option without following it yet', async () => {
     appStorage.places.setHome(DEMO_PLACES.rouseHillHome);
     appStorage.places.setWork(DEMO_PLACES.barangarooOffice);
     const user = userEvent.setup();
@@ -115,8 +115,7 @@ describe('planning a trip from the Plan tab', () => {
 
     expect(screen).toHavePathname(`/itinerary/${id}`);
     expect(screen.getByText(`Itinerary ${id}`)).toBeOnTheScreen();
-    expect(appStorage.activeTrip.get()?.itinerary.id).toBe(id);
-    expect(appStorage.activeTrip.get()?.mode).toBe('demo');
+    expect(appStorage.activeTrip.get()).toBeNull();
   });
 
   it('asks for what is missing instead of planning, and clears the message once fixed', async () => {

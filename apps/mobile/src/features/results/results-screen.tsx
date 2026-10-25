@@ -52,10 +52,6 @@ const MAP_SHARE_OF_WINDOW = 0.28;
 const MAP_MIN_HEIGHT = 150;
 const MAP_MAX_HEIGHT = 260;
 
-function errorName(error: unknown): string {
-  return error instanceof Error ? error.name : 'unknown';
-}
-
 function endpointsOf(request: PlanRequest): MapPoint[] {
   return [
     {
@@ -177,13 +173,9 @@ export function ResultsScreen() {
     void planSession.plan(refreshableRequest(current, new Date()));
   }
 
+  // Opening an option only shows it. Following it, which refreshes it when the app comes back, is
+  // the trip screen's "Start this trip".
   function openItinerary(itinerary: Itinerary) {
-    try {
-      planSession.select(itinerary.id);
-    } catch (selectError) {
-      // The itinerary screen can still show the option from these results.
-      console.warn(`HopReady: could not save the chosen trip (${errorName(selectError)}).`);
-    }
     router.navigate({ pathname: '/itinerary/[id]', params: { id: itinerary.id } });
   }
 
