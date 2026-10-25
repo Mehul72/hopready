@@ -8,7 +8,7 @@ Do these in order; each unblocks the next. Tell me when a step is done and I tak
 
 1. TfNSW token and Apple Maps key (items 1 and 2), stored as described below. I then record real TfNSW responses and run the live provider checks.
 2. Cloudflare account and token (item 3). I deploy the API to staging and check `/v1/health` and a real plan.
-3. Expo account and token (item 4), and the App Store Connect app record (item 5). I set the API address for builds (item 7).
+3. Expo account and token (item 4), and the App Store Connect app record (item 5). I create the EAS project and set the API address for builds (items 4 and 7).
 4. The one interactive signing setup (item 6), about 5 minutes in your Terminal.
 5. Then I build and upload to TestFlight, and report the exact processing state. Internal testers only (item 8).
 
