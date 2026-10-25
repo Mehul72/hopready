@@ -1,7 +1,6 @@
 import {
   DEFAULT_PREFERENCES,
   type Preferences,
-  TRANSIT_MODES,
   type TransitMode,
   WALKING_SPEEDS,
 } from '@hopready/core';
@@ -11,6 +10,7 @@ import { AppText, Button, Chip, SegmentedControl, Stepper } from '@/components';
 import { type AppPreferences, appStorage, usePreferences } from '@/storage';
 import { LEG_VISUALS, RADII, SPACING, useTheme } from '@/theme';
 
+import { AVOIDABLE_MODES } from '../plan/trip-option-settings';
 import { writeOrAlert } from '../saved/storage-writes';
 import { SettingsSection } from './settings-section';
 
@@ -134,6 +134,9 @@ function resetToDefaults() {
 export function TripDefaultsSection() {
   const { colours, modeColours } = useTheme();
   const preferences = usePreferences();
+  const allowedModeCount = AVOIDABLE_MODES.filter(
+    (mode) => !preferences.excludedTransitModes.includes(mode),
+  ).length;
 
   return (
     <SettingsSection
@@ -182,7 +185,7 @@ export function TripDefaultsSection() {
         Modes to avoid
       </AppText>
       <View style={styles.chips}>
-        {TRANSIT_MODES.map((mode) => {
+        {AVOIDABLE_MODES.map((mode) => {
           const avoided = preferences.excludedTransitModes.includes(mode);
           return (
             <Chip
@@ -191,6 +194,8 @@ export function TripDefaultsSection() {
               symbol={LEG_VISUALS[mode].symbol}
               symbolTint={avoided ? undefined : modeColours[mode]}
               selected={avoided}
+              // The same rule as Trip options: avoiding every mode would leave no trips at all.
+              disabled={!avoided && allowedModeCount <= 1}
               accessibilityHint={`When ticked, trips leave out ${servicesName(mode)} services`}
               onToggle={(avoid) => toggleMode(preferences.excludedTransitModes, mode, avoid)}
             />

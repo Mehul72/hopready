@@ -119,10 +119,13 @@ export function tripOptionsSummary(
     `walk up to ${preferences.maxWalkMinutes} min`,
     `${preferences.transferBufferMinutes} min to change`,
   ];
-  if (preferences.excludedTransitModes.length > 0) {
-    parts.push(
-      `avoiding ${preferences.excludedTransitModes.length} ${preferences.excludedTransitModes.length === 1 ? 'mode' : 'modes'}`,
-    );
+  // A stored mode that can no longer be chosen (such as "Other", from an earlier version) is not
+  // counted, because Trip options would show nothing ticked for it.
+  const avoidedCount = AVOIDABLE_MODES.filter((mode) =>
+    preferences.excludedTransitModes.includes(mode),
+  ).length;
+  if (avoidedCount > 0) {
+    parts.push(`avoiding ${avoidedCount} ${avoidedCount === 1 ? 'mode' : 'modes'}`);
   }
   if (choices.preferredStation) parts.push(`prefers ${choices.preferredStation.name}`);
   if (choices.preferredCarPark) parts.push(`prefers ${choices.preferredCarPark.name}`);

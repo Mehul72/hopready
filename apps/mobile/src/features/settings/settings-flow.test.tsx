@@ -177,6 +177,18 @@ describe('trip defaults', () => {
     });
   });
 
+  it('offers only modes that can be avoided, and always leaves one allowed', async () => {
+    appStorage.preferences.change({
+      excludedTransitModes: ['train', 'metro', 'light-rail', 'bus', 'coach', 'ferry', 'school-bus'],
+    });
+    await renderApp('/settings');
+    const section = screen.getByTestId('trip-defaults');
+
+    expect(within(section).queryByRole('togglebutton', { name: 'Other service' })).toBeNull();
+    expect(within(section).getByRole('togglebutton', { name: 'On demand' })).toBeDisabled();
+    expect(within(section).getByRole('togglebutton', { name: 'Bus' })).toBeEnabled();
+  });
+
   it('resets to the defaults after confirming, keeping the navigation app', async () => {
     appStorage.preferences.change({
       transferBufferMinutes: 9,
