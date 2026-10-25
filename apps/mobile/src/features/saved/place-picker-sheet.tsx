@@ -112,6 +112,7 @@ function SearchResults({ query, onPick }: { query: string; onPick: (place: Place
               kind: 'place' as const,
               label: result.place.name,
             }))}
+            interactive={false}
             style={styles.map}
           />
           {results.map((result, index) => (

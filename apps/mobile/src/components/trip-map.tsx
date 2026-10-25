@@ -22,6 +22,9 @@ export type TripMapProps = TripMapContent & {
   bottomInset?: number;
   // Replaces the generated route summary that VoiceOver reads.
   accessibilityLabel?: string;
+  // False for a map inside a scrolling page: a swipe across it then scrolls the page instead of
+  // panning the map, which frames its content by itself. Apple's legal link stays tappable.
+  interactive?: boolean;
   testID?: string;
 };
 
@@ -89,7 +92,7 @@ function MarkerBadge({ kind }: { kind: MapMarkerKind }) {
 // options, or a set of places. Show it on every screen that shows Apple drive times or Apple
 // search results: Apple's terms only allow that data next to an Apple map.
 export function TripMap(props: TripMapProps) {
-  const { style, bottomInset = 0, accessibilityLabel, testID } = props;
+  const { style, bottomInset = 0, accessibilityLabel, interactive = true, testID } = props;
   const theme = useTheme();
   const mapRef = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -139,6 +142,9 @@ export function TripMap(props: TripMapProps) {
         showsUserLocation={showsUserLocation}
         mapPadding={{ top: 0, right: 0, bottom: bottomInset, left: 0 }}
         pitchEnabled={false}
+        scrollEnabled={interactive}
+        zoomEnabled={interactive}
+        rotateEnabled={interactive}
         onMapReady={() => setMapReady(true)}>
         {model.lines.map((line) => (
           <Polyline

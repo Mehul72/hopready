@@ -29,6 +29,7 @@ function ParkedCarView({ state }: { state: Extract<ParkedCarState, { status: 'pa
           },
         ]}
         accessibilityLabel={`Map showing your car at ${name}.`}
+        interactive={false}
         style={styles.map}
       />
       <Card testID="parked-car">

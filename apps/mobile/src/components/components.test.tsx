@@ -312,4 +312,12 @@ describe('TripMap', () => {
     await render(<TripMap itinerary={itinerary} />);
     expect(screen.getByTestId('map-view')).toHaveProp('showsUserLocation', false);
   });
+
+  it('can stay still inside a scrolling page, so a swipe scrolls the page', async () => {
+    await render(<TripMap itinerary={itinerary} interactive={false} />);
+    const map = screen.getByTestId('map-view');
+
+    expect(map).toHaveProp('scrollEnabled', false);
+    expect(map).toHaveProp('zoomEnabled', false);
+  });
 });

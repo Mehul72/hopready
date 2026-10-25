@@ -194,7 +194,11 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
       {itinerary.notes.map((note, index) => (
         <Banner key={`${index}:${note}`} tone="info" message={note} />
       ))}
-      <TripMap itinerary={itinerary} style={[styles.map, { height: mapHeight }]} />
+      <TripMap
+        itinerary={itinerary}
+        interactive={false}
+        style={[styles.map, { height: mapHeight }]}
+      />
       <TripShortcuts trip={trip} />
       <AppText variant="title3" accessibilityRole="header" style={styles.heading}>
         Steps
