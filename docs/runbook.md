@@ -30,6 +30,14 @@ A healthy answer is `{"status":"ok", ...}` with every provider `configured`. Hea
    npx wrangler deploy --var APPLE_MAPS_DAILY_CALL_BUDGET:22000
    ```
 
+## Symptom: requests fail with Cloudflare Error 1102 or 1027
+
+These come from Cloudflare, not from HopReady, and only on the Workers Free plan.
+
+1. **Confirm.** Error 1102 means a request ran past the CPU limit (10 ms on Free). Error 1027 means the account used its 100,000 free requests for the day. In the dashboard, Workers & Pages > hopready-api > Metrics shows the errors; Logs show the outcome for each request.
+2. **Mitigate.** Both stop on Workers Paid (US$5/month: 30 seconds of CPU per request by default, and no daily cap). Moving to Paid needs the owner's approval (docs/OWNER-ACTIONS.md, item 3). Without it, Error 1027 clears at the daily reset (00:00 UTC, 11 am in Sydney during daylight saving), and nothing short of Paid stops Error 1102 on slow requests.
+3. **Verify.** Plan one trip in the app, and check Metrics for new errors.
+
 ## Symptom: plans fail with 502 or 504
 
 1. **Check the providers directly.** Use the dev key from the Keychain; never paste keys into tickets.

@@ -29,7 +29,7 @@ A successful upload is not the end of it. Apple then processes the build, which 
 
 Before the first upload, list `Frameworks/` inside the production build (`unzip -l HopReady.ipa | grep Frameworks/`). Apple requires a privacy manifest, and a signature, for SDKs on its list of commonly used third-party SDKs. HopReady removed `expo-image` so SDWebImage is no longer included. Hermes (`hermesvm.framework`) is also on Apple's list and the React Native build of it carries no manifest of its own; if App Store Connect answers the upload with ITMS-91061 naming it, update Expo and React Native to the latest patch release before working around it.
 
-1. Run `pnpm check` on the commit being built. The iOS simulator build and Maestro flows pass (see docs/testing.md).
+1. Run `pnpm check` on the commit being built, and the XCUITest journeys on the iOS simulator (docs/testing.md).
 2. The production API is deployed, and `GET /v1/health` reports `transit`, `driving` and `carParks` as `configured`.
 3. `EXPO_PUBLIC_API_BASE_URL` for the production profile points at that API.
 4. Version and build number: `app.config.ts` version is set, and EAS auto-increments the build number (`appVersionSource: remote`).
@@ -48,6 +48,19 @@ Before the first upload, list `Frameworks/` inside the production build (`unzip 
    - the largest text size;
    - VoiceOver on the results and trip screens.
 9. Do not invite external testers or submit for review without the owner's approval.
+
+Before the first public release, also:
+
+- Compare Apple's drive times with real drives for a few Sydney trips at peak and off-peak, including one with an arrival time (docs/decisions/0002 notes Apple does not document Sydney accuracy). If they are often off by more than a few minutes, tell the owner before launch: the fix is a second driving provider, which costs money (docs/providers.md).
+- Settle owner decisions 22 to 24 (docs/OWNER-ACTIONS.md).
+
+## If a build turns out to be bad
+
+1. **TestFlight:** in App Store Connect > TestFlight, open the build and choose **Expire Build**. Testers can no longer install it.
+2. **App Store, phased release on:** choose **Pause Phased Release** on the version page. People who already updated keep the bad build.
+3. **App Store, severe problem:** remove the app from sale (Pricing and Availability) until a fix is live. The App Store cannot roll back to an earlier version.
+4. **Fix forward:** build again with a higher build number, submit, and ask for an expedited review if the problem is serious.
+5. If the problem is in the API rather than the app, roll the Worker back instead (docs/runbook.md); every installed build follows the API.
 
 ## Store listing (draft)
 
