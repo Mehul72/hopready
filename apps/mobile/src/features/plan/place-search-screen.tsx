@@ -26,6 +26,7 @@ import { type DataMode, useDataMode, usePlaceSearch } from '@/trip';
 
 import { closeSheet } from './close-sheet';
 import { turnOnDemoMode } from './demo-mode';
+import { useAnnounceSearchOutcome } from '../shared/announce-search-outcome';
 import { LocationNotice } from './location-notice';
 import { useNearHint } from './near-hint';
 import { recentPlaces } from './place-labels';
@@ -186,6 +187,7 @@ export function PlaceSearchScreen() {
   );
   const stops = results.filter((result) => result.place.kind === 'stop');
   const places = results.filter((result) => result.place.kind !== 'stop');
+  useAnnounceSearchOutcome(searchable ? search.data : undefined, results.length);
 
   function choose(place: Place) {
     // A location lookup still running must not replace this choice when it finishes.

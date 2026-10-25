@@ -19,6 +19,7 @@ import { appStorage } from '@/storage';
 import { MIN_TOUCH_TARGET, RADII, SPACING, useTheme } from '@/theme';
 import { useDataMode, usePlaceSearch } from '@/trip';
 
+import { useAnnounceSearchOutcome } from '../shared/announce-search-outcome';
 import { findCurrentPlace, openLocationSettingsOrExplain } from './current-location';
 import { writeOrAlert } from './storage-writes';
 
@@ -44,6 +45,10 @@ function SearchResults({ query, onPick }: { query: string; onPick: (place: Place
   const search = usePlaceSearch(query, null);
   const mode = useDataMode();
   const trimmed = query.trim();
+  useAnnounceSearchOutcome(
+    trimmed.length >= PLACE_QUERY_MIN_LENGTH ? search.data : undefined,
+    search.data?.results.length ?? 0,
+  );
 
   if (trimmed.length < PLACE_QUERY_MIN_LENGTH) {
     return (

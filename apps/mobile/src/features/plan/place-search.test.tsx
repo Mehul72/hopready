@@ -2,6 +2,7 @@ import { DEMO_PLACES } from '@hopready/core/fixtures';
 import * as Location from 'expo-location';
 import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
+import { AccessibilityInfo } from 'react-native';
 
 import { ApiError } from '@/api';
 import { appStorage } from '@/storage';
@@ -127,7 +128,8 @@ describe('results', () => {
     ).toBeOnTheScreen();
   });
 
-  it('says plainly when nothing matches', async () => {
+  it('says plainly when nothing matches, also to VoiceOver', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const user = userEvent.setup();
     await renderApp('/place-search?field=destination');
 
@@ -135,6 +137,19 @@ describe('results', () => {
 
     expect(await screen.findByText('No matches')).toBeOnTheScreen();
     expect(screen.queryByTestId('search-map')).not.toBeOnTheScreen();
+    expect(announce).toHaveBeenCalledWith('No matches');
+  });
+
+  it('tells VoiceOver how many places were found', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    const user = userEvent.setup();
+    await renderApp('/place-search?field=destination');
+
+    await user.type(searchInput(), 'Chatswood');
+
+    await waitFor(() =>
+      expect(announce).toHaveBeenCalledWith(expect.stringMatching(/^\d+ places? found$/)),
+    );
   });
 
   it('fills the field the sheet was opened for and closes it', async () => {
