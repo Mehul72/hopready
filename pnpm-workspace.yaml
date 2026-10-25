@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Both ship prebuilt platform binaries as optional dependencies, so their install scripts are not needed.
+allowBuilds:
+  esbuild: false
+  unrs-resolver: false
+
+# React Native's Metro bundler and several native modules still expect a flat node_modules.
+nodeLinker: hoisted

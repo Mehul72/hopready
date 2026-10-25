@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+.expo/
+apps/mobile/ios/
+apps/mobile/android/
+apps/mobile/assets/
+packages/core/src/providers/tfnsw/__recordings__/
+packages/core/src/providers/*/__recordings__/
