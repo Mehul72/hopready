@@ -18,7 +18,8 @@ LOG_LEVEL=
 TFNSW_DAILY_CALL_BUDGET=
 # Most requests to the Apple Maps Server API per UTC day before this server stops calling Apple. Default: 20000.
 APPLE_MAPS_DAILY_CALL_BUDGET=
-# Longest a trip plan may take before the API answers 504, in milliseconds (1000 to 60000). Default: 20000.
+# Longest a trip plan may take before the API answers 504, in milliseconds (1000 to 60000). Default: 12000,
+# below the app's 15 s request timeout.
 PLAN_DEADLINE_MS=
 # Node server only: the port to listen on. Default: 8787.
 PORT=

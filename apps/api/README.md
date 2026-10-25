@@ -52,19 +52,19 @@ All settings are optional. A blank value counts as not set. A value that is pres
 (for example `PLAN_DEADLINE_MS=soon`) stops the server: Node exits, and the Worker answers every
 request with a 500 and logs which setting is wrong, never its value.
 
-| Name                           | Default     | What it does                                                                    |
-| ------------------------------ | ----------- | ------------------------------------------------------------------------------- |
-| `HOPREADY_MODE`                | `live`      | `live` calls real providers. `demo` serves labelled fixtures.                   |
-| `TFNSW_API_KEY`                | not set     | Secret. Public transport, stop search and car parks.                            |
-| `APPLE_MAPS_TEAM_ID`           | not set     | Secret. With the next two, enables drive times and address search.              |
-| `APPLE_MAPS_KEY_ID`            | not set     | Secret. Key ID of the Apple Maps private key.                                   |
-| `APPLE_MAPS_PRIVATE_KEY`       | not set     | Secret. The `.p8` contents. One line with `\n` between lines also works.        |
-| `LOG_LEVEL`                    | `info`      | `debug`, `info`, `warn` or `error`.                                             |
-| `TFNSW_DAILY_CALL_BUDGET`      | `50000`     | Most TfNSW requests per UTC day. TfNSW's default quota is 60,000 a day per key. |
-| `APPLE_MAPS_DAILY_CALL_BUDGET` | `20000`     | Most Apple requests per UTC day. Apple allows 25,000 a day per team.            |
-| `PLAN_DEADLINE_MS`             | `20000`     | Longest a trip plan may take before a 504. 1,000 to 60,000.                     |
-| `PORT`                         | `8787`      | Node server only.                                                               |
-| `HOST`                         | `127.0.0.1` | Node server only.                                                               |
+| Name                           | Default     | What it does                                                                                      |
+| ------------------------------ | ----------- | ------------------------------------------------------------------------------------------------- |
+| `HOPREADY_MODE`                | `live`      | `live` calls real providers. `demo` serves labelled fixtures.                                     |
+| `TFNSW_API_KEY`                | not set     | Secret. Public transport, stop search and car parks.                                              |
+| `APPLE_MAPS_TEAM_ID`           | not set     | Secret. With the next two, enables drive times and address search.                                |
+| `APPLE_MAPS_KEY_ID`            | not set     | Secret. Key ID of the Apple Maps private key.                                                     |
+| `APPLE_MAPS_PRIVATE_KEY`       | not set     | Secret. The `.p8` contents. One line with `\n` between lines also works.                          |
+| `LOG_LEVEL`                    | `info`      | `debug`, `info`, `warn` or `error`.                                                               |
+| `TFNSW_DAILY_CALL_BUDGET`      | `50000`     | Most TfNSW requests per UTC day. TfNSW's default quota is 60,000 a day per key.                   |
+| `APPLE_MAPS_DAILY_CALL_BUDGET` | `20000`     | Most Apple requests per UTC day. Apple allows 25,000 a day per team.                              |
+| `PLAN_DEADLINE_MS`             | `12000`     | Longest a trip plan may take before a 504. 1,000 to 60,000. Keep it below the app's 15 s timeout. |
+| `PORT`                         | `8787`      | Node server only.                                                                                 |
+| `HOST`                         | `127.0.0.1` | Node server only.                                                                                 |
 
 Apple's 25,000 calls are shared with any MapKit JS use on the same team.
 

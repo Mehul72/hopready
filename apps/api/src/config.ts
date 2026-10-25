@@ -58,7 +58,8 @@ const envSchema = z.object({
   LOG_LEVEL: z.preprocess(blankAsUnset, z.enum(LOG_LEVELS).default('info')),
   TFNSW_DAILY_CALL_BUDGET: wholeNumber(1, 10_000_000, 50_000),
   APPLE_MAPS_DAILY_CALL_BUDGET: wholeNumber(1, 10_000_000, 20_000),
-  PLAN_DEADLINE_MS: wholeNumber(1_000, 60_000, 20_000),
+  // Below the app's 15 s request timeout, so a partial plan still reaches the phone.
+  PLAN_DEADLINE_MS: wholeNumber(1_000, 60_000, 12_000),
 });
 
 const APPLE_MAPS_SETTING_NAMES = [

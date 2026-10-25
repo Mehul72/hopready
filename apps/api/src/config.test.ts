@@ -23,7 +23,7 @@ describe('loadConfig', () => {
         'APPLE_MAPS_PRIVATE_KEY',
       ],
       dailyCallBudgets: { tfnsw: 50_000, appleMaps: 20_000 },
-      planDeadlineMs: 20_000,
+      planDeadlineMs: 12_000,
     });
   });
 
@@ -67,7 +67,7 @@ describe('loadConfig', () => {
     });
     expect(config.mode).toBe('live');
     expect(config.tfnsw).toBeNull();
-    expect(config.planDeadlineMs).toBe(20_000);
+    expect(config.planDeadlineMs).toBe(12_000);
     expect(config.logLevel).toBe('info');
   });
 
