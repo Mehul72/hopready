@@ -73,6 +73,7 @@ const ROUGH_TRANSIT_METRES_PER_MINUTE = 583;
 const ROUGH_TRANSIT_OVERHEAD_MINUTES = 8;
 const MIN_PROGRESS_METRES = 1_000;
 const MAX_DETOUR_RATIO = 1.6;
+const MAX_EXPLAINED_SKIPPED_CAR_PARKS = 3;
 // Provider times are whole minutes; allow that much slack before calling something early or late.
 const TIME_GRACE_SECONDS = 60;
 
@@ -262,6 +263,12 @@ async function planTransitOnly(
   const { origin, destination, time } = context.request;
   try {
     const journeys = await queryTransit(context, origin, destination, time);
+    if (journeys.length === 0) {
+      context.unavailable.push({
+        strategy,
+        reason: 'No public transport journeys were found for this time.',
+      });
+    }
     const usable = journeys.filter((journey) => keepJourney(context, journey));
     return {
       itineraries: usable.map((journey) =>
@@ -492,12 +499,19 @@ async function planReturnViaCar(
   const car: Place = { ...parkedCar.location, kind: 'parked-car' };
   const retrievalSeconds = preferences.carRetrievalBufferMinutes * 60;
 
+  const noWayBack = () =>
+    context.unavailable.push({
+      strategy: 'return-via-car',
+      reason: 'No public transport gets you back to your car in time from here.',
+    });
+
   try {
     if (time.type === 'depart') {
       const journeys = (await queryTransit(context, origin, car, time))
         .filter((journey) => keepJourney(context, journey))
         .sort(byFirstStart)
         .slice(0, 2);
+      if (journeys.length === 0) noWayBack();
       const itineraries = await Promise.all(
         journeys.map(async (journey) => {
           const atCar = journey.legs[journey.legs.length - 1]!.end;
@@ -519,7 +533,10 @@ async function planReturnViaCar(
       await queryTransit(context, origin, car, { type: 'arrive', at: reachCarBy })
     ).filter((journey) => keepJourney(context, journey));
     const journey = latestJourney(journeys);
-    if (!journey) return { itineraries: [] };
+    if (!journey) {
+      noWayBack();
+      return { itineraries: [] };
+    }
     const atCar = journey.legs[journey.legs.length - 1]!.end;
     return {
       itineraries: [
@@ -682,6 +699,7 @@ function shortlistByGeometry(
   const maxStraightLineMetres =
     preferences.maxDriveMinutes * MAX_STRAIGHT_LINE_METRES_PER_DRIVE_MINUTE;
 
+  const wrongWay: { point: TransferPoint; fromOrigin: number }[] = [];
   const plausible = points.filter((point) => {
     const fromOrigin = haversineMetres(origin.coordinate, point.place.coordinate);
     const toDestination = haversineMetres(point.place.coordinate, destination.coordinate);
@@ -693,8 +711,16 @@ function shortlistByGeometry(
     const makesProgress = toDestination <= directMetres - MIN_PROGRESS_METRES;
     const reasonableDetour =
       (fromOrigin + toDestination) / Math.max(directMetres, 1) <= MAX_DETOUR_RATIO;
+    if (!makesProgress || !reasonableDetour) wrongWay.push({ point, fromOrigin });
     return makesProgress && reasonableDetour;
   });
+
+  // Name the nearby car parks that were skipped for direction, so a missing local car park is explained
+  // without listing every facility in Sydney.
+  wrongWay
+    .sort((a, b) => a.fromOrigin - b.fromOrigin)
+    .slice(0, MAX_EXPLAINED_SKIPPED_CAR_PARKS)
+    .forEach(({ point }) => recordCarPark(context, strategy, point, 'not-towards-destination'));
 
   const estimate = (point: TransferPoint) =>
     roughDriveMinutes(origin, point.place) + roughTransitMinutes(point.place, destination);

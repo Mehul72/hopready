@@ -276,6 +276,11 @@ describe('drive, park, then metro', () => {
 
     expect(usedCarParks).not.toContain(TALLAWONG.id);
     expect(response.checkedCarParks.some((carPark) => carPark.outcome === 'used')).toBe(true);
+    expect(response.checkedCarParks).toContainEqual({
+      id: TALLAWONG.id,
+      name: TALLAWONG.name,
+      outcome: 'not-towards-destination',
+    });
   });
 
   it('labels fresh, stale and missing occupancy honestly', async () => {
@@ -593,6 +598,34 @@ describe('no valid route', () => {
 
     expect(response.itineraries.filter((it) => it.strategy !== 'drive-only')).toEqual([]);
     expect(response.unavailable.map((entry) => entry.strategy)).toContain('park-and-ride');
+    expect(response.unavailable).toContainEqual({
+      strategy: 'transit-only',
+      reason: 'No public transport journeys were found for this time.',
+    });
+  });
+
+  it('explains when no public transport gets back to the parked car', async () => {
+    const parkedCar = {
+      location: { ...KELLYVILLE.station!, kind: 'parked-car' as const },
+      carParkId: KELLYVILLE.id,
+      confirmedAt: addMinutes(NOW, -600),
+    };
+    const response = await planTrip(
+      request({
+        origin: CHATSWOOD_OFFICE,
+        destination: ROUSE_HILL,
+        trip: { kind: 'return-via-car', parkedCar },
+      }),
+      deps({ transit: fakeTransit(() => []) }),
+    );
+
+    expect(response.itineraries).toEqual([]);
+    expect(response.unavailable).toEqual([
+      {
+        strategy: 'return-via-car',
+        reason: 'No public transport gets you back to your car in time from here.',
+      },
+    ]);
   });
 });
 
