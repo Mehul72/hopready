@@ -243,8 +243,9 @@ or `not-configured`), otherwise 502 `provider-unavailable`.
 
 ### `GET /v1/carparks`
 
-The Park&Ride facilities from the TfNSW Car Park API with their current occupancy, for the app's
-"which car park did you use?" picker. Each isolate caches the list for 60 seconds.
+The Park&Ride facilities from the TfNSW Car Park API, for the app's "which car park did you use?"
+picker. Space counts are not included: they are checked when a trip is planned, so opening the
+picker never spends TfNSW occupancy calls. Each isolate caches the list for ten minutes.
 
 ```json
 {
@@ -271,10 +272,8 @@ The Park&Ride facilities from the TfNSW Car Park API with their current occupanc
         "stopId": "2155384"
       },
       "occupancy": {
-        "status": "known",
-        "spacesAvailable": 42,
-        "totalSpaces": 121,
-        "observedAt": "2026-10-26T20:29:00.000Z"
+        "status": "unknown",
+        "reason": "Space counts are checked when you plan a trip."
       }
     }
   ],
@@ -282,9 +281,9 @@ The Park&Ride facilities from the TfNSW Car Park API with their current occupanc
 }
 ```
 
-Counts older than 15 minutes when served come back as `"status": "stale"`. If the counts cannot be
-fetched, every facility says `"status": "unknown"`, `notices` explains, and that answer is not
-cached. Without a car park provider the answer is 503 `not-configured`.
+An empty list from TfNSW is treated as a provider failure (502 `provider-unavailable`) and is not
+cached, so the next request asks again. Without a car park provider the answer is 503
+`not-configured`.
 
 ## Errors
 
@@ -303,23 +302,24 @@ Every error has the same body:
 
 The app should switch on `code`. Messages are for people and may change.
 
-| Status | Code                    | Retryable | When                                                             |
-| ------ | ----------------------- | --------- | ---------------------------------------------------------------- |
-| 400    | `invalid-json`          | no        | The body is missing or is not JSON.                              |
-| 400    | `invalid-request`       | no        | A field is missing or invalid; the message names the field path. |
-| 404    | `not-found`             | no        | Unknown route.                                                   |
-| 405    | `method-not-allowed`    | no        | Known route, wrong method. `Allow` lists the right ones.         |
-| 413    | `payload-too-large`     | no        | Body over the endpoint's limit.                                  |
-| 422    | `outside-coverage`      | no        | A place is outside Greater Sydney.                               |
-| 422    | `provider-rejected`     | no        | A provider refused the request as invalid.                       |
-| 429    | `too-many-requests`     | yes       | Rate limited. Wait for `Retry-After` seconds.                    |
-| 500    | `internal-error`        | yes       | Unexpected fault, or invalid server settings. Logged in detail.  |
-| 502    | `provider-unavailable`  | yes       | A provider failed or could not be reached.                       |
-| 502    | `provider-bad-response` | no        | A provider answered in a shape HopReady could not read.          |
-| 503    | `not-configured`        | no        | The provider this needs is not set up, or its key was refused.   |
-| 503    | `provider-busy`         | yes       | A provider quota or HopReady's daily budget is used up.          |
-| 504    | `provider-timeout`      | yes       | A provider took too long.                                        |
-| 504    | `deadline-exceeded`     | yes       | The whole plan took longer than `PLAN_DEADLINE_MS`.              |
+| Status | Code                     | Retryable | When                                                             |
+| ------ | ------------------------ | --------- | ---------------------------------------------------------------- |
+| 400    | `invalid-json`           | no        | The body is missing or is not JSON.                              |
+| 400    | `invalid-request`        | no        | A field is missing or invalid; the message names the field path. |
+| 404    | `not-found`              | no        | Unknown route.                                                   |
+| 405    | `method-not-allowed`     | no        | Known route, wrong method. `Allow` lists the right ones.         |
+| 413    | `payload-too-large`      | no        | Body over the endpoint's limit.                                  |
+| 415    | `unsupported-media-type` | no        | A POST body not declared as `application/json`.                  |
+| 422    | `outside-coverage`       | no        | A place is outside Greater Sydney.                               |
+| 422    | `provider-rejected`      | no        | A provider refused the request as invalid.                       |
+| 429    | `too-many-requests`      | yes       | Rate limited. Wait for `Retry-After` seconds.                    |
+| 500    | `internal-error`         | yes       | Unexpected fault, or invalid server settings. Logged in detail.  |
+| 502    | `provider-unavailable`   | yes       | A provider failed or could not be reached.                       |
+| 502    | `provider-bad-response`  | no        | A provider answered in a shape HopReady could not read.          |
+| 503    | `not-configured`         | no        | The provider this needs is not set up, or its key was refused.   |
+| 503    | `provider-busy`          | yes       | A provider quota or HopReady's daily budget is used up.          |
+| 504    | `provider-timeout`       | yes       | A provider took too long.                                        |
+| 504    | `deadline-exceeded`      | yes       | The whole plan took longer than `PLAN_DEADLINE_MS`.              |
 
 `Retry-After` is sent with 429, and with 503 `provider-busy` when the provider or the budget says
 when it frees up.
