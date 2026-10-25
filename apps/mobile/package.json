@@ -55,6 +55,7 @@
     "eslint-config-expo": "~58.0.4",
     "jest": "^30.0.0",
     "jest-expo": "~58.0.12",
+    "sf-symbols-typescript": "^2.2.0",
     "test-renderer": "^1.0.0",
     "typescript": "~6.0.3"
   }
