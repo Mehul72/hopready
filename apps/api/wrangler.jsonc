@@ -1,0 +1,89 @@
+// Cloudflare Workers settings for the HopReady API. Secrets never go in this file:
+// set them with `npx wrangler secret put <NAME>` (see README.md).
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "hopready-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+
+  // Workers Logs keep the structured lines the API writes. Invocation logs are off because they
+  // record each request's method and URL, which is more than the API needs to keep.
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false,
+    },
+  },
+
+  "vars": {
+    "HOPREADY_MODE": "live",
+  },
+
+  // Counted per Cloudflare location and approximate. The limits match RATE_LIMIT_RULES in
+  // src/rate-limit.ts, and a test keeps them in step. A namespace_id must be unique in the account.
+  "ratelimits": [
+    {
+      "name": "PLAN_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 },
+    },
+    {
+      "name": "PLACES_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      "name": "CARPARKS_RATE_LIMITER",
+      "namespace_id": "1003",
+      "simple": { "limit": 30, "period": 60 },
+    },
+    {
+      "name": "IP_RATE_LIMITER",
+      "namespace_id": "1004",
+      "simple": { "limit": 120, "period": 60 },
+    },
+  ],
+
+  // One SQLite-backed object holds the day's provider call count shared by every isolate.
+  "durable_objects": {
+    "bindings": [{ "name": "PROVIDER_BUDGET", "class_name": "ProviderBudget" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ProviderBudget"] }],
+
+  "env": {
+    // Deployed as hopready-api-staging. Bindings and vars are not inherited, so they are repeated,
+    // with their own rate limit namespaces so staging traffic never counts against production.
+    "staging": {
+      "vars": {
+        "HOPREADY_MODE": "live",
+        "LOG_LEVEL": "debug",
+      },
+      "ratelimits": [
+        {
+          "name": "PLAN_RATE_LIMITER",
+          "namespace_id": "1101",
+          "simple": { "limit": 20, "period": 60 },
+        },
+        {
+          "name": "PLACES_RATE_LIMITER",
+          "namespace_id": "1102",
+          "simple": { "limit": 60, "period": 60 },
+        },
+        {
+          "name": "CARPARKS_RATE_LIMITER",
+          "namespace_id": "1103",
+          "simple": { "limit": 30, "period": 60 },
+        },
+        {
+          "name": "IP_RATE_LIMITER",
+          "namespace_id": "1104",
+          "simple": { "limit": 120, "period": 60 },
+        },
+      ],
+      "durable_objects": {
+        "bindings": [{ "name": "PROVIDER_BUDGET", "class_name": "ProviderBudget" }],
+      },
+    },
+  },
+}
