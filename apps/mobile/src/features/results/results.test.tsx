@@ -343,17 +343,21 @@ describe('a trip home', () => {
     expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeOnTheScreen();
   });
 
-  it('asks for Take me home again, instead of refreshing, once the car is removed', async () => {
+  it('asks to plan the way home again, instead of refreshing, once the car is removed', async () => {
     await showTripHome();
 
     await act(async () => {
       appStorage.parkedCar.clear();
     });
 
-    expect(screen.getByTestId('trip-home-out-of-date')).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        'Warning. This trip home is out of date. Your car was removed after it was planned. Plan your way home on the Plan tab.',
+      ),
+    ).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeOnTheScreen();
-    await userEvent.setup().press(screen.getByRole('button', { name: 'Open the Car tab' }));
-    expect(await screen.findByText('Car screen')).toBeOnTheScreen();
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Open the Plan tab' }));
+    expect(screen).toHavePathname('/');
   });
 });
 

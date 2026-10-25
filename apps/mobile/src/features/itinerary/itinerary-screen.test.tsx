@@ -543,7 +543,34 @@ describe('a followed trip home', () => {
     expect(screen.queryByRole('button', { name: 'Check for changes' })).not.toBeOnTheScreen();
   });
 
-  it('asks for Take me home again once the parked car is removed', async () => {
+  it.each([
+    [
+      'the car is moved',
+      () =>
+        appStorage.parkedCar.markParked(
+          { ...car, location: place('Pinned location', -33.6951, 150.9071), carParkId: null },
+          null,
+        ),
+    ],
+    [
+      'the person says they were dropped off',
+      () => appStorage.parkedCar.markDroppedOff(WEEKDAY_MORNING.toISOString()),
+    ],
+  ])('leads to Take me home on the Car tab when %s', async (_, change) => {
+    await followTripHome();
+    await act(async () => {
+      change();
+    });
+
+    const open = screen.getByRole('button', { name: 'Open the Car tab' });
+    expect(open).toHaveProp('accessibilityHint', 'Shows Take me home');
+    await userEvent.setup().press(open);
+
+    expect(screen).toHavePathname('/car');
+    expect(screen.getByRole('button', { name: 'Take me home' })).toBeOnTheScreen();
+  });
+
+  it('asks to plan the way home on the Plan tab once the parked car is removed', async () => {
     await followTripHome();
 
     await act(async () => {
@@ -552,10 +579,12 @@ describe('a followed trip home', () => {
 
     expect(
       screen.getByLabelText(
-        'Warning. This trip home is out of date. Your car details changed after it was planned. Tap Take me home on the Car tab to plan it again.',
+        'Warning. This trip home is out of date. Your car was removed after it was planned. Plan your way home on the Plan tab.',
       ),
     ).toBeOnTheScreen();
-    await userEvent.setup().press(screen.getByRole('button', { name: 'Open the Car tab' }));
-    expect(screen).toHavePathname('/car');
+    // With no car saved, the Car tab has no Take me home to send the person to.
+    expect(screen.queryByRole('button', { name: 'Open the Car tab' })).not.toBeOnTheScreen();
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Open the Plan tab' }));
+    expect(screen).toHavePathname('/');
   });
 });
