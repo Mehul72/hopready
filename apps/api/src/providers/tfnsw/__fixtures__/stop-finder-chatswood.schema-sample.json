@@ -1,0 +1,209 @@
+{
+  "version": "10.6.21.17",
+  "systemMessages": [],
+  "locations": [
+    {
+      "id": "poiID:51200:95306011:-1:Chatswood Chase:Chatswood:Chatswood Chase:ANY:POI:2004566:5785917:MRCV:nsw",
+      "isGlobalId": false,
+      "name": "Chatswood Chase, Chatswood",
+      "disassembledName": "Chatswood Chase",
+      "type": "poi",
+      "coord": [-33.79563, 151.18517],
+      "matchQuality": 1000,
+      "isBest": false,
+      "parent": {
+        "id": "95306011|1",
+        "name": "Chatswood",
+        "type": "locality"
+      }
+    },
+    {
+      "id": "206710",
+      "isGlobalId": true,
+      "name": "Chatswood Station, Chatswood",
+      "disassembledName": "Chatswood Station",
+      "type": "stop",
+      "coord": [-33.797237, 151.180934],
+      "matchQuality": 990,
+      "isBest": true,
+      "parent": {
+        "id": "95306011|1",
+        "name": "Chatswood",
+        "type": "locality"
+      },
+      "modes": [1, 2, 5]
+    },
+    {
+      "id": "streetID:1500002233:5:95306011:-1:Victoria Avenue:Chatswood:Victoria Avenue::Victoria Avenue:2067:ANY:DIVA_STREET:2004500:5786000:MRCV:nsw",
+      "name": "Victoria Avenue, Chatswood",
+      "type": "street",
+      "coord": [-33.79689, 151.18324],
+      "matchQuality": 960
+    },
+    {
+      "id": "95306011|1",
+      "name": "Chatswood",
+      "type": "locality",
+      "coord": [-33.79653, 151.18325],
+      "matchQuality": 950
+    },
+    {
+      "id": "2067141",
+      "isGlobalId": true,
+      "name": "Chatswood Station, Platform 1, Chatswood",
+      "disassembledName": "Chatswood Station, Platform 1",
+      "type": "platform",
+      "coord": [-33.797466, 151.181074],
+      "matchQuality": 940,
+      "isBest": false,
+      "parent": {
+        "id": "206710",
+        "name": "Chatswood Station, Chatswood",
+        "disassembledName": "Chatswood Station",
+        "type": "stop",
+        "parent": {
+          "id": "95306011|1",
+          "name": "Chatswood",
+          "type": "locality"
+        }
+      }
+    },
+    {
+      "id": "2067142",
+      "isGlobalId": true,
+      "name": "Chatswood Station, Platform 2, Chatswood",
+      "disassembledName": "Chatswood Station, Platform 2",
+      "type": "platform",
+      "coord": [-33.797469, 151.180988],
+      "matchQuality": 939,
+      "isBest": false,
+      "parent": {
+        "id": "206710",
+        "name": "Chatswood Station, Chatswood",
+        "disassembledName": "Chatswood Station",
+        "type": "stop",
+        "parent": {
+          "id": "95306011|1",
+          "name": "Chatswood",
+          "type": "locality"
+        }
+      }
+    },
+    {
+      "id": "2067143",
+      "isGlobalId": true,
+      "name": "Chatswood Station, Platform 3, Chatswood",
+      "disassembledName": "Chatswood Station, Platform 3",
+      "type": "platform",
+      "coord": [-33.797473, 151.18088],
+      "matchQuality": 938,
+      "isBest": false,
+      "parent": {
+        "id": "206710",
+        "name": "Chatswood Station, Chatswood",
+        "disassembledName": "Chatswood Station",
+        "type": "stop",
+        "parent": {
+          "id": "95306011|1",
+          "name": "Chatswood",
+          "type": "locality"
+        }
+      }
+    },
+    {
+      "id": "2067144",
+      "isGlobalId": true,
+      "name": "Chatswood Station, Platform 4, Chatswood",
+      "disassembledName": "Chatswood Station, Platform 4",
+      "type": "platform",
+      "coord": [-33.797475, 151.180805],
+      "matchQuality": 937,
+      "isBest": false,
+      "parent": {
+        "id": "206710",
+        "name": "Chatswood Station, Chatswood",
+        "disassembledName": "Chatswood Station",
+        "type": "stop",
+        "parent": {
+          "id": "95306011|1",
+          "name": "Chatswood",
+          "type": "locality"
+        }
+      }
+    },
+    {
+      "id": "206720",
+      "isGlobalId": true,
+      "name": "Chatswood Station, Stand A, Chatswood",
+      "disassembledName": "Chatswood Station, Stand A",
+      "type": "platform",
+      "coord": [-33.795911, 151.181247],
+      "matchQuality": 930,
+      "isBest": false,
+      "parent": {
+        "id": "206710",
+        "name": "Chatswood Station, Chatswood",
+        "disassembledName": "Chatswood Station",
+        "type": "stop",
+        "parent": {
+          "id": "95306011|1",
+          "name": "Chatswood",
+          "type": "locality"
+        }
+      }
+    },
+    {
+      "id": "2067130",
+      "isGlobalId": true,
+      "name": "Chatswood Station, Stand C, Chatswood",
+      "disassembledName": "Chatswood Station, Stand C",
+      "type": "platform",
+      "matchQuality": 928
+    },
+    {
+      "id": "2067201",
+      "isGlobalId": true,
+      "name": "Chatswood Interchange, Victoria Av, Stand H",
+      "disassembledName": "Chatswood Interchange, Stand H",
+      "type": "platform",
+      "coord": [-33.79664, 151.18241],
+      "matchQuality": 920,
+      "isBest": false,
+      "parent": {
+        "id": "95306011|1",
+        "name": "Chatswood",
+        "type": "locality"
+      }
+    },
+    {
+      "id": "poiID:51201:95306011:-1:Chatswood Library:Chatswood:Chatswood Library:ANY:POI:2004000:5786100:MRCV:nsw",
+      "isGlobalId": false,
+      "name": "Chatswood Library, Chatswood",
+      "disassembledName": "Chatswood Library",
+      "type": "poi",
+      "coord": [-33.79601, 151.18303],
+      "matchQuality": 900,
+      "parent": {
+        "id": "95306011|1",
+        "name": "Chatswood",
+        "type": "locality"
+      }
+    },
+    {
+      "id": "2462151",
+      "isGlobalId": true,
+      "name": "Chatsworth Island, Chatsworth Rd",
+      "disassembledName": "Chatsworth Island, Chatsworth Rd",
+      "type": "stop",
+      "coord": [-29.645491, 153.221307],
+      "matchQuality": 600,
+      "isBest": false,
+      "parent": {
+        "id": "95324010|1",
+        "name": "Chatsworth",
+        "type": "locality"
+      },
+      "modes": [5]
+    }
+  ]
+}

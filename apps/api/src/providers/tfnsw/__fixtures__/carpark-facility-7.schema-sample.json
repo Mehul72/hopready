@@ -1,0 +1,38 @@
+{
+  "tsn": "253330",
+  "time": "846276280",
+  "spots": "42",
+  "zones": [
+    {
+      "spots": "42",
+      "zone_id": "1",
+      "occupancy": {
+        "loop": "20",
+        "total": "17",
+        "monthlies": null,
+        "open_gate": null,
+        "transients": null
+      },
+      "zone_name": "Kiama Car Park",
+      "parent_zone_id": "0"
+    }
+  ],
+  "ParkID": "1",
+  "location": {
+    "suburb": "Kiama",
+    "address": "Bong Bong Street",
+    "latitude": "-34.672518",
+    "longitude": "150.854695"
+  },
+  "occupancy": {
+    "loop": "20",
+    "total": "17",
+    "monthlies": null,
+    "open_gate": null,
+    "transients": null
+  },
+  "MessageDate": "2026-10-26T07:44:40",
+  "facility_id": "7",
+  "facility_name": "Park&Ride - Kiama",
+  "tfnsw_facility_id": "253330TPR001"
+}

@@ -1,0 +1,38 @@
+{
+  "tsn": "2101131",
+  "time": "846276309",
+  "spots": "244",
+  "zones": [
+    {
+      "spots": "244",
+      "zone_id": "1",
+      "occupancy": {
+        "loop": null,
+        "total": null,
+        "monthlies": null,
+        "open_gate": null,
+        "transients": null
+      },
+      "zone_name": "Warriewood B-Line Car Park",
+      "parent_zone_id": "0"
+    }
+  ],
+  "ParkID": "1",
+  "location": {
+    "suburb": "Warriewood",
+    "address": "Pittwater Road",
+    "latitude": "33.697777",
+    "longitude": "151.300667"
+  },
+  "occupancy": {
+    "loop": null,
+    "total": null,
+    "monthlies": null,
+    "open_gate": null,
+    "transients": null
+  },
+  "MessageDate": "2026-10-26T07:45:09",
+  "facility_id": "10",
+  "facility_name": "Park&Ride - Warriewood",
+  "tfnsw_facility_id": "2101131TPR001"
+}

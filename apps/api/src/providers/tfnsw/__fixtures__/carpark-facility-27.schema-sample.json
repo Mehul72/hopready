@@ -1,0 +1,32 @@
+{
+  "tsn": "2155384",
+  "time": "846276298",
+  "spots": "455",
+  "zones": [
+    {
+      "spots": "455",
+      "zone_id": "1",
+      "occupancy": {
+        "loop": "469",
+        "total": "466",
+        "monthlies": null,
+        "open_gate": null,
+        "transients": null
+      },
+      "zone_name": "SYD396B Tallawong P2 Car Park",
+      "parent_zone_id": "0"
+    }
+  ],
+  "ParkID": "1",
+  "occupancy": {
+    "loop": "469",
+    "total": "466",
+    "monthlies": null,
+    "open_gate": null,
+    "transients": null
+  },
+  "MessageDate": "2026-10-26T07:44:58",
+  "facility_id": "27",
+  "facility_name": "Park&Ride - Tallawong P2",
+  "tfnsw_facility_id": "2155384TPR002"
+}

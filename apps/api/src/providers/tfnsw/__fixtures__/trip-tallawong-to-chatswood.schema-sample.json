@@ -1,0 +1,2538 @@
+{
+  "version": "10.6.21.17",
+  "systemMessages": [
+    {
+      "type": "warning",
+      "module": "BROKER",
+      "code": -10015,
+      "text": "itp",
+      "subType": "itp-monomodal"
+    }
+  ],
+  "journeys": [
+    {
+      "rating": 0,
+      "isAdditional": false,
+      "interchanges": 0,
+      "legs": [
+        {
+          "duration": 240,
+          "distance": 210,
+          "origin": {
+            "name": "Conferta Ave, Tallawong",
+            "disassembledName": "Conferta Ave",
+            "type": "street",
+            "coord": [-33.693047, 150.905258],
+            "parent": {
+              "id": "95302934|1",
+              "name": "Tallawong",
+              "type": "locality"
+            },
+            "departureTimeBaseTimetable": "2026-10-25T21:03:00Z",
+            "departureTimePlanned": "2026-10-25T21:03:00Z",
+            "departureTimeEstimated": "2026-10-25T21:04:00Z"
+          },
+          "destination": {
+            "isGlobalId": true,
+            "id": "2155269",
+            "name": "Tallawong Station, Platform 2, Tallawong",
+            "disassembledName": "Tallawong Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "2155384",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95302934|1",
+                "name": "Tallawong",
+                "type": "locality"
+              },
+              "coord": [-33.691631, 150.906006],
+              "niveau": 0
+            },
+            "modes": [2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "TLA2"
+            },
+            "coord": [-33.691705, 150.905653],
+            "arrivalTimeBaseTimetable": "2026-10-25T21:07:00Z",
+            "arrivalTimePlanned": "2026-10-25T21:07:00Z",
+            "arrivalTimeEstimated": "2026-10-25T21:08:00Z"
+          },
+          "transportation": {
+            "product": {
+              "class": 100,
+              "name": "footpath",
+              "iconId": 100
+            },
+            "properties": {
+              "tripCode": 0,
+              "lineDisplay": "LINE"
+            }
+          },
+          "footPathInfoRedundant": true,
+          "coords": [
+            [-33.693047, 150.905258],
+            [-33.692412, 150.905371],
+            [-33.691705, 150.905653]
+          ]
+        },
+        {
+          "duration": 2161,
+          "origin": {
+            "isGlobalId": true,
+            "id": "2155269",
+            "name": "Tallawong Station, Platform 2, Tallawong",
+            "disassembledName": "Tallawong Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "2155384",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95302934|1",
+                "name": "Tallawong",
+                "type": "locality"
+              },
+              "coord": [-33.691631, 150.906006],
+              "niveau": 0
+            },
+            "modes": [2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "TLA2"
+            },
+            "coord": [-33.691705, 150.905653],
+            "departureTimeBaseTimetable": "2026-10-25T21:07:00Z",
+            "departureTimePlanned": "2026-10-25T21:07:00Z",
+            "departureTimeEstimated": "2026-10-25T21:08:00Z"
+          },
+          "destination": {
+            "isGlobalId": true,
+            "id": "2067142",
+            "name": "Chatswood Station, Platform 2, Chatswood",
+            "disassembledName": "Chatswood Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "206710",
+              "name": "Chatswood Station, Platform 2, Chatswood",
+              "disassembledName": "Chatswood Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95300906|1",
+                "name": "Chatswood",
+                "type": "locality"
+              },
+              "coord": [-33.797237, 151.180934],
+              "niveau": 0
+            },
+            "modes": [1, 2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "CHW2"
+            },
+            "coord": [-33.797469, 151.180988],
+            "arrivalTimeBaseTimetable": "2026-10-25T21:43:01Z",
+            "arrivalTimePlanned": "2026-10-25T21:43:01Z",
+            "arrivalTimeEstimated": "2026-10-25T21:44:01Z"
+          },
+          "transportation": {
+            "id": "nsw:030M1: :R:sj2",
+            "name": "Sydney Metro Network M1 Metro North West & Bankstown Line",
+            "disassembledName": "M1",
+            "number": "M1 Metro North West & Bankstown Line",
+            "iconId": 24,
+            "description": "Tallawong to Sydenham",
+            "product": {
+              "class": 2,
+              "name": "Sydney Metro Network",
+              "iconId": 2
+            },
+            "operator": {
+              "id": "SMNW",
+              "name": "Sydney Metro"
+            },
+            "destination": {
+              "id": "10101410",
+              "name": "Sydenham",
+              "type": "stop"
+            },
+            "properties": {
+              "isTTB": true,
+              "tripCode": 520,
+              "timetablePeriod": "NSW JP",
+              "lineDisplay": "LINE",
+              "globalId": "3001",
+              "RealtimeTripId": "0272-001-360-002:1000",
+              "AVMSTripID": "0272-001-360-002:1000"
+            }
+          },
+          "stopSequence": [
+            {
+              "isGlobalId": true,
+              "id": "2155269",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155384",
+                "name": "Tallawong Station, Platform 2, Tallawong",
+                "disassembledName": "Tallawong Station, Platform 2",
+                "type": "stop",
+                "parent": {
+                  "id": "95302934|1",
+                  "name": "Tallawong",
+                  "type": "locality"
+                },
+                "coord": [-33.691631, 150.906006],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "TLA2"
+              },
+              "coord": [-33.691705, 150.905653],
+              "departureTimeBaseTimetable": "2026-10-25T21:07:00Z",
+              "departureTimePlanned": "2026-10-25T21:07:00Z",
+              "departureTimeEstimated": "2026-10-25T21:08:00Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2155267",
+              "name": "Rouse Hill Station, Platform 1, Rouse Hill",
+              "disassembledName": "Rouse Hill Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155383",
+                "name": "Rouse Hill Station, Platform 1, Rouse Hill",
+                "disassembledName": "Rouse Hill Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95302668|1",
+                  "name": "Rouse Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.691812, 150.924168],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "RSH1"
+              },
+              "coord": [-33.691959, 150.924357],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:09:00Z",
+              "arrivalTimePlanned": "2026-10-25T21:09:00Z",
+              "arrivalTimeEstimated": "2026-10-25T21:10:00Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:09:28Z",
+              "departureTimePlanned": "2026-10-25T21:09:28Z",
+              "departureTimeEstimated": "2026-10-25T21:10:28Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2155265",
+              "name": "Kellyville Station, Platform 1, Kellyville",
+              "disassembledName": "Kellyville Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155382",
+                "name": "Kellyville Station, Platform 1, Kellyville",
+                "disassembledName": "Kellyville Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95304184|1",
+                  "name": "Kellyville",
+                  "type": "locality"
+                },
+                "coord": [-33.713374, 150.935231],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "KVL1"
+              },
+              "coord": [-33.713488, 150.935344],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:11:43Z",
+              "arrivalTimePlanned": "2026-10-25T21:11:43Z",
+              "arrivalTimeEstimated": "2026-10-25T21:12:43Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:12:11Z",
+              "departureTimePlanned": "2026-10-25T21:12:11Z",
+              "departureTimeEstimated": "2026-10-25T21:13:11Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2153402",
+              "name": "Bella Vista Station, Platform 1, Bella Vista",
+              "disassembledName": "Bella Vista Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2153478",
+                "name": "Bella Vista Station, Platform 1, Bella Vista",
+                "disassembledName": "Bella Vista Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303730|1",
+                  "name": "Bella Vista",
+                  "type": "locality"
+                },
+                "coord": [-33.730566, 150.94402],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "BEV1"
+              },
+              "coord": [-33.730698, 150.944123],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:14:07Z",
+              "arrivalTimePlanned": "2026-10-25T21:14:07Z",
+              "arrivalTimeEstimated": "2026-10-25T21:15:07Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:14:35Z",
+              "departureTimePlanned": "2026-10-25T21:14:35Z",
+              "departureTimeEstimated": "2026-10-25T21:15:35Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2153404",
+              "name": "Norwest Station, Platform 1, Norwest",
+              "disassembledName": "Norwest Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2153477",
+                "name": "Norwest Station, Platform 1, Norwest",
+                "disassembledName": "Norwest Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95301492|1",
+                  "name": "Norwest",
+                  "type": "locality"
+                },
+                "coord": [-33.734617, 150.963522],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "NWZ1"
+              },
+              "coord": [-33.734282, 150.963851],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:16:38Z",
+              "arrivalTimePlanned": "2026-10-25T21:16:38Z",
+              "arrivalTimeEstimated": "2026-10-25T21:17:38Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:17:06Z",
+              "departureTimePlanned": "2026-10-25T21:17:06Z",
+              "departureTimeEstimated": "2026-10-25T21:18:06Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2154264",
+              "name": "Hills Showground Station, Platform 1, Castle Hill",
+              "disassembledName": "Hills Showground Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2154392",
+                "name": "Hills Showground Station, Platform 1, Castle Hill",
+                "disassembledName": "Hills Showground Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95309519|1",
+                  "name": "Castle Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.72782, 150.987345],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "HSG1"
+              },
+              "coord": [-33.727755, 150.987427],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:19:12Z",
+              "arrivalTimePlanned": "2026-10-25T21:19:12Z",
+              "arrivalTimeEstimated": "2026-10-25T21:20:12Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:19:40Z",
+              "departureTimePlanned": "2026-10-25T21:19:40Z",
+              "departureTimeEstimated": "2026-10-25T21:20:40Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2154262",
+              "name": "Castle Hill Station, Platform 1, Castle Hill",
+              "disassembledName": "Castle Hill Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2154391",
+                "name": "Castle Hill Station, Platform 1, Castle Hill",
+                "disassembledName": "Castle Hill Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95309519|1",
+                  "name": "Castle Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.731313, 151.007419],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CTH1"
+              },
+              "coord": [-33.731469, 151.00768],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:21:37Z",
+              "arrivalTimePlanned": "2026-10-25T21:21:37Z",
+              "arrivalTimeEstimated": "2026-10-25T21:22:37Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:22:05Z",
+              "departureTimePlanned": "2026-10-25T21:22:05Z",
+              "departureTimeEstimated": "2026-10-25T21:23:05Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2126159",
+              "name": "Cherrybrook Station, Platform 1, Cherrybrook",
+              "disassembledName": "Cherrybrook Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2126158",
+                "name": "Cherrybrook Station, Platform 1, Cherrybrook",
+                "disassembledName": "Cherrybrook Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95300852|1",
+                  "name": "Cherrybrook",
+                  "type": "locality"
+                },
+                "coord": [-33.736703, 151.031977],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CHB1"
+              },
+              "coord": [-33.736728, 151.032084],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:24:16Z",
+              "arrivalTimePlanned": "2026-10-25T21:24:16Z",
+              "arrivalTimeEstimated": "2026-10-25T21:25:16Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:24:44Z",
+              "departureTimePlanned": "2026-10-25T21:24:44Z",
+              "departureTimeEstimated": "2026-10-25T21:25:44Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2121225",
+              "name": "Epping Station, Platform 5, Epping",
+              "disassembledName": "Epping Station, Platform 5",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "212110",
+                "name": "Epping Station, Platform 5, Epping",
+                "disassembledName": "Epping Station, Platform 5",
+                "type": "stop",
+                "parent": {
+                  "id": "95302242|1",
+                  "name": "Epping",
+                  "type": "locality"
+                },
+                "coord": [-33.772717, 151.082003],
+                "niveau": 0
+              },
+              "modes": [1, 2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "EPP5"
+              },
+              "coord": [-33.772875, 151.082278],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:29:43Z",
+              "arrivalTimePlanned": "2026-10-25T21:29:43Z",
+              "arrivalTimeEstimated": "2026-10-25T21:30:43Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:30:28Z",
+              "departureTimePlanned": "2026-10-25T21:30:28Z",
+              "departureTimeEstimated": "2026-10-25T21:31:28Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113351",
+              "name": "Macquarie University Station, Platform 1, Macquarie Park",
+              "disassembledName": "Macquarie University Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211310",
+                "name": "Macquarie University Station, Platform 1, Macquarie Park",
+                "disassembledName": "Macquarie University Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.777282, 151.118267],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "MQU1"
+              },
+              "coord": [-33.777596, 151.118314],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:33:34Z",
+              "arrivalTimePlanned": "2026-10-25T21:33:34Z",
+              "arrivalTimeEstimated": "2026-10-25T21:34:34Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:34:02Z",
+              "departureTimePlanned": "2026-10-25T21:34:02Z",
+              "departureTimeEstimated": "2026-10-25T21:35:02Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113341",
+              "name": "Macquarie Park Station, Platform 1, Macquarie Park",
+              "disassembledName": "Macquarie Park Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211340",
+                "name": "Macquarie Park Station, Platform 1, Macquarie Park",
+                "disassembledName": "Macquarie Park Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.784713, 151.128401],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "MQP1"
+              },
+              "coord": [-33.784982, 151.128337],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:35:31Z",
+              "arrivalTimePlanned": "2026-10-25T21:35:31Z",
+              "arrivalTimeEstimated": "2026-10-25T21:36:31Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:35:59Z",
+              "departureTimePlanned": "2026-10-25T21:35:59Z",
+              "departureTimeEstimated": "2026-10-25T21:36:59Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113361",
+              "name": "North Ryde Station, Platform 1, Macquarie Park",
+              "disassembledName": "North Ryde Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211320",
+                "name": "North Ryde Station, Platform 1, Macquarie Park",
+                "disassembledName": "North Ryde Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.79391, 151.138143],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "NRY1"
+              },
+              "coord": [-33.794171, 151.13806],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:37:33Z",
+              "arrivalTimePlanned": "2026-10-25T21:37:33Z",
+              "arrivalTimeEstimated": "2026-10-25T21:38:33Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:38:01Z",
+              "departureTimePlanned": "2026-10-25T21:38:01Z",
+              "departureTimeEstimated": "2026-10-25T21:39:01Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2067142",
+              "name": "Chatswood Station, Platform 2, Chatswood",
+              "disassembledName": "Chatswood Station, Platform 2",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "206710",
+                "name": "Chatswood Station, Platform 2, Chatswood",
+                "disassembledName": "Chatswood Station, Platform 2",
+                "type": "stop",
+                "parent": {
+                  "id": "95300906|1",
+                  "name": "Chatswood",
+                  "type": "locality"
+                },
+                "coord": [-33.797237, 151.180934],
+                "niveau": 0
+              },
+              "modes": [1, 2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CHW2"
+              },
+              "coord": [-33.797469, 151.180988],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:43:01Z",
+              "arrivalTimePlanned": "2026-10-25T21:43:01Z",
+              "arrivalTimeEstimated": "2026-10-25T21:44:01Z"
+            }
+          ],
+          "coords": [
+            [-33.691705, 150.905653],
+            [-33.691959, 150.924357],
+            [-33.713488, 150.935344],
+            [-33.730698, 150.944123],
+            [-33.734282, 150.963851],
+            [-33.727755, 150.987427],
+            [-33.731469, 151.00768],
+            [-33.736728, 151.032084],
+            [-33.772875, 151.082278],
+            [-33.777596, 151.118314],
+            [-33.784982, 151.128337],
+            [-33.794171, 151.13806],
+            [-33.797469, 151.180988]
+          ],
+          "properties": {
+            "PlanLowFloorVehicle": "1",
+            "PlanWheelChairAccess": "1"
+          },
+          "isRealtimeControlled": true,
+          "realtimeStatus": ["MONITORED"],
+          "infos": [
+            {
+              "priority": "low",
+              "id": "ems-50101",
+              "version": "3",
+              "type": "stopInfo",
+              "urlText": "Chatswood Station lift 3 is not available",
+              "url": "https://transportnsw.info/alerts/details#/ems-50101",
+              "content": "<p>Lift 3 between the concourse and <strong>Platforms 1 &amp; 2</strong> is temporarily out of service.</p><p>If you need help, ask staff.</p>",
+              "subtitle": "Chatswood Station lift 3 is not available",
+              "properties": {
+                "publisher": "ems.comm.addinfo",
+                "infoType": "stopInfo",
+                "appliesTo": "departingArriving",
+                "stopIDglobalID": "206710:2067141,2067142"
+              }
+            },
+            {
+              "priority": "veryHigh",
+              "id": "ems-50102",
+              "version": "1",
+              "type": "lineInfo",
+              "urlText": "Metro: allow extra travel time",
+              "url": "https://transportnsw.info/alerts/details#/ems-50102",
+              "content": "Allow extra travel time between Tallawong and Chatswood.<br/>Services run every&nbsp;10 minutes &#38; may be crowded.",
+              "subtitle": "Metro &amp; trains: allow extra travel time",
+              "properties": {
+                "publisher": "ems.comm.addinfo",
+                "infoType": "lineInfo"
+              }
+            }
+          ]
+        }
+      ],
+      "fare": {
+        "tickets": []
+      }
+    },
+    {
+      "rating": 0,
+      "isAdditional": false,
+      "interchanges": 0,
+      "legs": [
+        {
+          "duration": 240,
+          "distance": 210,
+          "origin": {
+            "name": "Conferta Ave, Tallawong",
+            "disassembledName": "Conferta Ave",
+            "type": "street",
+            "coord": [-33.693047, 150.905258],
+            "parent": {
+              "id": "95302934|1",
+              "name": "Tallawong",
+              "type": "locality"
+            },
+            "departureTimeBaseTimetable": "2026-10-25T21:13:00Z",
+            "departureTimePlanned": "2026-10-25T21:13:00Z",
+            "departureTimeEstimated": "2026-10-25T21:13:00Z"
+          },
+          "destination": {
+            "isGlobalId": true,
+            "id": "2155269",
+            "name": "Tallawong Station, Platform 2, Tallawong",
+            "disassembledName": "Tallawong Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "2155384",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95302934|1",
+                "name": "Tallawong",
+                "type": "locality"
+              },
+              "coord": [-33.691631, 150.906006],
+              "niveau": 0
+            },
+            "modes": [2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "TLA2"
+            },
+            "coord": [-33.691705, 150.905653],
+            "arrivalTimeBaseTimetable": "2026-10-25T21:17:00Z",
+            "arrivalTimePlanned": "2026-10-25T21:17:00Z",
+            "arrivalTimeEstimated": "2026-10-25T21:17:00Z"
+          },
+          "transportation": {
+            "product": {
+              "class": 100,
+              "name": "footpath",
+              "iconId": 100
+            },
+            "properties": {
+              "tripCode": 0,
+              "lineDisplay": "LINE"
+            }
+          },
+          "footPathInfoRedundant": true
+        },
+        {
+          "duration": 2161,
+          "origin": {
+            "isGlobalId": true,
+            "id": "2155269",
+            "name": "Tallawong Station, Platform 2, Tallawong",
+            "disassembledName": "Tallawong Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "2155384",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95302934|1",
+                "name": "Tallawong",
+                "type": "locality"
+              },
+              "coord": [-33.691631, 150.906006],
+              "niveau": 0
+            },
+            "modes": [2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "TLA2"
+            },
+            "coord": [-33.691705, 150.905653],
+            "departureTimeBaseTimetable": "2026-10-25T21:17:00Z",
+            "departureTimePlanned": "2026-10-25T21:17:00Z",
+            "departureTimeEstimated": "2026-10-25T21:17:00Z"
+          },
+          "destination": {
+            "isGlobalId": true,
+            "id": "2067142",
+            "name": "Chatswood Station, Platform 2, Chatswood",
+            "disassembledName": "Chatswood Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "206710",
+              "name": "Chatswood Station, Platform 2, Chatswood",
+              "disassembledName": "Chatswood Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95300906|1",
+                "name": "Chatswood",
+                "type": "locality"
+              },
+              "coord": [-33.797237, 151.180934],
+              "niveau": 0
+            },
+            "modes": [1, 2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "CHW2"
+            },
+            "coord": [-33.797469, 151.180988],
+            "arrivalTimeBaseTimetable": "2026-10-25T21:53:01Z",
+            "arrivalTimePlanned": "2026-10-25T21:53:01Z",
+            "arrivalTimeEstimated": "2026-10-25T21:53:01Z"
+          },
+          "transportation": {
+            "id": "nsw:030M1: :R:sj2",
+            "name": "Sydney Metro Network M1 Metro North West & Bankstown Line",
+            "disassembledName": "M1",
+            "number": "M1 Metro North West & Bankstown Line",
+            "iconId": 24,
+            "description": "Tallawong to Sydenham",
+            "product": {
+              "class": 2,
+              "name": "Sydney Metro Network",
+              "iconId": 2
+            },
+            "operator": {
+              "id": "SMNW",
+              "name": "Sydney Metro"
+            },
+            "destination": {
+              "id": "10101410",
+              "name": "Sydenham",
+              "type": "stop"
+            },
+            "properties": {
+              "isTTB": true,
+              "tripCode": 520,
+              "timetablePeriod": "NSW JP",
+              "lineDisplay": "LINE",
+              "globalId": "3001",
+              "RealtimeTripId": "0272-001-729-002:1000",
+              "AVMSTripID": "0272-001-729-002:1000"
+            }
+          },
+          "stopSequence": [
+            {
+              "isGlobalId": true,
+              "id": "2155269",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155384",
+                "name": "Tallawong Station, Platform 2, Tallawong",
+                "disassembledName": "Tallawong Station, Platform 2",
+                "type": "stop",
+                "parent": {
+                  "id": "95302934|1",
+                  "name": "Tallawong",
+                  "type": "locality"
+                },
+                "coord": [-33.691631, 150.906006],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "TLA2"
+              },
+              "coord": [-33.691705, 150.905653],
+              "departureTimeBaseTimetable": "2026-10-25T21:17:00Z",
+              "departureTimePlanned": "2026-10-25T21:17:00Z",
+              "departureTimeEstimated": "2026-10-25T21:17:00Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2155267",
+              "name": "Rouse Hill Station, Platform 1, Rouse Hill",
+              "disassembledName": "Rouse Hill Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155383",
+                "name": "Rouse Hill Station, Platform 1, Rouse Hill",
+                "disassembledName": "Rouse Hill Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95302668|1",
+                  "name": "Rouse Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.691812, 150.924168],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "RSH1"
+              },
+              "coord": [-33.691959, 150.924357],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:19:00Z",
+              "arrivalTimePlanned": "2026-10-25T21:19:00Z",
+              "arrivalTimeEstimated": "2026-10-25T21:19:00Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:19:28Z",
+              "departureTimePlanned": "2026-10-25T21:19:28Z",
+              "departureTimeEstimated": "2026-10-25T21:19:28Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2155265",
+              "name": "Kellyville Station, Platform 1, Kellyville",
+              "disassembledName": "Kellyville Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155382",
+                "name": "Kellyville Station, Platform 1, Kellyville",
+                "disassembledName": "Kellyville Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95304184|1",
+                  "name": "Kellyville",
+                  "type": "locality"
+                },
+                "coord": [-33.713374, 150.935231],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "KVL1"
+              },
+              "coord": [-33.713488, 150.935344],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:21:43Z",
+              "arrivalTimePlanned": "2026-10-25T21:21:43Z",
+              "arrivalTimeEstimated": "2026-10-25T21:21:43Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:22:11Z",
+              "departureTimePlanned": "2026-10-25T21:22:11Z",
+              "departureTimeEstimated": "2026-10-25T21:22:11Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2153402",
+              "name": "Bella Vista Station, Platform 1, Bella Vista",
+              "disassembledName": "Bella Vista Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2153478",
+                "name": "Bella Vista Station, Platform 1, Bella Vista",
+                "disassembledName": "Bella Vista Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303730|1",
+                  "name": "Bella Vista",
+                  "type": "locality"
+                },
+                "coord": [-33.730566, 150.94402],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "BEV1"
+              },
+              "coord": [-33.730698, 150.944123],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:24:07Z",
+              "arrivalTimePlanned": "2026-10-25T21:24:07Z",
+              "arrivalTimeEstimated": "2026-10-25T21:24:07Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:24:35Z",
+              "departureTimePlanned": "2026-10-25T21:24:35Z",
+              "departureTimeEstimated": "2026-10-25T21:24:35Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2153404",
+              "name": "Norwest Station, Platform 1, Norwest",
+              "disassembledName": "Norwest Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2153477",
+                "name": "Norwest Station, Platform 1, Norwest",
+                "disassembledName": "Norwest Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95301492|1",
+                  "name": "Norwest",
+                  "type": "locality"
+                },
+                "coord": [-33.734617, 150.963522],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "NWZ1"
+              },
+              "coord": [-33.734282, 150.963851],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:26:38Z",
+              "arrivalTimePlanned": "2026-10-25T21:26:38Z",
+              "arrivalTimeEstimated": "2026-10-25T21:26:38Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:27:06Z",
+              "departureTimePlanned": "2026-10-25T21:27:06Z",
+              "departureTimeEstimated": "2026-10-25T21:27:06Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2154264",
+              "name": "Hills Showground Station, Platform 1, Castle Hill",
+              "disassembledName": "Hills Showground Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2154392",
+                "name": "Hills Showground Station, Platform 1, Castle Hill",
+                "disassembledName": "Hills Showground Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95309519|1",
+                  "name": "Castle Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.72782, 150.987345],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "HSG1"
+              },
+              "coord": [-33.727755, 150.987427],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:29:12Z",
+              "arrivalTimePlanned": "2026-10-25T21:29:12Z",
+              "arrivalTimeEstimated": "2026-10-25T21:29:12Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:29:40Z",
+              "departureTimePlanned": "2026-10-25T21:29:40Z",
+              "departureTimeEstimated": "2026-10-25T21:29:40Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2154262",
+              "name": "Castle Hill Station, Platform 1, Castle Hill",
+              "disassembledName": "Castle Hill Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2154391",
+                "name": "Castle Hill Station, Platform 1, Castle Hill",
+                "disassembledName": "Castle Hill Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95309519|1",
+                  "name": "Castle Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.731313, 151.007419],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CTH1"
+              },
+              "coord": [-33.731469, 151.00768],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:31:37Z",
+              "arrivalTimePlanned": "2026-10-25T21:31:37Z",
+              "arrivalTimeEstimated": "2026-10-25T21:31:37Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:32:05Z",
+              "departureTimePlanned": "2026-10-25T21:32:05Z",
+              "departureTimeEstimated": "2026-10-25T21:32:05Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2126159",
+              "name": "Cherrybrook Station, Platform 1, Cherrybrook",
+              "disassembledName": "Cherrybrook Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2126158",
+                "name": "Cherrybrook Station, Platform 1, Cherrybrook",
+                "disassembledName": "Cherrybrook Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95300852|1",
+                  "name": "Cherrybrook",
+                  "type": "locality"
+                },
+                "coord": [-33.736703, 151.031977],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CHB1"
+              },
+              "coord": [-33.736728, 151.032084],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:34:16Z",
+              "arrivalTimePlanned": "2026-10-25T21:34:16Z",
+              "arrivalTimeEstimated": "2026-10-25T21:34:16Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:34:44Z",
+              "departureTimePlanned": "2026-10-25T21:34:44Z",
+              "departureTimeEstimated": "2026-10-25T21:34:44Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2121225",
+              "name": "Epping Station, Platform 5, Epping",
+              "disassembledName": "Epping Station, Platform 5",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "212110",
+                "name": "Epping Station, Platform 5, Epping",
+                "disassembledName": "Epping Station, Platform 5",
+                "type": "stop",
+                "parent": {
+                  "id": "95302242|1",
+                  "name": "Epping",
+                  "type": "locality"
+                },
+                "coord": [-33.772717, 151.082003],
+                "niveau": 0
+              },
+              "modes": [1, 2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "EPP5"
+              },
+              "coord": [-33.772875, 151.082278],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:39:43Z",
+              "arrivalTimePlanned": "2026-10-25T21:39:43Z",
+              "arrivalTimeEstimated": "2026-10-25T21:39:43Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:40:28Z",
+              "departureTimePlanned": "2026-10-25T21:40:28Z",
+              "departureTimeEstimated": "2026-10-25T21:40:28Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113351",
+              "name": "Macquarie University Station, Platform 1, Macquarie Park",
+              "disassembledName": "Macquarie University Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211310",
+                "name": "Macquarie University Station, Platform 1, Macquarie Park",
+                "disassembledName": "Macquarie University Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.777282, 151.118267],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "MQU1"
+              },
+              "coord": [-33.777596, 151.118314],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:43:34Z",
+              "arrivalTimePlanned": "2026-10-25T21:43:34Z",
+              "arrivalTimeEstimated": "2026-10-25T21:43:34Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:44:02Z",
+              "departureTimePlanned": "2026-10-25T21:44:02Z",
+              "departureTimeEstimated": "2026-10-25T21:44:02Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113341",
+              "name": "Macquarie Park Station, Platform 1, Macquarie Park",
+              "disassembledName": "Macquarie Park Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211340",
+                "name": "Macquarie Park Station, Platform 1, Macquarie Park",
+                "disassembledName": "Macquarie Park Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.784713, 151.128401],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "MQP1"
+              },
+              "coord": [-33.784982, 151.128337],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:45:31Z",
+              "arrivalTimePlanned": "2026-10-25T21:45:31Z",
+              "arrivalTimeEstimated": "2026-10-25T21:45:31Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:45:59Z",
+              "departureTimePlanned": "2026-10-25T21:45:59Z",
+              "departureTimeEstimated": "2026-10-25T21:45:59Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113361",
+              "name": "North Ryde Station, Platform 1, Macquarie Park",
+              "disassembledName": "North Ryde Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211320",
+                "name": "North Ryde Station, Platform 1, Macquarie Park",
+                "disassembledName": "North Ryde Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.79391, 151.138143],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "NRY1"
+              },
+              "coord": [-33.794171, 151.13806],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:47:33Z",
+              "arrivalTimePlanned": "2026-10-25T21:47:33Z",
+              "arrivalTimeEstimated": "2026-10-25T21:47:33Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:48:01Z",
+              "departureTimePlanned": "2026-10-25T21:48:01Z",
+              "departureTimeEstimated": "2026-10-25T21:48:01Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2067142",
+              "name": "Chatswood Station, Platform 2, Chatswood",
+              "disassembledName": "Chatswood Station, Platform 2",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "206710",
+                "name": "Chatswood Station, Platform 2, Chatswood",
+                "disassembledName": "Chatswood Station, Platform 2",
+                "type": "stop",
+                "parent": {
+                  "id": "95300906|1",
+                  "name": "Chatswood",
+                  "type": "locality"
+                },
+                "coord": [-33.797237, 151.180934],
+                "niveau": 0
+              },
+              "modes": [1, 2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CHW2"
+              },
+              "coord": [-33.797469, 151.180988],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:53:01Z",
+              "arrivalTimePlanned": "2026-10-25T21:53:01Z",
+              "arrivalTimeEstimated": "2026-10-25T21:53:01Z"
+            }
+          ],
+          "coords": [
+            [-33.691705, 150.905653],
+            [-33.691959, 150.924357],
+            [-33.713488, 150.935344],
+            [-33.730698, 150.944123],
+            [-33.734282, 150.963851],
+            [-33.727755, 150.987427],
+            [-33.731469, 151.00768],
+            [-33.736728, 151.032084],
+            [-33.772875, 151.082278],
+            [-33.777596, 151.118314],
+            [-33.784982, 151.128337],
+            [-33.794171, 151.13806],
+            [-33.797469, 151.180988]
+          ],
+          "properties": {
+            "PlanLowFloorVehicle": "1",
+            "PlanWheelChairAccess": "1"
+          }
+        }
+      ],
+      "fare": {
+        "tickets": []
+      }
+    },
+    {
+      "rating": 0,
+      "isAdditional": false,
+      "interchanges": 0,
+      "legs": [
+        {
+          "duration": 240,
+          "distance": 210,
+          "origin": {
+            "name": "Conferta Ave, Tallawong",
+            "disassembledName": "Conferta Ave",
+            "type": "street",
+            "coord": [-33.693047, 150.905258],
+            "parent": {
+              "id": "95302934|1",
+              "name": "Tallawong",
+              "type": "locality"
+            },
+            "departureTimeBaseTimetable": "2026-10-25T21:23:00Z",
+            "departureTimePlanned": "2026-10-25T21:23:00Z",
+            "departureTimeEstimated": "2026-10-25T21:23:00Z"
+          },
+          "destination": {
+            "isGlobalId": true,
+            "id": "2155269",
+            "name": "Tallawong Station, Platform 2, Tallawong",
+            "disassembledName": "Tallawong Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "2155384",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95302934|1",
+                "name": "Tallawong",
+                "type": "locality"
+              },
+              "coord": [-33.691631, 150.906006],
+              "niveau": 0
+            },
+            "modes": [2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "TLA2"
+            },
+            "coord": [-33.691705, 150.905653],
+            "arrivalTimeBaseTimetable": "2026-10-25T21:27:00Z",
+            "arrivalTimePlanned": "2026-10-25T21:27:00Z",
+            "arrivalTimeEstimated": "2026-10-25T21:27:00Z"
+          },
+          "transportation": {
+            "product": {
+              "class": 100,
+              "name": "footpath",
+              "iconId": 100
+            },
+            "properties": {
+              "tripCode": 0,
+              "lineDisplay": "LINE"
+            }
+          },
+          "footPathInfoRedundant": true
+        },
+        {
+          "duration": 2161,
+          "origin": {
+            "isGlobalId": true,
+            "id": "2155269",
+            "name": "Tallawong Station, Platform 2, Tallawong",
+            "disassembledName": "Tallawong Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "2155384",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95302934|1",
+                "name": "Tallawong",
+                "type": "locality"
+              },
+              "coord": [-33.691631, 150.906006],
+              "niveau": 0
+            },
+            "modes": [2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "TLA2"
+            },
+            "coord": [-33.691705, 150.905653],
+            "departureTimeBaseTimetable": "2026-10-25T21:27:00Z",
+            "departureTimePlanned": "2026-10-25T21:27:00Z",
+            "departureTimeEstimated": "2026-10-25T21:27:00Z"
+          },
+          "destination": {
+            "isGlobalId": true,
+            "id": "2067142",
+            "name": "Chatswood Station, Platform 2, Chatswood",
+            "disassembledName": "Chatswood Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "206710",
+              "name": "Chatswood Station, Platform 2, Chatswood",
+              "disassembledName": "Chatswood Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95300906|1",
+                "name": "Chatswood",
+                "type": "locality"
+              },
+              "coord": [-33.797237, 151.180934],
+              "niveau": 0
+            },
+            "modes": [1, 2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "CHW2"
+            },
+            "coord": [-33.797469, 151.180988],
+            "arrivalTimeBaseTimetable": "2026-10-25T22:03:01Z",
+            "arrivalTimePlanned": "2026-10-25T22:03:01Z",
+            "arrivalTimeEstimated": "2026-10-25T22:03:01Z"
+          },
+          "transportation": {
+            "id": "nsw:030M1: :R:sj2",
+            "name": "Sydney Metro Network M1 Metro North West & Bankstown Line",
+            "disassembledName": "M1",
+            "number": "M1 Metro North West & Bankstown Line",
+            "iconId": 24,
+            "description": "Tallawong to Sydenham",
+            "product": {
+              "class": 2,
+              "name": "Sydney Metro Network",
+              "iconId": 2
+            },
+            "operator": {
+              "id": "SMNW",
+              "name": "Sydney Metro"
+            },
+            "destination": {
+              "id": "10101410",
+              "name": "Sydenham",
+              "type": "stop"
+            },
+            "properties": {
+              "isTTB": true,
+              "tripCode": 520,
+              "timetablePeriod": "NSW JP",
+              "lineDisplay": "LINE",
+              "globalId": "3001",
+              "RealtimeTripId": "0272-001-947-002:1000",
+              "AVMSTripID": "0272-001-947-002:1000"
+            }
+          },
+          "stopSequence": [
+            {
+              "isGlobalId": true,
+              "id": "2155269",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155384",
+                "name": "Tallawong Station, Platform 2, Tallawong",
+                "disassembledName": "Tallawong Station, Platform 2",
+                "type": "stop",
+                "parent": {
+                  "id": "95302934|1",
+                  "name": "Tallawong",
+                  "type": "locality"
+                },
+                "coord": [-33.691631, 150.906006],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "TLA2"
+              },
+              "coord": [-33.691705, 150.905653],
+              "departureTimeBaseTimetable": "2026-10-25T21:27:00Z",
+              "departureTimePlanned": "2026-10-25T21:27:00Z",
+              "departureTimeEstimated": "2026-10-25T21:27:00Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2155267",
+              "name": "Rouse Hill Station, Platform 1, Rouse Hill",
+              "disassembledName": "Rouse Hill Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155383",
+                "name": "Rouse Hill Station, Platform 1, Rouse Hill",
+                "disassembledName": "Rouse Hill Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95302668|1",
+                  "name": "Rouse Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.691812, 150.924168],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "RSH1"
+              },
+              "coord": [-33.691959, 150.924357],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:29:00Z",
+              "arrivalTimePlanned": "2026-10-25T21:29:00Z",
+              "arrivalTimeEstimated": "2026-10-25T21:29:00Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:29:28Z",
+              "departureTimePlanned": "2026-10-25T21:29:28Z",
+              "departureTimeEstimated": "2026-10-25T21:29:28Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2155265",
+              "name": "Kellyville Station, Platform 1, Kellyville",
+              "disassembledName": "Kellyville Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155382",
+                "name": "Kellyville Station, Platform 1, Kellyville",
+                "disassembledName": "Kellyville Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95304184|1",
+                  "name": "Kellyville",
+                  "type": "locality"
+                },
+                "coord": [-33.713374, 150.935231],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "KVL1"
+              },
+              "coord": [-33.713488, 150.935344],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:31:43Z",
+              "arrivalTimePlanned": "2026-10-25T21:31:43Z",
+              "arrivalTimeEstimated": "2026-10-25T21:31:43Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:32:11Z",
+              "departureTimePlanned": "2026-10-25T21:32:11Z",
+              "departureTimeEstimated": "2026-10-25T21:32:11Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2153402",
+              "name": "Bella Vista Station, Platform 1, Bella Vista",
+              "disassembledName": "Bella Vista Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2153478",
+                "name": "Bella Vista Station, Platform 1, Bella Vista",
+                "disassembledName": "Bella Vista Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303730|1",
+                  "name": "Bella Vista",
+                  "type": "locality"
+                },
+                "coord": [-33.730566, 150.94402],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "BEV1"
+              },
+              "coord": [-33.730698, 150.944123],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:34:07Z",
+              "arrivalTimePlanned": "2026-10-25T21:34:07Z",
+              "arrivalTimeEstimated": "2026-10-25T21:34:07Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:34:35Z",
+              "departureTimePlanned": "2026-10-25T21:34:35Z",
+              "departureTimeEstimated": "2026-10-25T21:34:35Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2153404",
+              "name": "Norwest Station, Platform 1, Norwest",
+              "disassembledName": "Norwest Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2153477",
+                "name": "Norwest Station, Platform 1, Norwest",
+                "disassembledName": "Norwest Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95301492|1",
+                  "name": "Norwest",
+                  "type": "locality"
+                },
+                "coord": [-33.734617, 150.963522],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "NWZ1"
+              },
+              "coord": [-33.734282, 150.963851],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:36:38Z",
+              "arrivalTimePlanned": "2026-10-25T21:36:38Z",
+              "arrivalTimeEstimated": "2026-10-25T21:36:38Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:37:06Z",
+              "departureTimePlanned": "2026-10-25T21:37:06Z",
+              "departureTimeEstimated": "2026-10-25T21:37:06Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2154264",
+              "name": "Hills Showground Station, Platform 1, Castle Hill",
+              "disassembledName": "Hills Showground Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2154392",
+                "name": "Hills Showground Station, Platform 1, Castle Hill",
+                "disassembledName": "Hills Showground Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95309519|1",
+                  "name": "Castle Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.72782, 150.987345],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "HSG1"
+              },
+              "coord": [-33.727755, 150.987427],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:39:12Z",
+              "arrivalTimePlanned": "2026-10-25T21:39:12Z",
+              "arrivalTimeEstimated": "2026-10-25T21:39:12Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:39:40Z",
+              "departureTimePlanned": "2026-10-25T21:39:40Z",
+              "departureTimeEstimated": "2026-10-25T21:39:40Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2154262",
+              "name": "Castle Hill Station, Platform 1, Castle Hill",
+              "disassembledName": "Castle Hill Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2154391",
+                "name": "Castle Hill Station, Platform 1, Castle Hill",
+                "disassembledName": "Castle Hill Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95309519|1",
+                  "name": "Castle Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.731313, 151.007419],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CTH1"
+              },
+              "coord": [-33.731469, 151.00768],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:41:37Z",
+              "arrivalTimePlanned": "2026-10-25T21:41:37Z",
+              "arrivalTimeEstimated": "2026-10-25T21:41:37Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:42:05Z",
+              "departureTimePlanned": "2026-10-25T21:42:05Z",
+              "departureTimeEstimated": "2026-10-25T21:42:05Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2126159",
+              "name": "Cherrybrook Station, Platform 1, Cherrybrook",
+              "disassembledName": "Cherrybrook Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2126158",
+                "name": "Cherrybrook Station, Platform 1, Cherrybrook",
+                "disassembledName": "Cherrybrook Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95300852|1",
+                  "name": "Cherrybrook",
+                  "type": "locality"
+                },
+                "coord": [-33.736703, 151.031977],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CHB1"
+              },
+              "coord": [-33.736728, 151.032084],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:44:16Z",
+              "arrivalTimePlanned": "2026-10-25T21:44:16Z",
+              "arrivalTimeEstimated": "2026-10-25T21:44:16Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:44:44Z",
+              "departureTimePlanned": "2026-10-25T21:44:44Z",
+              "departureTimeEstimated": "2026-10-25T21:44:44Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2121225",
+              "name": "Epping Station, Platform 5, Epping",
+              "disassembledName": "Epping Station, Platform 5",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "212110",
+                "name": "Epping Station, Platform 5, Epping",
+                "disassembledName": "Epping Station, Platform 5",
+                "type": "stop",
+                "parent": {
+                  "id": "95302242|1",
+                  "name": "Epping",
+                  "type": "locality"
+                },
+                "coord": [-33.772717, 151.082003],
+                "niveau": 0
+              },
+              "modes": [1, 2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "EPP5"
+              },
+              "coord": [-33.772875, 151.082278],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:49:43Z",
+              "arrivalTimePlanned": "2026-10-25T21:49:43Z",
+              "arrivalTimeEstimated": "2026-10-25T21:49:43Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:50:28Z",
+              "departureTimePlanned": "2026-10-25T21:50:28Z",
+              "departureTimeEstimated": "2026-10-25T21:50:28Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113351",
+              "name": "Macquarie University Station, Platform 1, Macquarie Park",
+              "disassembledName": "Macquarie University Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211310",
+                "name": "Macquarie University Station, Platform 1, Macquarie Park",
+                "disassembledName": "Macquarie University Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.777282, 151.118267],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "MQU1"
+              },
+              "coord": [-33.777596, 151.118314],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:53:34Z",
+              "arrivalTimePlanned": "2026-10-25T21:53:34Z",
+              "arrivalTimeEstimated": "2026-10-25T21:53:34Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:54:02Z",
+              "departureTimePlanned": "2026-10-25T21:54:02Z",
+              "departureTimeEstimated": "2026-10-25T21:54:02Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113341",
+              "name": "Macquarie Park Station, Platform 1, Macquarie Park",
+              "disassembledName": "Macquarie Park Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211340",
+                "name": "Macquarie Park Station, Platform 1, Macquarie Park",
+                "disassembledName": "Macquarie Park Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.784713, 151.128401],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "MQP1"
+              },
+              "coord": [-33.784982, 151.128337],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:55:31Z",
+              "arrivalTimePlanned": "2026-10-25T21:55:31Z",
+              "arrivalTimeEstimated": "2026-10-25T21:55:31Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:55:59Z",
+              "departureTimePlanned": "2026-10-25T21:55:59Z",
+              "departureTimeEstimated": "2026-10-25T21:55:59Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113361",
+              "name": "North Ryde Station, Platform 1, Macquarie Park",
+              "disassembledName": "North Ryde Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211320",
+                "name": "North Ryde Station, Platform 1, Macquarie Park",
+                "disassembledName": "North Ryde Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.79391, 151.138143],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "NRY1"
+              },
+              "coord": [-33.794171, 151.13806],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:57:33Z",
+              "arrivalTimePlanned": "2026-10-25T21:57:33Z",
+              "arrivalTimeEstimated": "2026-10-25T21:57:33Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:58:01Z",
+              "departureTimePlanned": "2026-10-25T21:58:01Z",
+              "departureTimeEstimated": "2026-10-25T21:58:01Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2067142",
+              "name": "Chatswood Station, Platform 2, Chatswood",
+              "disassembledName": "Chatswood Station, Platform 2",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "206710",
+                "name": "Chatswood Station, Platform 2, Chatswood",
+                "disassembledName": "Chatswood Station, Platform 2",
+                "type": "stop",
+                "parent": {
+                  "id": "95300906|1",
+                  "name": "Chatswood",
+                  "type": "locality"
+                },
+                "coord": [-33.797237, 151.180934],
+                "niveau": 0
+              },
+              "modes": [1, 2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CHW2"
+              },
+              "coord": [-33.797469, 151.180988],
+              "arrivalTimeBaseTimetable": "2026-10-25T22:03:01Z",
+              "arrivalTimePlanned": "2026-10-25T22:03:01Z",
+              "arrivalTimeEstimated": "2026-10-25T22:03:01Z"
+            }
+          ],
+          "coords": [
+            [-33.691705, 150.905653],
+            [-33.691959, 150.924357],
+            [-33.713488, 150.935344],
+            [-33.730698, 150.944123],
+            [-33.734282, 150.963851],
+            [-33.727755, 150.987427],
+            [-33.731469, 151.00768],
+            [-33.736728, 151.032084],
+            [-33.772875, 151.082278],
+            [-33.777596, 151.118314],
+            [-33.784982, 151.128337],
+            [-33.794171, 151.13806],
+            [-33.797469, 151.180988]
+          ],
+          "properties": {
+            "PlanLowFloorVehicle": "1",
+            "PlanWheelChairAccess": "1"
+          },
+          "isRealtimeControlled": true,
+          "realtimeStatus": ["MONITORED", "TRIP_CANCELLED"]
+        }
+      ],
+      "fare": {
+        "tickets": []
+      }
+    },
+    {
+      "rating": 0,
+      "isAdditional": false,
+      "interchanges": 0,
+      "legs": [
+        {
+          "duration": 300,
+          "distance": 1900,
+          "origin": {
+            "name": "Conferta Ave, Tallawong",
+            "disassembledName": "Conferta Ave",
+            "type": "street",
+            "coord": [-33.693047, 150.905258],
+            "parent": {
+              "id": "95302934|1",
+              "name": "Tallawong",
+              "type": "locality"
+            },
+            "departureTimeBaseTimetable": "2026-10-25T21:31:00Z",
+            "departureTimePlanned": "2026-10-25T21:31:00Z",
+            "departureTimeEstimated": "2026-10-25T21:31:00Z"
+          },
+          "destination": {
+            "id": "2155384",
+            "name": "Tallawong Station, Tallawong",
+            "disassembledName": "Tallawong Station",
+            "type": "stop",
+            "coord": [-33.691631, 150.906006],
+            "arrivalTimeBaseTimetable": "2026-10-25T21:36:00Z",
+            "arrivalTimePlanned": "2026-10-25T21:36:00Z",
+            "arrivalTimeEstimated": "2026-10-25T21:36:00Z"
+          },
+          "transportation": {
+            "product": {
+              "class": 105,
+              "name": "Taxi",
+              "iconId": 105
+            }
+          }
+        },
+        {
+          "duration": 2161,
+          "origin": {
+            "isGlobalId": true,
+            "id": "2155269",
+            "name": "Tallawong Station, Platform 2, Tallawong",
+            "disassembledName": "Tallawong Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "2155384",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95302934|1",
+                "name": "Tallawong",
+                "type": "locality"
+              },
+              "coord": [-33.691631, 150.906006],
+              "niveau": 0
+            },
+            "modes": [2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "TLA2"
+            },
+            "coord": [-33.691705, 150.905653],
+            "departureTimeBaseTimetable": "2026-10-25T21:37:00Z",
+            "departureTimePlanned": "2026-10-25T21:37:00Z",
+            "departureTimeEstimated": "2026-10-25T21:37:00Z"
+          },
+          "destination": {
+            "isGlobalId": true,
+            "id": "2067142",
+            "name": "Chatswood Station, Platform 2, Chatswood",
+            "disassembledName": "Chatswood Station, Platform 2",
+            "type": "platform",
+            "niveau": -1,
+            "parent": {
+              "isGlobalId": true,
+              "id": "206710",
+              "name": "Chatswood Station, Platform 2, Chatswood",
+              "disassembledName": "Chatswood Station, Platform 2",
+              "type": "stop",
+              "parent": {
+                "id": "95300906|1",
+                "name": "Chatswood",
+                "type": "locality"
+              },
+              "coord": [-33.797237, 151.180934],
+              "niveau": 0
+            },
+            "modes": [1, 2, 5],
+            "properties": {
+              "WheelchairAccess": "true",
+              "area": "1",
+              "platform": "CHW2"
+            },
+            "coord": [-33.797469, 151.180988],
+            "arrivalTimeBaseTimetable": "2026-10-25T22:13:01Z",
+            "arrivalTimePlanned": "2026-10-25T22:13:01Z",
+            "arrivalTimeEstimated": "2026-10-25T22:13:01Z"
+          },
+          "transportation": {
+            "id": "nsw:030M1: :R:sj2",
+            "name": "Sydney Metro Network M1 Metro North West & Bankstown Line",
+            "disassembledName": "M1",
+            "number": "M1 Metro North West & Bankstown Line",
+            "iconId": 24,
+            "description": "Tallawong to Sydenham",
+            "product": {
+              "class": 2,
+              "name": "Sydney Metro Network",
+              "iconId": 2
+            },
+            "operator": {
+              "id": "SMNW",
+              "name": "Sydney Metro"
+            },
+            "destination": {
+              "id": "10101410",
+              "name": "Sydenham",
+              "type": "stop"
+            },
+            "properties": {
+              "isTTB": true,
+              "tripCode": 520,
+              "timetablePeriod": "NSW JP",
+              "lineDisplay": "LINE",
+              "globalId": "3001",
+              "RealtimeTripId": "0272-001-726-002:1000",
+              "AVMSTripID": "0272-001-726-002:1000"
+            }
+          },
+          "stopSequence": [
+            {
+              "isGlobalId": true,
+              "id": "2155269",
+              "name": "Tallawong Station, Platform 2, Tallawong",
+              "disassembledName": "Tallawong Station, Platform 2",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155384",
+                "name": "Tallawong Station, Platform 2, Tallawong",
+                "disassembledName": "Tallawong Station, Platform 2",
+                "type": "stop",
+                "parent": {
+                  "id": "95302934|1",
+                  "name": "Tallawong",
+                  "type": "locality"
+                },
+                "coord": [-33.691631, 150.906006],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "TLA2"
+              },
+              "coord": [-33.691705, 150.905653],
+              "departureTimeBaseTimetable": "2026-10-25T21:37:00Z",
+              "departureTimePlanned": "2026-10-25T21:37:00Z",
+              "departureTimeEstimated": "2026-10-25T21:37:00Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2155267",
+              "name": "Rouse Hill Station, Platform 1, Rouse Hill",
+              "disassembledName": "Rouse Hill Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155383",
+                "name": "Rouse Hill Station, Platform 1, Rouse Hill",
+                "disassembledName": "Rouse Hill Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95302668|1",
+                  "name": "Rouse Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.691812, 150.924168],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "RSH1"
+              },
+              "coord": [-33.691959, 150.924357],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:39:00Z",
+              "arrivalTimePlanned": "2026-10-25T21:39:00Z",
+              "arrivalTimeEstimated": "2026-10-25T21:39:00Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:39:28Z",
+              "departureTimePlanned": "2026-10-25T21:39:28Z",
+              "departureTimeEstimated": "2026-10-25T21:39:28Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2155265",
+              "name": "Kellyville Station, Platform 1, Kellyville",
+              "disassembledName": "Kellyville Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2155382",
+                "name": "Kellyville Station, Platform 1, Kellyville",
+                "disassembledName": "Kellyville Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95304184|1",
+                  "name": "Kellyville",
+                  "type": "locality"
+                },
+                "coord": [-33.713374, 150.935231],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "KVL1"
+              },
+              "coord": [-33.713488, 150.935344],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:41:43Z",
+              "arrivalTimePlanned": "2026-10-25T21:41:43Z",
+              "arrivalTimeEstimated": "2026-10-25T21:41:43Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:42:11Z",
+              "departureTimePlanned": "2026-10-25T21:42:11Z",
+              "departureTimeEstimated": "2026-10-25T21:42:11Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2153402",
+              "name": "Bella Vista Station, Platform 1, Bella Vista",
+              "disassembledName": "Bella Vista Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2153478",
+                "name": "Bella Vista Station, Platform 1, Bella Vista",
+                "disassembledName": "Bella Vista Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303730|1",
+                  "name": "Bella Vista",
+                  "type": "locality"
+                },
+                "coord": [-33.730566, 150.94402],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "BEV1"
+              },
+              "coord": [-33.730698, 150.944123],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:44:07Z",
+              "arrivalTimePlanned": "2026-10-25T21:44:07Z",
+              "arrivalTimeEstimated": "2026-10-25T21:44:07Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:44:35Z",
+              "departureTimePlanned": "2026-10-25T21:44:35Z",
+              "departureTimeEstimated": "2026-10-25T21:44:35Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2153404",
+              "name": "Norwest Station, Platform 1, Norwest",
+              "disassembledName": "Norwest Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2153477",
+                "name": "Norwest Station, Platform 1, Norwest",
+                "disassembledName": "Norwest Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95301492|1",
+                  "name": "Norwest",
+                  "type": "locality"
+                },
+                "coord": [-33.734617, 150.963522],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "NWZ1"
+              },
+              "coord": [-33.734282, 150.963851],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:46:38Z",
+              "arrivalTimePlanned": "2026-10-25T21:46:38Z",
+              "arrivalTimeEstimated": "2026-10-25T21:46:38Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:47:06Z",
+              "departureTimePlanned": "2026-10-25T21:47:06Z",
+              "departureTimeEstimated": "2026-10-25T21:47:06Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2154264",
+              "name": "Hills Showground Station, Platform 1, Castle Hill",
+              "disassembledName": "Hills Showground Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2154392",
+                "name": "Hills Showground Station, Platform 1, Castle Hill",
+                "disassembledName": "Hills Showground Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95309519|1",
+                  "name": "Castle Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.72782, 150.987345],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "HSG1"
+              },
+              "coord": [-33.727755, 150.987427],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:49:12Z",
+              "arrivalTimePlanned": "2026-10-25T21:49:12Z",
+              "arrivalTimeEstimated": "2026-10-25T21:49:12Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:49:40Z",
+              "departureTimePlanned": "2026-10-25T21:49:40Z",
+              "departureTimeEstimated": "2026-10-25T21:49:40Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2154262",
+              "name": "Castle Hill Station, Platform 1, Castle Hill",
+              "disassembledName": "Castle Hill Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2154391",
+                "name": "Castle Hill Station, Platform 1, Castle Hill",
+                "disassembledName": "Castle Hill Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95309519|1",
+                  "name": "Castle Hill",
+                  "type": "locality"
+                },
+                "coord": [-33.731313, 151.007419],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CTH1"
+              },
+              "coord": [-33.731469, 151.00768],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:51:37Z",
+              "arrivalTimePlanned": "2026-10-25T21:51:37Z",
+              "arrivalTimeEstimated": "2026-10-25T21:51:37Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:52:05Z",
+              "departureTimePlanned": "2026-10-25T21:52:05Z",
+              "departureTimeEstimated": "2026-10-25T21:52:05Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2126159",
+              "name": "Cherrybrook Station, Platform 1, Cherrybrook",
+              "disassembledName": "Cherrybrook Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "2126158",
+                "name": "Cherrybrook Station, Platform 1, Cherrybrook",
+                "disassembledName": "Cherrybrook Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95300852|1",
+                  "name": "Cherrybrook",
+                  "type": "locality"
+                },
+                "coord": [-33.736703, 151.031977],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CHB1"
+              },
+              "coord": [-33.736728, 151.032084],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:54:16Z",
+              "arrivalTimePlanned": "2026-10-25T21:54:16Z",
+              "arrivalTimeEstimated": "2026-10-25T21:54:16Z",
+              "departureTimeBaseTimetable": "2026-10-25T21:54:44Z",
+              "departureTimePlanned": "2026-10-25T21:54:44Z",
+              "departureTimeEstimated": "2026-10-25T21:54:44Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2121225",
+              "name": "Epping Station, Platform 5, Epping",
+              "disassembledName": "Epping Station, Platform 5",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "212110",
+                "name": "Epping Station, Platform 5, Epping",
+                "disassembledName": "Epping Station, Platform 5",
+                "type": "stop",
+                "parent": {
+                  "id": "95302242|1",
+                  "name": "Epping",
+                  "type": "locality"
+                },
+                "coord": [-33.772717, 151.082003],
+                "niveau": 0
+              },
+              "modes": [1, 2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "EPP5"
+              },
+              "coord": [-33.772875, 151.082278],
+              "arrivalTimeBaseTimetable": "2026-10-25T21:59:43Z",
+              "arrivalTimePlanned": "2026-10-25T21:59:43Z",
+              "arrivalTimeEstimated": "2026-10-25T21:59:43Z",
+              "departureTimeBaseTimetable": "2026-10-25T22:00:28Z",
+              "departureTimePlanned": "2026-10-25T22:00:28Z",
+              "departureTimeEstimated": "2026-10-25T22:00:28Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113351",
+              "name": "Macquarie University Station, Platform 1, Macquarie Park",
+              "disassembledName": "Macquarie University Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211310",
+                "name": "Macquarie University Station, Platform 1, Macquarie Park",
+                "disassembledName": "Macquarie University Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.777282, 151.118267],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "MQU1"
+              },
+              "coord": [-33.777596, 151.118314],
+              "arrivalTimeBaseTimetable": "2026-10-25T22:03:34Z",
+              "arrivalTimePlanned": "2026-10-25T22:03:34Z",
+              "arrivalTimeEstimated": "2026-10-25T22:03:34Z",
+              "departureTimeBaseTimetable": "2026-10-25T22:04:02Z",
+              "departureTimePlanned": "2026-10-25T22:04:02Z",
+              "departureTimeEstimated": "2026-10-25T22:04:02Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113341",
+              "name": "Macquarie Park Station, Platform 1, Macquarie Park",
+              "disassembledName": "Macquarie Park Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211340",
+                "name": "Macquarie Park Station, Platform 1, Macquarie Park",
+                "disassembledName": "Macquarie Park Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.784713, 151.128401],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "MQP1"
+              },
+              "coord": [-33.784982, 151.128337],
+              "arrivalTimeBaseTimetable": "2026-10-25T22:05:31Z",
+              "arrivalTimePlanned": "2026-10-25T22:05:31Z",
+              "arrivalTimeEstimated": "2026-10-25T22:05:31Z",
+              "departureTimeBaseTimetable": "2026-10-25T22:05:59Z",
+              "departureTimePlanned": "2026-10-25T22:05:59Z",
+              "departureTimeEstimated": "2026-10-25T22:05:59Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2113361",
+              "name": "North Ryde Station, Platform 1, Macquarie Park",
+              "disassembledName": "North Ryde Station, Platform 1",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "211320",
+                "name": "North Ryde Station, Platform 1, Macquarie Park",
+                "disassembledName": "North Ryde Station, Platform 1",
+                "type": "stop",
+                "parent": {
+                  "id": "95303585|1",
+                  "name": "Macquarie Park",
+                  "type": "locality"
+                },
+                "coord": [-33.79391, 151.138143],
+                "niveau": 0
+              },
+              "modes": [2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "NRY1"
+              },
+              "coord": [-33.794171, 151.13806],
+              "arrivalTimeBaseTimetable": "2026-10-25T22:07:33Z",
+              "arrivalTimePlanned": "2026-10-25T22:07:33Z",
+              "arrivalTimeEstimated": "2026-10-25T22:07:33Z",
+              "departureTimeBaseTimetable": "2026-10-25T22:08:01Z",
+              "departureTimePlanned": "2026-10-25T22:08:01Z",
+              "departureTimeEstimated": "2026-10-25T22:08:01Z"
+            },
+            {
+              "isGlobalId": true,
+              "id": "2067142",
+              "name": "Chatswood Station, Platform 2, Chatswood",
+              "disassembledName": "Chatswood Station, Platform 2",
+              "type": "platform",
+              "niveau": -1,
+              "parent": {
+                "isGlobalId": true,
+                "id": "206710",
+                "name": "Chatswood Station, Platform 2, Chatswood",
+                "disassembledName": "Chatswood Station, Platform 2",
+                "type": "stop",
+                "parent": {
+                  "id": "95300906|1",
+                  "name": "Chatswood",
+                  "type": "locality"
+                },
+                "coord": [-33.797237, 151.180934],
+                "niveau": 0
+              },
+              "modes": [1, 2, 5],
+              "properties": {
+                "area": "1",
+                "platform": "CHW2"
+              },
+              "coord": [-33.797469, 151.180988],
+              "arrivalTimeBaseTimetable": "2026-10-25T22:13:01Z",
+              "arrivalTimePlanned": "2026-10-25T22:13:01Z",
+              "arrivalTimeEstimated": "2026-10-25T22:13:01Z"
+            }
+          ],
+          "coords": [
+            [-33.691705, 150.905653],
+            [-33.691959, 150.924357],
+            [-33.713488, 150.935344],
+            [-33.730698, 150.944123],
+            [-33.734282, 150.963851],
+            [-33.727755, 150.987427],
+            [-33.731469, 151.00768],
+            [-33.736728, 151.032084],
+            [-33.772875, 151.082278],
+            [-33.777596, 151.118314],
+            [-33.784982, 151.128337],
+            [-33.794171, 151.13806],
+            [-33.797469, 151.180988]
+          ],
+          "properties": {
+            "PlanLowFloorVehicle": "1",
+            "PlanWheelChairAccess": "1"
+          },
+          "isRealtimeControlled": true,
+          "realtimeStatus": ["MONITORED"]
+        }
+      ],
+      "fare": {
+        "tickets": []
+      }
+    }
+  ]
+}

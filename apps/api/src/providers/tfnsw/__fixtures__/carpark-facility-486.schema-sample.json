@@ -1,0 +1,38 @@
+{
+  "tsn": "213110",
+  "time": "846276303",
+  "spots": "216",
+  "zones": [
+    {
+      "spots": "216",
+      "zone_id": "1",
+      "occupancy": {
+        "loop": "39",
+        "total": "36",
+        "monthlies": null,
+        "open_gate": null,
+        "transients": null
+      },
+      "zone_name": "MainArea",
+      "parent_zone_id": "0"
+    }
+  ],
+  "ParkID": 1,
+  "location": {
+    "suburb": "Ashfield",
+    "address": "Brown Street",
+    "latitude": "-33.888104",
+    "longitude": "151.126577"
+  },
+  "occupancy": {
+    "loop": "39",
+    "total": "36",
+    "monthlies": null,
+    "open_gate": null,
+    "transients": null
+  },
+  "MessageDate": "2026-10-26T07:45:03",
+  "facility_id": "486",
+  "facility_name": "Park&Ride - Ashfield",
+  "tfnsw_facility_id": "213110TPR001"
+}
