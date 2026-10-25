@@ -15,16 +15,26 @@ import {
 } from '../model';
 import { planTrip, type PlannerLimits } from '../planner';
 import { ProviderError } from '../providers';
-import { secondsBetween, sydneyDateKey, sydneyOffsetMinutes, sydneyWallClock } from '../time';
+import {
+  addMinutes,
+  floorToMinute,
+  formatSydneyTime,
+  secondsBetween,
+  sydneyDateKey,
+  sydneyOffsetMinutes,
+  sydneyWallClock,
+} from '../time';
 import { PARK_AND_RIDE_CATALOGUE } from '../data/park-and-ride';
 import { createDemoProviders, DEMO_PLACES, type DemoScenario } from './index';
 
 // The real planner against the demo world, for every case the brief asks for. Times are fixed, so
 // every run plans against the same generated timetable.
 
+const TUESDAY_0630 = '2026-10-26T19:30:00Z';
 const TUESDAY_0700 = '2026-10-26T20:00:00Z';
 const TUESDAY_0730 = '2026-10-26T20:30:00Z';
 const TUESDAY_0740 = '2026-10-26T20:40:00Z';
+const TUESDAY_0745 = '2026-10-26T20:45:00Z';
 const TUESDAY_0900 = '2026-10-26T22:00:00Z';
 const TUESDAY_1730 = '2026-10-27T06:30:00Z';
 const FRIDAY_2350 = '2026-10-30T12:50:00Z';
@@ -32,11 +42,17 @@ const DST_START_SUNDAY_0800 = '2026-10-03T21:00:00Z';
 const DST_START_SUNDAY_0130 = '2026-10-03T15:30:00Z';
 const DST_END_SUNDAY_0800 = '2027-04-03T22:00:00Z';
 const DST_END_SUNDAY_0230_FIRST = '2027-04-03T15:30:00Z';
+// Every ten minutes from 6.30 to 8.30 am, while the car parks fill.
+const TUESDAY_MORNING = Array.from({ length: 13 }, (_, step) =>
+  addMinutes(TUESDAY_0630, step * 10),
+);
 
 const TRANSIT_ONLY = { transit: true, drive: false, dropOff: false };
 const METRO_NORTH_WEST_CAR_PARKS = ['26', '27', '28', '29', '30', '31', '32', '33'];
 const B_LINE_CAR_PARKS = ['10', '12', '13', '489', '490'];
 const OCCUPANCY_FRESH_MINUTES = 15;
+// A count with no more than this share of the spaces free is nearly full.
+const NEARLY_FULL_FREE_SHARE = 0.1;
 
 interface PlanOptions {
   now: string;
@@ -638,6 +654,123 @@ describe('car park occupancy', () => {
         expect(secondsBetween(occupancy.observedAt, TUESDAY_0730)).toBeLessThanOrEqual(180);
       }
     }
+  });
+});
+
+describe('only real choices', () => {
+  // Compared the way the cards read: leave and arrive to the minute, seconds dropped, and the drive
+  // in whole minutes.
+  const shownMinutesBetween = (from: string, to: string) =>
+    secondsBetween(floorToMinute(from), floorToMinute(to)) / 60;
+  const shownDriveMinutes = (itinerary: Itinerary) => Math.round(itinerary.driveSeconds / 60);
+
+  // No worse on anything the results can be sorted by, and leaving at most a minute earlier.
+  const isNoWorse = (better: Itinerary, other: Itinerary) =>
+    shownMinutesBetween(better.arriveAt, other.arriveAt) >= 0 &&
+    shownDriveMinutes(better) <= shownDriveMinutes(other) &&
+    better.transfers <= other.transfers &&
+    shownMinutesBetween(other.departAt, better.departAt) >= -1;
+
+  // A drop-off needs no space. A car park needs a fresh count with more than a tenth of it free.
+  const canCountOnASpace = (itinerary: Itinerary) => {
+    if (itinerary.strategy === 'drop-off') return true;
+    const occupancy = itinerary.parking?.occupancy;
+    return (
+      occupancy?.status === 'known' &&
+      occupancy.spacesAvailable > occupancy.totalSpaces * NEARLY_FULL_FREE_SHARE
+    );
+  };
+
+  const placeOf = (itinerary: Itinerary) =>
+    itinerary.parking?.carPark.name ??
+    itinerary.legs.find((leg) => leg.kind === 'drop-off')?.to.name ??
+    itinerary.strategy;
+
+  // Each listed car park or station that a listed one of the same kind, with a space to count on,
+  // is no worse than.
+  function paddedOptions(response: PlanResponse): string[] {
+    const transfers = response.itineraries.filter(
+      (itinerary) => itinerary.strategy === 'park-and-ride' || itinerary.strategy === 'drop-off',
+    );
+    return transfers.flatMap((other) =>
+      transfers
+        .filter(
+          (better) =>
+            better !== other &&
+            better.strategy === other.strategy &&
+            canCountOnASpace(better) &&
+            isNoWorse(better, other),
+        )
+        .map((better) => `${placeOf(other)} is no better than ${placeOf(better)}`),
+    );
+  }
+
+  const carParksListed = (response: PlanResponse) =>
+    byStrategy(response, 'park-and-ride').map((itinerary) => itinerary.parking!.carPark.name);
+
+  it('lists Tallawong P2 from Box Hill at 7.30 am, without the slower Kellyville car parks behind it', async () => {
+    const response = await plan(request(), { now: TUESDAY_0730 });
+    expectSoundResponse(response);
+
+    expect(paddedOptions(response)).toEqual([]);
+    expect(carParksListed(response)).toEqual(['Tallawong P2']);
+  });
+
+  it('never lists a car park or station that a listed one matches or beats on every count', async () => {
+    const trips = [
+      { origin: DEMO_PLACES.boxHillHome, destination: DEMO_PLACES.chatswoodOffice },
+      { origin: DEMO_PLACES.collaroyPlateauHome, destination: DEMO_PLACES.waterlooOffice },
+      { origin: DEMO_PLACES.rouseHillHome, destination: DEMO_PLACES.chatswoodOffice },
+    ];
+    const times: { time: PlanRequest['time']; now: string }[] = [
+      ...TUESDAY_MORNING.map((at) => ({ time: { type: 'depart' as const, at }, now: at })),
+      ...[-30, 0, 30].map((minutes) => ({
+        time: { type: 'arrive' as const, at: addMinutes(TUESDAY_0900, minutes) },
+        now: TUESDAY_0700,
+      })),
+    ];
+    const padded: string[] = [];
+    for (const trip of trips) {
+      for (const { time, now } of times) {
+        const response = await plan(
+          request({ ...trip, time, access: { transit: true, drive: true, dropOff: true } }),
+          { now },
+        );
+        const when = `${time.type} ${formatSydneyTime(time.at)} from ${trip.origin.name}`;
+        padded.push(...paddedOptions(response).map((entry) => `${when}: ${entry}`));
+      }
+    }
+
+    expect(padded).toEqual([]);
+  });
+
+  it('keeps Kellyville (north) as somewhere else to park while Tallawong P2 is nearly full', async () => {
+    const response = await plan(request({ at: TUESDAY_0745 }), { now: TUESDAY_0745 });
+    expectSoundResponse(response);
+    const tallawong = byStrategy(response, 'park-and-ride')[0]!.parking!.occupancy;
+
+    expect(carParksListed(response)).toEqual(['Tallawong P2', 'Kellyville (north)']);
+    expect(tallawong.status).toBe('known');
+    if (tallawong.status === 'known') {
+      expect(tallawong.spacesAvailable).toBeLessThanOrEqual(
+        tallawong.totalSpaces * NEARLY_FULL_FREE_SHARE,
+      );
+    }
+  });
+
+  it('drops off at Tallawong only, the quicker of two stations on the same line', async () => {
+    const dropOffOnly = request({ access: { transit: true, drive: false, dropOff: true } });
+    const response = await plan(dropOffOnly, { now: TUESDAY_0730 });
+    expectSoundResponse(response);
+
+    expect(byStrategy(response, 'drop-off').map(placeOf)).toEqual(['Tallawong Station']);
+  });
+
+  it('lists the car park the traveller asked for, even behind the quicker Tallawong P2', async () => {
+    const response = await plan(request({ preferredCarParkId: '30' }), { now: TUESDAY_0730 });
+    expectSoundResponse(response);
+
+    expect(carParksListed(response)).toEqual(['Tallawong P2', 'Kellyville (south)']);
   });
 });
 

@@ -83,6 +83,11 @@ const MAX_DETOUR_RATIO = 1.6;
 const MAX_EXPLAINED_SKIPPED_CAR_PARKS = 3;
 // Provider times are whole minutes; allow that much slack before calling something early or late.
 const TIME_GRACE_SECONDS = 60;
+// A count with no more than this share of the spaces free could easily be full by the time the
+// traveller gets there.
+const NEARLY_FULL_FREE_SHARE = 0.1;
+// Leaving a minute earlier is not worth a card of its own when nothing else is better.
+const LEAVE_EARLIER_SLACK_SECONDS = 60;
 
 type TransferStrategy = 'park-and-ride' | 'drop-off';
 type CarParkOutcome = PlanResponse['checkedCarParks'][number]['outcome'];
@@ -103,6 +108,8 @@ interface PlanContext {
   now: string;
   rejected: Map<RejectionReason, number>;
   checkedCarParks: Map<string, PlanResponse['checkedCarParks'][number]>;
+  // Ids of options through the car park or station the traveller asked for.
+  preferredOptions: Set<string>;
   unavailable: PlanResponse['unavailable'];
   notices: string[];
 }
@@ -125,6 +132,7 @@ export async function planTrip(
     now: toIso(deps.clock.now()),
     rejected: new Map(),
     checkedCarParks: new Map(),
+    preferredOptions: new Set(),
     unavailable: [],
     notices: [],
   };
@@ -410,6 +418,7 @@ async function planViaTransferPoints(
       return;
     }
     itineraries.push(itinerary);
+    if (point.preferred) context.preferredOptions.add(itinerary.id);
     recordCarPark(context, strategy, point, 'used');
   });
 
@@ -1105,14 +1114,81 @@ function selectItineraries(context: PlanContext, candidates: Itinerary[]): Itine
     }
     valid.push(itinerary);
   }
+  const shown = withoutDominatedOptions(context, valid);
   const { time } = context.request;
   const ordered =
     time.type === 'depart'
-      ? valid.sort(
+      ? shown.sort(
           (a, b) => secondsBetween(b.arriveAt, a.arriveAt) || a.durationSeconds - b.durationSeconds,
         )
-      : valid.sort(
+      : shown.sort(
           (a, b) => secondsBetween(a.departAt, b.departAt) || a.durationSeconds - b.durationSeconds,
         );
   return ordered.slice(0, context.limits.maxItineraries);
+}
+
+// Another car park or station that is no better on anything the results can be sorted by is padding,
+// not a choice. Such an option is hidden only behind one the traveller can count on for a space, so
+// a car park that may be full keeps its fallback. Nothing else hides the car park or station the
+// traveller asked for.
+function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): Itinerary[] {
+  const isPreferred = (option: Itinerary) => context.preferredOptions.has(option.id);
+  // Strongest first, so an option is only ever hidden behind one that is shown. The traveller's own
+  // choice leads, so only another option through it can hide one. After that, an option sorts ahead
+  // of any it strictly dominates, and of two that dominate each other, the one with a space to count
+  // on, then the one that leaves later, goes first.
+  const strongestFirst = options
+    .filter((option) => option.strategy === 'park-and-ride' || option.strategy === 'drop-off')
+    .sort(
+      (a, b) =>
+        Number(isPreferred(b)) - Number(isPreferred(a)) ||
+        shownSecondsBetween(b.arriveAt, a.arriveAt) ||
+        shownDriveMinutes(a) - shownDriveMinutes(b) ||
+        a.transfers - b.transfers ||
+        Number(canCountOnASpace(b)) - Number(canCountOnASpace(a)) ||
+        shownSecondsBetween(a.departAt, b.departAt),
+    );
+  const shown: Itinerary[] = [];
+  const hidden = new Set<Itinerary>();
+  for (const option of strongestFirst) {
+    const dominated = shown.some(
+      (other) =>
+        other.strategy === option.strategy && canCountOnASpace(other) && dominates(other, option),
+    );
+    if (dominated) hidden.add(option);
+    else shown.push(option);
+  }
+  return options.filter((option) => !hidden.has(option));
+}
+
+// At least as good on everything the results can be sorted by, read the way the app shows it, without
+// having the traveller leave more than a minute earlier.
+function dominates(better: Itinerary, other: Itinerary): boolean {
+  return (
+    shownSecondsBetween(better.arriveAt, other.arriveAt) >= 0 &&
+    shownDriveMinutes(better) <= shownDriveMinutes(other) &&
+    better.transfers <= other.transfers &&
+    shownSecondsBetween(other.departAt, better.departAt) >= -LEAVE_EARLIER_SLACK_SECONDS
+  );
+}
+
+// The app shows leave and arrive times to the minute with the seconds dropped, and drives in whole
+// minutes. Comparing the same way means two options that read the same count as the same.
+function shownSecondsBetween(from: string, to: string): number {
+  return secondsBetween(floorToMinute(from), floorToMinute(to));
+}
+
+function shownDriveMinutes(itinerary: Itinerary): number {
+  return Math.round(itinerary.driveSeconds / 60);
+}
+
+// A drop-off needs no space. A car park needs a fresh count (see freshOccupancy) that is not nearly
+// full; an unknown, stale or nearly full one could be full on arrival.
+function canCountOnASpace(itinerary: Itinerary): boolean {
+  if (itinerary.strategy === 'drop-off') return true;
+  const occupancy = itinerary.parking?.occupancy;
+  return (
+    occupancy?.status === 'known' &&
+    occupancy.spacesAvailable > occupancy.totalSpaces * NEARLY_FULL_FREE_SHARE
+  );
 }

@@ -171,8 +171,9 @@ describe('planning a trip from the Plan tab', () => {
 
   it('plans an arrive-by trip with the chosen time', async () => {
     const user = userEvent.setup();
+    // Rouse Hill has several ways to arrive by 9 am, so the results come with an order to choose.
     await act(async () => {
-      planDraft.setRoute(DEMO_PLACES.boxHillHome, DEMO_PLACES.chatswoodOffice);
+      planDraft.setRoute(DEMO_PLACES.rouseHillHome, DEMO_PLACES.chatswoodOffice);
     });
     await renderApp('/');
 
