@@ -1,12 +1,14 @@
 import {
   addSeconds,
   isBefore,
+  legSeconds,
   placeSchema,
   ProviderError,
   secondsBetween,
   stableId,
   toIso,
   toTfnswDateTime,
+  walkingPaceRatio,
   type Coordinate,
   type Leg,
   type Place,
@@ -241,7 +243,7 @@ function mapJourney(journey: TripJourney, query: TransitQuery, tally: AlertTally
   return {
     kind: 'mapped',
     journey: {
-      legs: keepWalksInSequence(legs),
+      legs: keepWalksInSequence(atWalkingPace(legs, query)),
       fare: { status: 'unknown' },
       alerts: uniqueById(walkAlerts),
     },
@@ -354,8 +356,27 @@ function footPathSeconds(
   return totalSeconds;
 }
 
+// No TfNSW walking speed parameter has been verified, so TfNSW times walks at its own pace. A slow
+// walker gets each walk stretched by how much longer walking takes at their speed; normal and fast
+// keep TfNSW's times, which for a fast walker err early. A walk to the first service then starts
+// earlier (see keepWalksInSequence), and a change the slower pace cannot make fails the planner's
+// transfer check.
+function atWalkingPace(legs: readonly Leg[], query: TransitQuery): Leg[] {
+  const paceRatio = walkingPaceRatio(query.walkingSpeed);
+  if (paceRatio <= 1) return [...legs];
+  // With no service to catch, an arrive-by walk keeps its arrival and starts earlier instead.
+  const keepsArrival = query.time.type === 'arrive' && legs.length === 1;
+  return legs.map((leg) => {
+    if (leg.kind !== 'walk') return leg;
+    const walkSeconds = Math.ceil(legSeconds(leg) * paceRatio);
+    return keepsArrival
+      ? { ...leg, start: addSeconds(leg.end, -walkSeconds) }
+      : { ...leg, end: addSeconds(leg.start, walkSeconds) };
+  });
+}
+
 // Walks bend around services, never the other way: a walk starts no earlier than the leg before it
-// ends, and a walk that opens the journey ends by the first departure. Its length stays TfNSW's.
+// ends, and a walk that opens the journey ends by the first departure. Its length is kept.
 function keepWalksInSequence(legs: readonly Leg[]): Leg[] {
   const ordered: Leg[] = [];
   legs.forEach((leg, index) => {

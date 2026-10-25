@@ -1,7 +1,9 @@
 import {
   buildItinerary,
+  DEFAULT_PREFERENCES,
   findContinuityIssues,
   legSchema,
+  planTrip,
   ProviderError,
   type Leg,
   type Place,
@@ -471,6 +473,83 @@ describe('TfNSW trip mapping', () => {
       start: '2026-10-25T20:54:30.000Z',
       end: '2026-10-25T20:58:30.000Z',
     });
+  });
+
+  it('stretches walks for a slow walker, so the walk to the first service starts earlier', async () => {
+    const journeysAt = async (walkingSpeed: TransitQuery['walkingSpeed']) =>
+      (await plan(loadFixture(TALLAWONG_TRIP), query({ walkingSpeed }))).journeys;
+    const [normal, fast, slow] = await Promise.all(
+      (['normal', 'fast', 'slow'] as const).map(journeysAt),
+    );
+    const [normalWalk, normalMetro] = normal![0]!.legs;
+    const [slowWalk, slowMetro] = slow![0]!.legs;
+
+    expect(normalWalk).toMatchObject({
+      start: '2026-10-25T21:04:00.000Z',
+      end: '2026-10-25T21:08:00.000Z',
+    });
+    // TfNSW's 4 minutes take 5 min 47 s at 0.9 m/s instead of 1.3, still ending as the metro leaves.
+    expect(slowWalk).toMatchObject({
+      start: '2026-10-25T21:02:13.000Z',
+      end: '2026-10-25T21:08:00.000Z',
+      distanceMetres: 210,
+    });
+    expect(slowMetro).toEqual(normalMetro);
+    expect(fast).toEqual(normal);
+  });
+
+  it('keeps the arrival of a slow arrive-by walk that has no service to catch', async () => {
+    type Journeys = { journeys: { legs: unknown[] }[] };
+    const body = loadFixtureCopy<Journeys>(TALLAWONG_TRIP);
+    const [first] = body.journeys;
+    body.journeys = [{ ...first!, legs: first!.legs.slice(0, 1) }];
+    const walkFor = async (time: TransitQuery['time']) =>
+      (await plan(body, query({ walkingSpeed: 'slow', time }))).journeys[0]!.legs;
+
+    expect(await walkFor({ type: 'arrive', at: '2026-10-25T21:10:00.000Z' })).toMatchObject([
+      { kind: 'walk', start: '2026-10-25T21:02:13.000Z', end: '2026-10-25T21:08:00.000Z' },
+    ]);
+    expect(await walkFor({ type: 'depart', at: '2026-10-25T21:00:00.000Z' })).toMatchObject([
+      { kind: 'walk', start: '2026-10-25T21:04:00.000Z', end: '2026-10-25T21:09:47.000Z' },
+    ]);
+  });
+
+  it('lets the planner turn down changes a slow walker cannot make', async () => {
+    const leaveAt = '2026-10-25T20:30:00.000Z';
+    const planFor = (walkingSpeed: TransitQuery['walkingSpeed']) => {
+      const fetchImpl = fakeFetch(() => jsonResponse(loadFixture(ROUSE_HILL_TRIP)));
+      const { transit } = createTfnswProviders({ apiKey: 'test-key', fetchImpl });
+      return planTrip(
+        {
+          origin: NEAR_ROUSE_HILL,
+          destination: NORTH_SYDNEY,
+          time: { type: 'depart', at: leaveAt },
+          access: { transit: true, drive: false, dropOff: false },
+          preferences: { ...DEFAULT_PREFERENCES, walkingSpeed },
+          trip: { kind: 'outbound' },
+        },
+        {
+          mode: 'live',
+          transit,
+          driving: null,
+          carParks: null,
+          clock: { now: () => new Date(leaveAt) },
+        },
+      );
+    };
+    const normal = await planFor('normal');
+    const slow = await planFor('slow');
+    const toMetro = (await rouseHillToNorthSydney({ walkingSpeed: 'slow' })).journeys[0]!.legs[2]!;
+
+    expect(normal.itineraries).toHaveLength(2);
+    // TfNSW allows 3 minutes to walk from the bus to the metro. At a slow pace that takes 4 min 20 s
+    // and ends after the 7.58 am metro has left.
+    expect(toMetro).toMatchObject({
+      start: '2026-10-25T20:54:00.000Z',
+      end: '2026-10-25T20:58:20.000Z',
+    });
+    expect(slow.itineraries).toEqual([]);
+    expect(slow.rejected).toEqual([{ reason: 'transfer-too-short', count: 2 }]);
   });
 
   it('returns no journeys, and the system message codes, when TfNSW finds none', async () => {
