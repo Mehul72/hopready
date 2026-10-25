@@ -718,15 +718,24 @@ function shortlistByGeometry(
   });
 
   // Name the nearby car parks that were skipped for direction, so a missing local car park is explained
-  // without listing every facility in Sydney.
+  // without listing every facility in Sydney. Only ones within a realistic drive count as nearby.
   wrongWay
+    .filter(({ point }) => roughDriveMinutes(origin, point.place) <= preferences.maxDriveMinutes)
     .sort((a, b) => a.fromOrigin - b.fromOrigin)
     .slice(0, MAX_EXPLAINED_SKIPPED_CAR_PARKS)
     .forEach(({ point }) => recordCarPark(context, strategy, point, 'not-towards-destination'));
 
+  // The straight-line bound above never wrongly excludes a car park, but it lets far ones in. Those
+  // often look quick overall (a short train ride after a long drive), so ranking on the estimate alone
+  // can fill every ETA slot with car parks that then fail the driving limit. Likely reachable ones go
+  // first.
+  const likelyOverDriveLimit = (point: TransferPoint) =>
+    roughDriveMinutes(origin, point.place) > preferences.maxDriveMinutes ? 1 : 0;
   const estimate = (point: TransferPoint) =>
     roughDriveMinutes(origin, point.place) + roughTransitMinutes(point.place, destination);
-  const ranked = plausible.sort((a, b) => estimate(a) - estimate(b));
+  const ranked = plausible.sort(
+    (a, b) => likelyOverDriveLimit(a) - likelyOverDriveLimit(b) || estimate(a) - estimate(b),
+  );
   const preferred = ranked.filter((point) => point.preferred);
   const others = ranked.filter((point) => !point.preferred);
   return [...preferred, ...others].slice(

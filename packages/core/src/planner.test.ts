@@ -369,6 +369,49 @@ describe('arrive by', () => {
   });
 });
 
+describe('choosing which car parks to check', () => {
+  it('checks a nearby car park even when many far ones would rank better on the rough estimate', async () => {
+    // Nine car parks beside the destination: a long drive, then a short train ride.
+    const farButShortRide = Array.from({ length: 9 }, (_, index) =>
+      facility(
+        `far-${index}`,
+        `Far car park ${index}`,
+        -33.77 - index * 0.002,
+        151.17,
+        `Far station ${index}`,
+        `far-stop-${index}`,
+      ),
+    );
+    const response = await planTrip(
+      request(),
+      deps({ carParks: fakeCarParks(new Map(), [TALLAWONG, ...farButShortRide]) }),
+    );
+
+    expect(response.checkedCarParks).toContainEqual({
+      id: TALLAWONG.id,
+      name: TALLAWONG.name,
+      outcome: 'used',
+    });
+  });
+
+  it('only names wrong-way car parks that are within a realistic drive', async () => {
+    const penrith = facility(
+      '22',
+      'Penrith (multi-level)',
+      -33.750055,
+      150.696135,
+      'Penrith Station',
+      '275010',
+    );
+    const response = await planTrip(
+      request(),
+      deps({ carParks: fakeCarParks(new Map(), [TALLAWONG, penrith]) }),
+    );
+
+    expect(response.checkedCarParks.map((carPark) => carPark.id)).not.toContain('22');
+  });
+});
+
 describe('transfer strategies need public transport', () => {
   it('does not offer parking when the only answer from the car park is a walk', async () => {
     const walkOnly = fakeTransit((query) => [
