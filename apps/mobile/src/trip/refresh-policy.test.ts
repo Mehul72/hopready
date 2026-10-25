@@ -115,7 +115,7 @@ describe('restOfTripRequest', () => {
   });
 
   it('plans from the stop of the next service, when it leaves, by public transport only', () => {
-    const rest = restOfTripRequest(out, metro);
+    const rest = restOfTripRequest(out, metro, NOW);
     expect(rest).toEqual({
       origin: PLACES.tallawongStation,
       destination: out.destination,
@@ -129,11 +129,29 @@ describe('restOfTripRequest', () => {
   });
 
   it('asks from the start of the minute the service leaves, so the service itself is found', () => {
-    const late = { ...metro, start: '2026-10-26T21:12:30.000Z' };
-    expect(restOfTripRequest(out, late).time).toEqual({
+    const atHalfPast = '2026-10-26T21:12:30.000Z';
+    const leg = { ...metro, start: atHalfPast, scheduledStart: atHalfPast };
+    expect(restOfTripRequest(out, leg, NOW).time).toEqual({
       type: 'depart',
       at: '2026-10-26T21:12:00.000Z',
     });
+  });
+
+  it('asks from the timetabled time of a service that was late, in case it made up time', () => {
+    const late = { ...metro, start: addMinutes(metro.scheduledStart, 3) };
+    expect(restOfTripRequest(out, late, NOW).time.at).toBe(metro.scheduledStart);
+    const early = { ...metro, start: addMinutes(metro.scheduledStart, -1) };
+    expect(restOfTripRequest(out, early, NOW).time.at).toBe(early.start);
+  });
+
+  it('never asks for a time that has passed', () => {
+    // Timetabled two minutes ago, and three minutes late at the last check.
+    const late = {
+      ...metro,
+      scheduledStart: addMinutes(NOW, -2),
+      start: addMinutes(NOW, 1),
+    };
+    expect(restOfTripRequest(out, late, NOW).time.at).toBe(NOW.toISOString());
   });
 
   it('keeps a trip home going back through the car', () => {
@@ -149,7 +167,7 @@ describe('restOfTripRequest', () => {
         },
       },
     });
-    expect(restOfTripRequest(home, metro)).toMatchObject({
+    expect(restOfTripRequest(home, metro, NOW)).toMatchObject({
       origin: PLACES.tallawongStation,
       destination: PLACES.rouseHillHome,
       access: home.access,

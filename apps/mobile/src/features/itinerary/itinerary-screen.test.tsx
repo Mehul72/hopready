@@ -405,6 +405,37 @@ describe('checking a followed trip for changes', () => {
     }
   });
 
+  it('still finds the metro after it makes up the time it had lost', async () => {
+    const { itinerary } = await followParkAndRide();
+    const followed = appStorage.activeTrip.get();
+    const metro = itinerary.legs.find((leg) => leg.kind === 'transit');
+    if (!followed || !metro) throw new Error('Expected a followed trip with a metro');
+    // The last check found the metro three minutes late. It now runs to time again.
+    await act(async () => {
+      appStorage.activeTrip.start({
+        ...followed,
+        itinerary: {
+          ...itinerary,
+          legs: itinerary.legs.map((leg) =>
+            leg.kind === 'transit'
+              ? { ...leg, start: addMinutes(leg.start, 3), end: addMinutes(leg.end, 3) }
+              : leg,
+          ),
+        },
+      });
+    });
+    jest.setSystemTime(new Date(addMinutes(itinerary.departAt, 1)));
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Check for changes' }));
+
+    expect(
+      await screen.findByLabelText('Information. This trip is still on, with the latest times.'),
+    ).toBeOnTheScreen();
+    expect(
+      appStorage.activeTrip.get()?.itinerary.legs.find((leg) => leg.kind === 'transit')?.start,
+    ).toBe(metro.start);
+  });
+
   it('checks the rest of the trip after leaving, and offers what still runs', async () => {
     const { response, itinerary } = await followParkAndRide();
     const metro = itinerary.legs.find((leg) => leg.kind === 'transit');

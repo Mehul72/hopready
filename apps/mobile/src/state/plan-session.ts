@@ -251,7 +251,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
       const request =
         part.kind === 'whole-trip'
           ? refreshableRequest(tripWithCar, now)
-          : restOfTripRequest(tripWithCar, part.leg);
+          : restOfTripRequest(tripWithCar, part.leg, now);
       setState({ activeTripRefresh: { ...IDLE_ACTIVE_TRIP_REFRESH, status: 'refreshing' } });
       const response = await trips.planTrip(request, { signal: run.signal });
       // Ignore the answer if the session was reset or the person chose another trip meanwhile.

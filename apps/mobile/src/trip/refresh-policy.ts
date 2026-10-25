@@ -1,6 +1,7 @@
 import {
   floorToMinute,
   isBefore,
+  laterOf,
   type PlanRequest,
   secondsBetween,
   toIso,
@@ -72,15 +73,24 @@ export function shouldRefreshActiveTripOnResume(
   return age > RESUME_REFRESH_MIN_AGE_SECONDS;
 }
 
-// The rest of a trip that has started: from the stop of the next service, leaving when it is
-// planned to leave, by public transport only. A trip home still ends with the drive from the car.
-// Parking choices are left out, as the rest of the trip never parks.
-export function restOfTripRequest(request: PlanRequest, leg: TransitLeg): PlanRequest {
+// When to look for the next service from. Its time on the trip is the estimate from the last
+// check, and a late service can make up time since then. Asked from that estimate, the planner
+// would drop it as leaving before the time asked for, so the search starts from the earlier of its
+// timetabled and estimated times, but never before now. It starts on the minute: the planner
+// rounds a leave-at time up to the minute, which would miss a service at 8:12:30.
+function nextServiceSearchFrom(leg: TransitLeg, now: Date): string {
+  const earliest = isBefore(leg.scheduledStart, leg.start) ? leg.scheduledStart : leg.start;
+  return floorToMinute(laterOf(earliest, toIso(now)));
+}
+
+// The rest of a trip that has started: from the stop of the next service, by public transport
+// only. A trip home still ends with the drive from the car. Parking choices are left out, as the
+// rest of the trip never parks.
+export function restOfTripRequest(request: PlanRequest, leg: TransitLeg, now: Date): PlanRequest {
   return {
     origin: leg.from,
     destination: request.destination,
-    // The planner rounds a leave-at time up to the minute, which would miss a service at 8:12:30.
-    time: { type: 'depart', at: floorToMinute(leg.start) },
+    time: { type: 'depart', at: nextServiceSearchFrom(leg, now) },
     access: request.trip.kind === 'outbound' ? PUBLIC_TRANSPORT_ONLY : request.access,
     preferences: request.preferences,
     trip: request.trip,
