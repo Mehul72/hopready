@@ -68,3 +68,5 @@ See docs/OWNER-ACTIONS.md. None of them blocks steps 4 to 10.
 - 2026-10-25: `pnpm install` waited at a prompt after `allowBuilds` changed. Run it non-interactively (see ADR-0005).
 - 2026-10-25: Homebrew under Rosetta cannot build CocoaPods on macOS 27. Installed CocoaPods 1.17.0 on Homebrew's bundled Ruby with a wrapper at `~/.local/bin/pod`.
 - 2026-10-25: Downloading and running actionlint was refused by the session's permission policy. Workflows were checked by parsing them with js-yaml instead: every action is pinned to a full SHA, and every job has a timeout.
+- 2026-10-25: Installing Maestro (Homebrew tap mobile-dev-inc/tap) was refused by the session's permission policy. Maestro flows are written to the repo for the owner to run; simulator checks use `xcrun simctl` screenshots instead.
+- 2026-10-25: Planner now reports nearby car parks skipped for direction, and explains empty transit and return-to-car results (commit 2cb1bfc).
