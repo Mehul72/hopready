@@ -75,7 +75,11 @@ export class CarParkCatalogue {
       fetchedAt: toIso(fetchedAt),
       carParks: facilities.map((facility) => ({ ...facility, occupancy: OCCUPANCY_NOT_CHECKED })),
     };
-    this.#cached = { listing, expiresAtMs: fetchedAt.getTime() + this.#ttlMs };
+    // Sydney always has Park&Ride car parks, so an empty answer is a provider hiccup. Keeping it
+    // for ten minutes would leave everyone with an empty picker long after the provider recovers.
+    if (listing.carParks.length > 0) {
+      this.#cached = { listing, expiresAtMs: fetchedAt.getTime() + this.#ttlMs };
+    }
     return listing;
   }
 }

@@ -1,4 +1,9 @@
-import { ProviderError, type Occupancy, type ProviderFailure } from '@hopready/core';
+import {
+  type CarParkFacility,
+  type Occupancy,
+  ProviderError,
+  type ProviderFailure,
+} from '@hopready/core';
 import { describe, expect, it } from 'vitest';
 
 import { API_VERSION } from './app';
@@ -591,6 +596,25 @@ describe('GET /v1/carparks', () => {
     clock.advanceMs(2 * 60_000);
     expect((await app.request('/v1/carparks')).status).toBe(200);
     expect(carParks.calls).toEqual({ listFacilities: 2, occupancy: 0 });
+  });
+
+  it('asks again next time after an empty list, instead of keeping it', async () => {
+    const answers: CarParkFacility[][] = [[], [tallawong]];
+    const carParks = fakeCarParks({
+      facilities: [],
+      listFacilities: async () => answers.shift() ?? [],
+      occupancy: async () => new Map(),
+    });
+    const { app } = testApp({ providers: { carParks } });
+
+    const empty = (await (await app.request('/v1/carparks')).json()) as { carParks: unknown[] };
+    const recovered = (await (await app.request('/v1/carparks')).json()) as {
+      carParks: unknown[];
+    };
+
+    expect(empty.carParks).toEqual([]);
+    expect(recovered.carParks).toHaveLength(1);
+    expect(carParks.calls.listFacilities).toBe(2);
   });
 
   it('maps a facility list failure like any provider failure', async () => {
