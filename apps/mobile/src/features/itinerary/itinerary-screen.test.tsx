@@ -502,14 +502,15 @@ describe('how live the times are', () => {
   });
 });
 
-describe('a followed trip home', () => {
+describe('a trip home after the car changes', () => {
   const car: ParkedCar = {
     location: PLACES.tallawongCarPark,
     carParkId: '26',
     confirmedAt: WEEKDAY_MORNING.toISOString(),
   };
 
-  async function followTripHome() {
+  // Plans a trip home through the car and opens its option, following it if asked.
+  async function openTripHome({ follow }: { follow: boolean }) {
     appStorage.parkedCar.markParked(car, 'Tallawong P1');
     const home = transitItinerary({ departAt: addMinutes(WEEKDAY_MORNING, 10) });
     jest.spyOn(tripService, 'planTrip').mockResolvedValue(planResponse([home], { mode: 'demo' }));
@@ -520,13 +521,27 @@ describe('a followed trip home', () => {
         trip: { kind: 'return-via-car', parkedCar: car },
       }),
     );
-    planSession.select(home.id);
+    if (follow) planSession.select(home.id);
     await renderApp(`/itinerary/${home.id}`);
     expect(screen.queryByTestId('trip-home-out-of-date')).not.toBeOnTheScreen();
   }
 
+  it('warns on an option opened from the results too, and does not start it', async () => {
+    await openTripHome({ follow: false });
+    expect(screen.getByRole('button', { name: 'Start this trip' })).toBeEnabled();
+
+    await act(async () => {
+      appStorage.parkedCar.markDroppedOff(WEEKDAY_MORNING.toISOString());
+    });
+
+    expect(screen.getByTestId('trip-home-out-of-date')).toBeOnTheScreen();
+    const start = screen.getByRole('button', { name: 'Start this trip' });
+    expect(start).toBeDisabled();
+    expect(start).toHaveProp('accessibilityHint', 'Plan your trip home again first');
+  });
+
   it('says straight away that the trip home is out of date once the car is moved', async () => {
-    await followTripHome();
+    await openTripHome({ follow: true });
 
     await act(async () => {
       appStorage.parkedCar.markParked(
@@ -557,7 +572,7 @@ describe('a followed trip home', () => {
       () => appStorage.parkedCar.markDroppedOff(WEEKDAY_MORNING.toISOString()),
     ],
   ])('leads to Take me home on the Car tab when %s', async (_, change) => {
-    await followTripHome();
+    await openTripHome({ follow: true });
     await act(async () => {
       change();
     });
@@ -571,7 +586,7 @@ describe('a followed trip home', () => {
   });
 
   it('asks to plan the way home on the Plan tab once the parked car is removed', async () => {
-    await followTripHome();
+    await openTripHome({ follow: true });
 
     await act(async () => {
       appStorage.parkedCar.clear();

@@ -14,13 +14,11 @@ import {
   refreshableRequest,
   replanRequest,
   useDataMode,
-  useTripHomeOutOfDate,
 } from '@/trip';
 
 import { showResultsFor } from '../saved/plan-requests';
 import { writeOrAlert } from '../saved/storage-writes';
 import { shownDurationSeconds } from '../shared/shown-duration';
-import { TripHomeOutOfDate } from '../shared/trip-home-out-of-date';
 import { describeTripSummary } from './trip-summary-card';
 import { optionLabel } from '../shared/option-labels';
 import { duration } from './trip-text';
@@ -146,10 +144,7 @@ function CheckForChanges({
 // trip.
 export function ActiveTripStatus({ trip, nowMs }: { trip: DisplayedTrip; nowMs: number }) {
   const mode = useDataMode();
-  const tripHomeOutOfDate = useTripHomeOutOfDate(trip.request);
   if (!trip.isActive) return null;
-  // What a check found is about the car as it was, so it gives way to asking for Take me home.
-  if (tripHomeOutOfDate) return <TripHomeOutOfDate />;
   // Once every service has left, there is nothing left to check (refresh-policy.ts).
   const canCheck = partToCheck(trip, new Date(nowMs), mode) !== null;
   return (

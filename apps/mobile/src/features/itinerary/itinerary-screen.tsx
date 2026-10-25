@@ -5,9 +5,11 @@ import { AppText, Banner, Button, EmptyState, Screen, TripMap } from '@/componen
 import { planSession } from '@/state';
 import { appStorage, isSamePlace, useFavouriteRoutes } from '@/storage';
 import { RADII, SPACING } from '@/theme';
+import { useTripHomeOutOfDate } from '@/trip';
 
 import { routeLabelFor } from '../saved/place-labels';
 import { writeOrAlert } from '../saved/storage-writes';
+import { TripHomeOutOfDate } from '../shared/trip-home-out-of-date';
 import { ActiveTripStatus } from './active-trip-status';
 import { DataAttribution } from './data-attribution';
 import { AlertBanner, ArrivalRow, LegRow } from './leg-row';
@@ -67,14 +69,27 @@ function stopFollowing(trip: DisplayedTrip) {
   ]);
 }
 
-function TripFooter({ trip }: { trip: DisplayedTrip }) {
+function TripFooter({
+  trip,
+  tripHomeOutOfDate,
+}: {
+  trip: DisplayedTrip;
+  tripHomeOutOfDate: boolean;
+}) {
   if (!trip.isActive) {
     return (
       <Button
         label="Start this trip"
         symbol="play.fill"
         fullWidth
-        accessibilityHint="Follows this trip, so HopReady checks it for changes when you come back to the app"
+        // A trip home that no longer fits the car is never checked, so following it would only
+        // keep the old way home on screen.
+        disabled={tripHomeOutOfDate}
+        accessibilityHint={
+          tripHomeOutOfDate
+            ? 'Plan your trip home again first'
+            : 'Follows this trip, so HopReady checks it for changes when you come back to the app'
+        }
         onPress={() => startTrip(trip)}
       />
     );
@@ -173,6 +188,7 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
   const nowMs = useCurrentMinute();
   const startDriving = useStartDriving();
   const { height } = useWindowDimensions();
+  const tripHomeOutOfDate = useTripHomeOutOfDate(trip?.request ?? null);
 
   if (!trip) return <TripNotFound />;
 
@@ -194,10 +210,19 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
     Math.min(MAP_MAX_HEIGHT, Math.max(MAP_MIN_HEIGHT, height * MAP_SHARE_OF_WINDOW)),
   );
   const staleCheckAt = staleCheckOf(trip.plannedAt, nowMs);
+  // A trip home planned before the car changed says so, followed or not. Any check of it was about
+  // the car as it was, so what that found gives way.
+  const status = tripHomeOutOfDate ? (
+    <TripHomeOutOfDate />
+  ) : (
+    <ActiveTripStatus trip={trip} nowMs={nowMs} />
+  );
 
   return (
-    <Screen footer={<TripFooter trip={trip} />} testID="itinerary-screen">
-      <ActiveTripStatus trip={trip} nowMs={nowMs} />
+    <Screen
+      footer={<TripFooter trip={trip} tripHomeOutOfDate={tripHomeOutOfDate} />}
+      testID="itinerary-screen">
+      {status}
       <TripSummaryCard itinerary={itinerary} staleCheckAt={staleCheckAt} />
       {itinerary.notes.map((note, index) => (
         <Banner key={`${index}:${note}`} tone="info" message={note} />
