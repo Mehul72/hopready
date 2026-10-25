@@ -18,7 +18,7 @@ export interface LiveDataConsentScreenProps {
 // Kept in step with site/privacy/index.html. A change to what is sent, or who receives it, also
 // needs LIVE_DATA_CONSENT_VERSION bumped once a version has shipped.
 const SENT = [
-  "The places you search for and travel between, and when you want to travel, go to HopReady's server. Planning with I'll drive and park also sends the parking spots you saved, and Take me home sends where your car is.",
+  "The places you search for and travel between, and when you want to travel, go to HopReady's server. Planning with I'll drive and park also sends the parking spots you saved, and Take me home sends where your car is. A trip you follow is sent again when you come back to the app, so it can be checked.",
   'If you allow location, searches also send your approximate location (to about 1 km) so nearby places come first, and iOS asks Apple for the street name when you use your current location.',
   'The server asks Transport for NSW for public transport and car parks, and Apple Maps for places and drive times. They are not told who you are.',
   "HopReady's server does not keep your places or searches after answering.",
