@@ -13,10 +13,12 @@ import { DEMO_PROVIDER_NAME, throwIfAborted } from './abort';
 import { valueAt, type DayCurve } from './curves';
 import type { DemoScenario } from './scenarios';
 import { isWeekend, serviceDayAt, sydneyMinuteOfDay } from './service-calendar';
+import { NETWORK_STOPS, type NetworkStop } from './stops';
 
-// Demo car parks are the documented Park&Ride facilities. Their counts are made up: they follow a
-// typical commuter day (filling through the morning peak, emptying in the evening) and differ a
-// little between car parks so the app shows a mix of busy and full.
+// Demo car parks are the documented Park&Ride facilities whose station the demo network serves; the
+// rest could never connect to a demo service. Their counts are made up: they follow a typical
+// commuter day (filling through the morning peak, emptying in the evening) and differ a little
+// between car parks so the app shows a mix of busy and full.
 
 export interface DemoCarParkOptions {
   clock: Clock;
@@ -61,12 +63,18 @@ const WEEKEND_FILL: DayCurve = [
 
 const facilityIdsSchema = z.array(z.string().max(64)).max(200);
 
+const NETWORK_STOP_BY_ID = new Map(NETWORK_STOPS.map((stop) => [stop.id, stop]));
+
+export const DEMO_CAR_PARKS: readonly CataloguedCarPark[] = PARK_AND_RIDE_CATALOGUE.filter(
+  (carPark) => NETWORK_STOP_BY_ID.has(carPark.station.stopId),
+);
+
 export function createDemoCarParkProvider(options: DemoCarParkOptions): CarParkProvider {
   return {
     name: DEMO_PROVIDER_NAME,
     async listFacilities(signal) {
       throwIfAborted(signal);
-      return PARK_AND_RIDE_CATALOGUE.map(facilityFrom);
+      return DEMO_CAR_PARKS.map(facilityFrom);
     },
     async occupancy(facilityIds, signal) {
       throwIfAborted(signal);
@@ -84,7 +92,7 @@ export function createDemoCarParkProvider(options: DemoCarParkOptions): CarParkP
       const nowMs = options.clock.now().getTime();
       const counts = new Map<string, Occupancy>();
       for (const id of new Set(parsed.data)) {
-        const carPark = PARK_AND_RIDE_CATALOGUE.find((entry) => entry.facilityId === id);
+        const carPark = DEMO_CAR_PARKS.find((entry) => entry.facilityId === id);
         if (carPark) counts.set(id, occupancyOf(carPark, nowMs, options.scenario));
       }
       return counts;
@@ -94,6 +102,8 @@ export function createDemoCarParkProvider(options: DemoCarParkOptions): CarParkP
 
 function facilityFrom(carPark: CataloguedCarPark): CarParkFacility {
   const { station } = carPark;
+  // Drop-offs use the network's own stop position so they meet demo services exactly.
+  const networkStop: NetworkStop = NETWORK_STOP_BY_ID.get(station.stopId)!;
   return {
     id: carPark.facilityId,
     name: carPark.name,
@@ -104,7 +114,7 @@ function facilityFrom(carPark: CataloguedCarPark): CarParkFacility {
     rules: { ...carPark.rules },
     station: {
       name: station.name,
-      coordinate: { ...station.coordinate },
+      coordinate: { ...networkStop.coordinate },
       kind: 'stop',
       stopId: station.stopId,
     },

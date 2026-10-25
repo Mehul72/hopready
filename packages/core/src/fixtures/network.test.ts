@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { PARK_AND_RIDE_CATALOGUE } from '../data/park-and-ride';
 import { haversineMetres, isWithinGreaterSydney } from '../geo';
+import { DEMO_CAR_PARKS } from './car-park-provider';
 import { minutesAt, NETWORK_ROUTES, type RunTimeProfile } from './routes';
 import { minutesFromClockText } from './service-calendar';
 import { NETWORK_STOPS, STOPS, WALKING_LINKS } from './stops';
@@ -16,21 +16,23 @@ describe('demo network data', () => {
     for (const stop of NETWORK_STOPS) expect(isWithinGreaterSydney(stop.coordinate)).toBe(true);
   });
 
-  it('serves every documented car park station except Schofields, which is on a line it leaves out', () => {
+  it('offers the Metro North West, North Shore and B-Line car parks, and only ones it serves', () => {
     const networkIds = new Set(NETWORK_STOPS.map((stop) => stop.id));
-    const missing = PARK_AND_RIDE_CATALOGUE.filter(
-      (carPark) => !networkIds.has(carPark.station.stopId),
-    );
+    const offered = DEMO_CAR_PARKS.map((carPark) => carPark.facilityId).sort();
 
-    expect(missing.map((carPark) => carPark.name)).toEqual(['Schofields']);
+    expect(DEMO_CAR_PARKS.every((carPark) => networkIds.has(carPark.station.stopId))).toBe(true);
+    for (const facilityId of ['26', '27', '28', '29', '30', '31', '32', '33', '10', '12', '13']) {
+      expect(offered).toContain(facilityId);
+    }
+    expect(offered).not.toContain('24');
   });
 
-  it('places each car park station within 100 m of the same stop in the network', () => {
+  it('places each demo car park within 1 km of the stop it serves', () => {
     const byId = new Map(NETWORK_STOPS.map((stop) => [stop.id, stop]));
-    for (const carPark of PARK_AND_RIDE_CATALOGUE) {
-      const stop = byId.get(carPark.station.stopId);
-      if (!stop) continue;
-      expect(haversineMetres(stop.coordinate, carPark.station.coordinate)).toBeLessThan(100);
+    for (const carPark of DEMO_CAR_PARKS) {
+      const stop = byId.get(carPark.station.stopId)!;
+      const carParkPoint = carPark.entrance ?? carPark.station.coordinate;
+      expect(haversineMetres(stop.coordinate, carParkPoint)).toBeLessThan(1_000);
     }
   });
 

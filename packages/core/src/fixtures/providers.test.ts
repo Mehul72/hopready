@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { PARK_AND_RIDE_CATALOGUE } from '../data/park-and-ride';
 import { haversineMetres } from '../geo';
 import { occupancySchema, placeSchema } from '../model';
 import { ProviderError, type DriveTime } from '../providers';
@@ -13,6 +12,8 @@ import {
   demoScenarioSchema,
   type DemoScenario,
 } from './index';
+import { DEMO_CAR_PARKS } from './car-park-provider';
+import { NETWORK_STOPS } from './stops';
 
 const TUESDAY_0630 = '2026-10-26T19:30:00Z';
 const TUESDAY_0800 = '2026-10-26T21:00:00Z';
@@ -163,14 +164,15 @@ describe('demo car parks', () => {
     const facilities = await providersAt(TUESDAY_0800).carParks.listFacilities(signal());
 
     expect(facilities.map((facility) => facility.id)).toEqual(
-      PARK_AND_RIDE_CATALOGUE.map((carPark) => carPark.facilityId),
+      DEMO_CAR_PARKS.map((carPark) => carPark.facilityId),
     );
+    const networkStops = new Map(NETWORK_STOPS.map((stop) => [stop.id, stop]));
     for (const facility of facilities) {
-      const entry = PARK_AND_RIDE_CATALOGUE.find((carPark) => carPark.facilityId === facility.id)!;
+      const entry = DEMO_CAR_PARKS.find((carPark) => carPark.facilityId === facility.id)!;
       expect(facility.coordinate).toEqual(entry.entrance ?? entry.station.coordinate);
       expect(facility.station).toEqual({
         name: entry.station.name,
-        coordinate: entry.station.coordinate,
+        coordinate: networkStops.get(entry.station.stopId)!.coordinate,
         kind: 'stop',
         stopId: entry.station.stopId,
       });
@@ -180,7 +182,7 @@ describe('demo car parks', () => {
   });
 
   it('reports counts from one to three minutes ago, never more spaces than exist', async () => {
-    const ids = PARK_AND_RIDE_CATALOGUE.map((carPark) => carPark.facilityId);
+    const ids = DEMO_CAR_PARKS.map((carPark) => carPark.facilityId);
     const counts = await providersAt(TUESDAY_0800).carParks.occupancy(ids, signal());
 
     for (const [, occupancy] of counts) {
@@ -331,7 +333,7 @@ describe('failure scenarios', () => {
     for (const scenario of ['provider-timeout', 'rate-limited', 'no-route'] as const) {
       const providers = providersAt(TUESDAY_0800, scenario);
       await expect(providers.carParks.listFacilities(signal())).resolves.toHaveLength(
-        PARK_AND_RIDE_CATALOGUE.length,
+        DEMO_CAR_PARKS.length,
       );
       await expect(providers.places.search('chats', null, signal())).resolves.not.toEqual([]);
       await expect(
