@@ -6,9 +6,10 @@ import { SPACING } from '@/theme';
 export const TFNSW_ATTRIBUTION =
   'Public transport and car park data © Transport for NSW, CC BY 4.0';
 export const APPLE_ATTRIBUTION = 'Maps and drive times © Apple Maps';
-// Demo trips use real stop and car park details but made-up times, drives and space counts.
+// Demo trips use real stop and car park details but made-up times, drives and space counts. Some
+// demo place positions come from OpenStreetMap, whose licence (ODbL) asks for credit too.
 export const DEMO_ATTRIBUTION =
-  'Sample times, drives and car park spaces for demo mode. Stop and car park details © Transport for NSW, CC BY 4.0. Map © Apple Maps';
+  'Sample times, drives and car park spaces for demo mode. Stop and car park details © Transport for NSW, CC BY 4.0. Some place positions © OpenStreetMap contributors. Map © Apple Maps';
 
 // Data sources for a screen that shows a trip. Transport for NSW's licence (CC BY 4.0) requires the
 // attribution, and Apple's terms require credit wherever Apple drive data appears.

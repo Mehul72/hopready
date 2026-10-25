@@ -16,6 +16,7 @@ export const APPLE_ROUTE_GUIDANCE_NOTICE =
   'YOUR USE OF THIS REAL TIME ROUTE GUIDANCE APPLICATION IS AT YOUR SOLE RISK. LOCATION DATA MAY NOT BE ACCURATE.';
 
 export const TFNSW_OPEN_DATA_URL = 'https://opendata.transport.nsw.gov.au/';
+export const OPENSTREETMAP_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
 
 const appConfigSchema = z.object({ version: z.string().trim().min(1) });
 
@@ -31,7 +32,7 @@ function LinkButton({ label, url, pageName }: { label: string; url: string; page
       variant="plain"
       symbol="safari"
       label={label}
-      accessibilityHint="Opens the page in HopReady"
+      accessibilityHint="Opens in Safari"
       onPress={() => {
         void openLink(url, pageName);
       }}
@@ -70,9 +71,18 @@ export function AboutSection() {
         url={PARK_AND_RIDE_RULES_URL}
         pageName="the Park&Ride rules page"
       />
+      <AppText tone="secondary">Maps, drive times and place search come from Apple Maps.</AppText>
       <AppText tone="secondary">
-        Maps, drive times and place search come from Apple Maps. Demo mode uses sample data instead.
+        Demo mode makes up its times, drives and car park spaces. Its stops and platforms come from
+        Transport for NSW timetable data (CC BY 4.0), and some of its place positions and suburb
+        names from OpenStreetMap, © OpenStreetMap contributors, available under the Open Database
+        Licence.
       </AppText>
+      <LinkButton
+        label="OpenStreetMap copyright"
+        url={OPENSTREETMAP_COPYRIGHT_URL}
+        pageName="the OpenStreetMap copyright page"
+      />
 
       {privacyPolicyUrl || supportUrl ? (
         <View style={styles.links}>
