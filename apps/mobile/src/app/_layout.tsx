@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { createQueryClient, useQueryFocusFollowsAppState } from '@/api';
 import { DemoModeBanner, ScreenPresentationProvider } from '@/components';
+import { useNeedsLiveDataConsent } from '@/features/consent';
 import { useShowsDemoData } from '@/state';
 import { appStorage } from '@/storage';
 import { NAVIGATION_THEMES, useColourScheme, useTheme } from '@/theme';
@@ -27,6 +28,7 @@ export default function RootLayout() {
   const scheme = useColourScheme();
   const { colours } = useTheme();
   const showsDemoData = useShowsDemoData();
+  const needsLiveDataConsent = useNeedsLiveDataConsent();
   useQueryFocusFollowsAppState();
   useRefreshActiveTripOnResume();
 
@@ -56,25 +58,36 @@ export default function RootLayout() {
                   {children}
                 </ScreenPresentationProvider>
               )}>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="results" options={{ title: 'Options' }} />
-              <Stack.Screen name="itinerary/[id]" options={{ title: 'Trip' }} />
-              <Stack.Screen
-                name="place-search"
-                options={{ presentation: 'modal', title: 'Choose a place' }}
-              />
-              <Stack.Screen
-                name="trip-options"
-                options={{ presentation: 'modal', title: 'Trip options' }}
-              />
-              <Stack.Screen
-                name="parked-car/confirm"
-                options={{ presentation: 'modal', title: 'Where you parked' }}
-              />
-              <Stack.Screen
-                name="parked-car/correct"
-                options={{ presentation: 'modal', title: 'Move the car pin' }}
-              />
+              {/* Live planning sends places to HopReady's server, so until the person agrees or
+                  chooses demo mode, the explanation is the only screen. */}
+              <Stack.Protected guard={!needsLiveDataConsent} redirectTo="/welcome">
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="results" options={{ title: 'Options' }} />
+                <Stack.Screen name="itinerary/[id]" options={{ title: 'Trip' }} />
+                <Stack.Screen
+                  name="place-search"
+                  options={{ presentation: 'modal', title: 'Choose a place' }}
+                />
+                <Stack.Screen
+                  name="trip-options"
+                  options={{ presentation: 'modal', title: 'Trip options' }}
+                />
+                <Stack.Screen
+                  name="parked-car/confirm"
+                  options={{ presentation: 'modal', title: 'Where you parked' }}
+                />
+                <Stack.Screen
+                  name="parked-car/correct"
+                  options={{ presentation: 'modal', title: 'Move the car pin' }}
+                />
+                <Stack.Screen
+                  name="data-use"
+                  options={{ presentation: 'modal', title: 'Live data use' }}
+                />
+              </Stack.Protected>
+              <Stack.Protected guard={needsLiveDataConsent} redirectTo="/">
+                <Stack.Screen name="welcome" options={{ headerShown: false }} />
+              </Stack.Protected>
             </Stack>
           </SafeAreaProvider>
         </View>

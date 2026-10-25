@@ -36,5 +36,11 @@ export {
   type ParkedCarState,
   type SavedPlaces,
 } from './schemas';
-export { type AppSettings, type SettingsStore } from './settings';
+export {
+  type AppSettings,
+  hasLiveDataConsent,
+  LIVE_DATA_CONSENT_VERSION,
+  type LiveDataConsent,
+  type SettingsStore,
+} from './settings';
 export { STORAGE_KEY_PREFIX, StorageError, type StoredValue } from './stored-value';

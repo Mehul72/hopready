@@ -25,7 +25,7 @@ export {
   INSTALL_ID_HEADER,
   parseRetryAfterSeconds,
 } from './http';
-export { apiClient, isDeviceOffline } from './instance';
+export { apiClient, isDeviceOffline, isLivePlanningConfigured } from './instance';
 export {
   createQueryClient,
   retryDelayMs,

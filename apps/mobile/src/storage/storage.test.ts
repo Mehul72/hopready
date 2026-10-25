@@ -7,6 +7,7 @@ import { parkAndRideItinerary, PLACES, planRequest, transitItinerary } from '@/t
 import { createAppStorage } from './app-storage';
 import { recentRequestKey } from './recent-requests';
 import { MAX_FAVOURITE_PLACES, MAX_RECENT_REQUESTS } from './schemas';
+import { hasLiveDataConsent, LIVE_DATA_CONSENT_VERSION } from './settings';
 import { StorageError, storageKey } from './stored-value';
 
 const NOW = '2026-10-26T20:55:00.000Z';
@@ -288,5 +289,80 @@ describe('demo mode switch', () => {
     storage.settings.setDemoMode(true);
 
     expect(storage.activeTrip.get()?.mode).toBe('demo');
+  });
+});
+
+describe('live data consent', () => {
+  it('starts unanswered on a fresh install', () => {
+    const { storage } = freshStorage();
+
+    expect(storage.settings.get().liveDataConsent).toBeNull();
+    expect(hasLiveDataConsent(storage.settings.get())).toBe(false);
+  });
+
+  it('records the current version and time, and survives a restart', () => {
+    const { backend, storage } = freshStorage();
+
+    storage.settings.acceptLiveDataConsent(new Date(NOW));
+
+    const reopened = createAppStorage(backend, createSequentialUuids());
+    expect(reopened.settings.get().liveDataConsent).toEqual({
+      version: LIVE_DATA_CONSENT_VERSION,
+      acceptedAt: NOW,
+    });
+    expect(hasLiveDataConsent(reopened.settings.get())).toBe(true);
+  });
+
+  it('asks again after it is withdrawn', () => {
+    const { storage } = freshStorage();
+    storage.settings.acceptLiveDataConsent(new Date(NOW));
+
+    storage.settings.withdrawLiveDataConsent();
+
+    expect(hasLiveDataConsent(storage.settings.get())).toBe(false);
+  });
+
+  it('keeps settings saved before consent existed, without assuming agreement', () => {
+    const { storage } = freshStorage({
+      [storageKey('settings', 1)]: JSON.stringify({
+        demoMode: true,
+        demoScenario: null,
+        installId: '00000000-0000-4000-8000-0000000000aa',
+      }),
+    });
+
+    expect(storage.settings.get()).toMatchObject({
+      demoMode: true,
+      installId: '00000000-0000-4000-8000-0000000000aa',
+      liveDataConsent: null,
+    });
+  });
+
+  it('treats a damaged record as not agreed, keeping the other settings', () => {
+    const { storage } = freshStorage({
+      [storageKey('settings', 1)]: JSON.stringify({
+        demoMode: true,
+        demoScenario: null,
+        installId: '00000000-0000-4000-8000-0000000000aa',
+        liveDataConsent: { version: 'one', acceptedAt: 'yesterday' },
+      }),
+    });
+
+    expect(storage.settings.get()).toMatchObject({ demoMode: true, liveDataConsent: null });
+  });
+
+  it('only counts agreement to the current explanation', () => {
+    const otherVersion = { version: LIVE_DATA_CONSENT_VERSION + 1, acceptedAt: NOW };
+
+    expect(hasLiveDataConsent({ liveDataConsent: otherVersion })).toBe(false);
+  });
+
+  it('is forgotten with everything else by delete all data', () => {
+    const { storage } = freshStorage();
+    storage.settings.acceptLiveDataConsent(new Date(NOW));
+
+    storage.deleteAllData();
+
+    expect(storage.settings.get().liveDataConsent).toBeNull();
   });
 });

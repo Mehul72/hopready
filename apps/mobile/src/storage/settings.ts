@@ -5,6 +5,15 @@ import type { KeyValueBackend } from './backend';
 import { type DemoScenario, demoScenarioSchema } from './demo-scenario';
 import { createStoredValue, type ManagedStoredValue } from './stored-value';
 
+// Bump when what HopReady sends, or who it goes to, changes: everyone is then asked again.
+export const LIVE_DATA_CONSENT_VERSION = 1;
+
+const liveDataConsentSchema = z.object({
+  version: z.number().int().positive(),
+  acceptedAt: z.iso.datetime({ offset: true }),
+});
+export type LiveDataConsent = z.infer<typeof liveDataConsentSchema>;
+
 export const appSettingsSchema = z.object({
   // Off until the person turns it on. Live mode never switches to demo data by itself.
   demoMode: z.boolean(),
@@ -15,12 +24,23 @@ export const appSettingsSchema = z.object({
   // accounts. It is not tied to the person and is replaced when they delete all data. The server
   // only accepts version 4 UUIDs, so anything else is treated as corrupt and replaced.
   installId: z.uuidv4(),
+  // Live mode sends the places a person searches and plans between to HopReady's server, which
+  // passes them to Transport for NSW and Apple. Nothing is sent until they agree. A damaged record
+  // reads as "not agreed", so the question is asked again rather than assumed.
+  liveDataConsent: liveDataConsentSchema.nullable().catch(null),
 });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
 export interface SettingsStore extends ManagedStoredValue<AppSettings> {
   setDemoMode: (enabled: boolean) => void;
   setDemoScenario: (scenario: DemoScenario | null) => void;
+  acceptLiveDataConsent: (at: Date) => void;
+  withdrawLiveDataConsent: () => void;
+}
+
+// Agreement to an earlier version of the explanation does not cover what the app does now.
+export function hasLiveDataConsent(settings: Pick<AppSettings, 'liveDataConsent'>): boolean {
+  return settings.liveDataConsent?.version === LIVE_DATA_CONSENT_VERSION;
 }
 
 export function createSettingsStore(
@@ -35,6 +55,7 @@ export function createSettingsStore(
       demoMode: false,
       demoScenario: null,
       installId: dependencies.createId(),
+      liveDataConsent: null,
     }),
     fillMissingFromDefaults: true,
     persistDefault: true,
@@ -55,6 +76,15 @@ export function createSettingsStore(
     },
     setDemoScenario: (scenario) => {
       stored.update((current) => ({ ...current, demoScenario: scenario }));
+    },
+    acceptLiveDataConsent: (at) => {
+      stored.update((current) => ({
+        ...current,
+        liveDataConsent: { version: LIVE_DATA_CONSENT_VERSION, acceptedAt: at.toISOString() },
+      }));
+    },
+    withdrawLiveDataConsent: () => {
+      stored.update((current) => ({ ...current, liveDataConsent: null }));
     },
   };
 }

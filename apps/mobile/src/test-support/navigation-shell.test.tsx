@@ -26,6 +26,8 @@ const ROUTES = {
   'trip-options': placeholder('Trip options'),
   'parked-car/confirm': placeholder('Confirm parking'),
   'parked-car/correct': placeholder('Correct parking'),
+  welcome: placeholder('Welcome'),
+  'data-use': placeholder('Data use'),
 };
 
 beforeEach(() => {
@@ -46,6 +48,15 @@ describe('navigation shell', () => {
     await testRouter.push('/parked-car/confirm');
     await testRouter.push('/parked-car/correct');
     expect(screen.getByText('Correct parking screen')).toBeOnTheScreen();
+    await testRouter.push('/data-use');
+    expect(screen.getByText('Data use screen')).toBeOnTheScreen();
+  });
+
+  it('never asks about live data in a build that cannot plan live trips', async () => {
+    await renderRouter(ROUTES, { initialUrl: '/welcome' });
+
+    expect(screen.getByText('Plan screen')).toBeOnTheScreen();
+    expect(screen.queryByText('Welcome screen')).not.toBeOnTheScreen();
   });
 
   it('shows the demo strip above every screen while demo mode is on', async () => {
