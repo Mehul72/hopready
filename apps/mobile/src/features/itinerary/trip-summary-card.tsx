@@ -5,7 +5,8 @@ import { AppText, Card } from '@/components';
 import { type ColourTokens, COMPACT_MAX_FONT_SCALE, RADII, SPACING, useTheme } from '@/theme';
 
 import { shownDurationSeconds } from '../shared/shown-duration';
-import { describeRealtimeCoverage, duration, STRATEGY_LABELS, type Wording } from './trip-text';
+import { optionLabel } from '../shared/option-labels';
+import { describeRealtimeCoverage, duration, type Wording } from './trip-text';
 
 interface CoverageStyle {
   background: keyof ColourTokens;
@@ -50,7 +51,7 @@ export function describeTripSummary(itinerary: Itinerary): string {
   const facts = tripFacts(itinerary).map((fact) => fact.spoken);
   const coverage = describeRealtimeCoverage(itinerary);
   return [
-    `${STRATEGY_LABELS[itinerary.strategy]}.`,
+    `${optionLabel(itinerary)}.`,
     `Leave ${formatSydneyTime(itinerary.departAt)}, arrive ${formatSydneyTime(itinerary.arriveAt)}.`,
     `${total.spoken} in total${facts.length > 0 ? `, ${facts.join(', ')}` : ''}.`,
     coverage?.spoken ?? null,
@@ -72,7 +73,7 @@ export function TripSummaryCard({ itinerary }: { itinerary: Itinerary }) {
     <Card testID="trip-summary">
       <View accessible accessibilityLabel={describeTripSummary(itinerary)} style={styles.body}>
         <AppText variant="subheadline" tone="secondary" weight="semibold">
-          {STRATEGY_LABELS[itinerary.strategy]}
+          {optionLabel(itinerary)}
         </AppText>
         <View style={styles.times}>
           <View style={styles.time}>

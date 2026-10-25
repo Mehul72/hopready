@@ -8,7 +8,7 @@ import { useActiveTrip } from '@/storage';
 import { SPACING } from '@/theme';
 
 import { isFollowedTripOver } from './followed-trip-window';
-import { STRATEGY_LABELS } from './trip-text';
+import { optionLabel } from '../shared/option-labels';
 
 const STATUS_NOTES: Readonly<Partial<Record<ActiveTripRefreshStatus, string>>> = {
   refreshing: 'Checking for changes.',
@@ -27,7 +27,7 @@ export function FollowedTripCard({ now }: { now: Date }) {
   if (isFollowedTripOver(activeTrip, now.getTime())) return null;
   const { itinerary } = activeTrip;
 
-  const strategy = STRATEGY_LABELS[itinerary.strategy];
+  const strategy = optionLabel(itinerary);
   const times = `Leave ${formatSydneyTime(itinerary.departAt)} · Arrive ${formatSydneyTime(itinerary.arriveAt)}`;
   const spokenTimes = `Leave ${formatSydneyTime(itinerary.departAt)}, arrive ${formatSydneyTime(itinerary.arriveAt)}`;
   const note = STATUS_NOTES[activeTripRefresh.status] ?? null;

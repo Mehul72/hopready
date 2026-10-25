@@ -12,7 +12,8 @@ import { showResultsFor } from '../saved/plan-requests';
 import { writeOrAlert } from '../saved/storage-writes';
 import { shownDurationSeconds } from '../shared/shown-duration';
 import { describeTripSummary } from './trip-summary-card';
-import { duration, STRATEGY_LABELS } from './trip-text';
+import { optionLabel } from '../shared/option-labels';
+import { duration } from './trip-text';
 import type { DisplayedTrip } from './use-displayed-trip';
 
 // Follows another option after the chosen one stopped being offered. The alternatives come from
@@ -49,7 +50,7 @@ function AlternativeCard({
       accessibilityHint="Follows this option instead">
       <View style={styles.alternative}>
         <AppText variant="subheadline" tone="secondary" weight="semibold">
-          {STRATEGY_LABELS[alternative.strategy]}
+          {optionLabel(alternative)}
         </AppText>
         <AppText variant="headline" tabularNumbers>
           {`Leave ${formatSydneyTime(alternative.departAt)} · Arrive ${formatSydneyTime(alternative.arriveAt)}`}

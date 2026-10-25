@@ -1,13 +1,6 @@
-import type { PlanResponse, Preferences, RejectionReason, Strategy } from '@hopready/core';
+import type { PlanResponse, Preferences, RejectionReason } from '@hopready/core';
 
-export const STRATEGY_LABELS: Readonly<Record<Strategy, string>> = {
-  'transit-only': 'Public transport',
-  'park-and-ride': 'Drive and park',
-  'drop-off': 'Drop-off',
-  'drive-only': 'Drive',
-  'return-via-car': 'Back via your car',
-  'transit-home': 'Public transport',
-};
+export { STRATEGY_LABELS } from '../shared/option-labels';
 
 type CarParkOutcome = PlanResponse['checkedCarParks'][number]['outcome'];
 

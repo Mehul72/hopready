@@ -11,9 +11,9 @@ import { LEG_VISUALS, type LegVisualKind, legVisualKind } from '@/theme';
 
 import { selfDriveSeconds } from './itinerary-order';
 import { describeOccupancy, SPACES_CAN_FILL_NOTE, type Wording } from '../shared/occupancy-wording';
+import { optionLabel } from '../shared/option-labels';
 import { isSampleItinerary } from '../shared/sample-data';
 import { shownDurationSeconds } from '../shared/shown-duration';
-import { STRATEGY_LABELS } from './plan-explanations';
 
 const SECONDS_PER_MINUTE = 60;
 // Shorter than this rounds to "0 min", which reads as a mistake rather than a short step.
@@ -224,7 +224,7 @@ export function describeItinerary(itinerary: Itinerary, now: Date): string {
   const alerts = alertSummary(itinerary);
   const steps = legSteps(itinerary).map((step) => step.spoken);
   const sentences = [
-    STRATEGY_LABELS[itinerary.strategy],
+    optionLabel(itinerary),
     `Leave ${formatSydneyTime(itinerary.departAt)}, arrive ${formatSydneyTime(itinerary.arriveAt)}, ${facts.total.spoken} in total`,
     steps.length > 0 ? capitalise(steps.join(', then ')) : null,
     facts.changes?.spoken ?? null,

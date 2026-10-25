@@ -13,7 +13,7 @@ import {
 } from '@/components';
 import { COMPACT_MAX_FONT_SCALE, type ColourTokens, RADII, SPACING, useTheme } from '@/theme';
 
-import { STRATEGY_LABELS } from './plan-explanations';
+import { optionLabel } from '../shared/option-labels';
 import {
   alertSummary,
   describeItinerary,
@@ -130,7 +130,7 @@ export function RouteCard({ itinerary, now, selected, onPress }: RouteCardProps)
       <View style={styles.content}>
         <View style={styles.headerRow}>
           <AppText variant="subheadline" tone="secondary" weight="semibold" style={styles.shrink}>
-            {STRATEGY_LABELS[itinerary.strategy]}
+            {optionLabel(itinerary)}
           </AppText>
           <TimingPill summary={timingSummary(itinerary)} />
         </View>

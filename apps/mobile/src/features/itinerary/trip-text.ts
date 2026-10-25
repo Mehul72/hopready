@@ -4,7 +4,6 @@ import {
   type ParkingRules,
   secondsBetween,
   type ServiceAlert,
-  type Strategy,
   SYDNEY_TIME_ZONE,
   type TransitLeg,
 } from '@hopready/core';
@@ -20,14 +19,7 @@ const MINUTES_PER_HOUR = 60;
 export const UNKNOWN_RULES_TEXT = 'Check signs for parking rules';
 export const PLATFORM_NOT_PROVIDED = 'Platform not provided';
 
-export const STRATEGY_LABELS: Readonly<Record<Strategy, string>> = {
-  'transit-only': 'Public transport',
-  'park-and-ride': 'Drive and park',
-  'drop-off': 'Drop-off',
-  'drive-only': 'Drive',
-  'return-via-car': 'Back via your car',
-  'transit-home': 'Public transport home',
-};
+export { STRATEGY_LABELS } from '../shared/option-labels';
 
 export interface Wording {
   text: string;
