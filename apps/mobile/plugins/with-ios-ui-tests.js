@@ -31,10 +31,35 @@ function copyTestSources(config) {
   ]);
 }
 
+// The library writes names quoted when it creates them and reads them back unquoted.
+function findByName(find, name) {
+  return find(name) ?? find(`"${name}"`) ?? null;
+}
+
+// A project generated without --clean keeps the target from last time, so test files added since
+// then are put into its Sources phase here.
+function addMissingSources(project) {
+  const targetKey = findByName((name) => project.findTargetKey(name), TARGET_NAME);
+  const groupKey = findByName((name) => project.findPBXGroupKey({ name }), TARGET_NAME);
+  if (!targetKey || !groupKey) {
+    throw new Error(`with-ios-ui-tests: ${TARGET_NAME} exists but its target or group is missing`);
+  }
+  const phase = project.pbxSourcesBuildPhaseObj(targetKey);
+  const present = new Set(
+    (phase?.files ?? []).map((entry) => String(entry.comment).replace(/ in Sources$/, '')),
+  );
+  for (const file of swiftSources()) {
+    if (!present.has(file)) project.addSourceFile(file, { target: targetKey }, groupKey);
+  }
+}
+
 function addTestTarget(config) {
   return withXcodeProject(config, (modConfig) => {
     const project = modConfig.modResults;
-    if (project.pbxTargetByName(TARGET_NAME)) return modConfig;
+    if (project.pbxTargetByName(TARGET_NAME)) {
+      addMissingSources(project);
+      return modConfig;
+    }
 
     const appTarget = project.getFirstTarget();
     const appName = appTarget.firstTarget.name.replace(/"/g, '');
