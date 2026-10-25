@@ -4,7 +4,7 @@ import { Alert, type AlertButton } from 'react-native';
 
 import { appStorage, type FavouriteRoute, isSamePlace } from '@/storage';
 
-import { planChoices } from '../plan/plan-choices';
+import { planChoicesInForce } from '../plan/plan-choices';
 
 import {
   type CurrentPlaceOutcome,
@@ -68,7 +68,7 @@ export function useShortcutPlanner(): ShortcutPlanner {
   // The preferred station and car park from Trip options, as the Plan tab sends them, so a
   // shortcut plans the same trip and the results do not claim the options changed.
   const preferredStops = (): Pick<PlanRequest, 'preferredCarParkId' | 'preferredStop'> => {
-    const { preferredCarPark, preferredStation } = planChoices.get();
+    const { preferredCarPark, preferredStation } = planChoicesInForce();
     return {
       ...(preferredCarPark ? { preferredCarParkId: preferredCarPark.id } : {}),
       ...(preferredStation ? { preferredStop: preferredStation } : {}),

@@ -3,7 +3,12 @@ import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { appStorage } from '@/storage';
 import { createMemoryBackend } from '@/test-support/memory-kv-store';
 
-import { createPlanChoicesStore, DEFAULT_PLAN_CHOICES, planChoices } from './plan-choices';
+import {
+  createPlanChoicesStore,
+  DEFAULT_PLAN_CHOICES,
+  planChoices,
+  planChoicesInForce,
+} from './plan-choices';
 import { createPlanDraftStore, planDraft } from './plan-draft';
 
 const NOW = new Date('2026-10-26T20:32:00.000Z');
@@ -64,14 +69,44 @@ describe('saved plan choices', () => {
     const backend = createMemoryBackend();
     const firstLaunch = createPlanChoicesStore(backend, () => () => undefined);
     firstLaunch.setAccess({ drive: false, dropOff: true });
-    firstLaunch.setPreferredCarPark({ id: '29', name: 'Kellyville (north)' });
+    firstLaunch.setPreferredCarPark({ id: '29', name: 'Kellyville (north)', kind: 'car-park' });
 
     const nextLaunch = createPlanChoicesStore(backend, () => () => undefined);
     expect(nextLaunch.get()).toEqual({
       access: { transit: true, drive: false, dropOff: true },
       preferredStation: null,
-      preferredCarPark: { id: '29', name: 'Kellyville (north)' },
+      preferredCarPark: { id: '29', name: 'Kellyville (north)', kind: 'car-park' },
     });
+  });
+
+  it('keeps a preferred car park saved before parking spots could be preferred', () => {
+    const backend = createMemoryBackend({
+      'hopready.plan-choices.v1': JSON.stringify({
+        access: { transit: true, drive: false, dropOff: true },
+        preferredStation: null,
+        preferredCarPark: { id: '29', name: 'Kellyville (north)' },
+      }),
+    });
+    const store = createPlanChoicesStore(backend, () => () => undefined);
+    expect(store.get()).toEqual({
+      access: { transit: true, drive: false, dropOff: true },
+      preferredStation: null,
+      preferredCarPark: { id: '29', name: 'Kellyville (north)', kind: 'car-park' },
+    });
+  });
+
+  it('stops preferring a parking spot once it is deleted, but never a car park', () => {
+    const added = appStorage.parkingSpots.add('Street spot', { lat: -33.6925, lon: 150.9235 });
+    if (added.status !== 'added') throw new Error('The parking spot was not saved');
+    const spot = { id: added.item.id, name: 'Street spot', kind: 'saved-spot' as const };
+    planChoices.setPreferredCarPark(spot);
+    expect(planChoicesInForce().preferredCarPark).toEqual(spot);
+
+    appStorage.parkingSpots.remove(spot.id);
+    expect(planChoicesInForce().preferredCarPark).toBeNull();
+
+    planChoices.setPreferredCarPark({ id: '29', name: 'Kellyville (north)', kind: 'car-park' });
+    expect(planChoicesInForce().preferredCarPark).toMatchObject({ id: '29' });
   });
 
   it('falls back to the defaults when the saved value cannot be read', () => {

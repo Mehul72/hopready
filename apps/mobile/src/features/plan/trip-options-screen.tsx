@@ -246,7 +246,9 @@ export function TripOptionsScreen() {
             leadingSymbol="parkingsign.circle.fill"
             onPress={() => setChoosingCarPark((current) => !current)}
             accessibilityHint={
-              choosingCarPark ? 'Hides the car park list' : 'Shows the car park list'
+              choosingCarPark
+                ? 'Hides car parks and your parking spots'
+                : 'Shows car parks and your parking spots'
             }
             testID="preferred-car-park"
           />

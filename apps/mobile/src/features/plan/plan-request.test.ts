@@ -41,7 +41,7 @@ describe('buildPlanRequest', () => {
     const spot = { id: 'spot-1', name: 'Side street', coordinate: { lat: -33.7, lon: 150.93 } };
     const choices = {
       preferredStation: DEMO_PLACES.castleTowers,
-      preferredCarPark: { id: '29', name: 'Kellyville (north)' },
+      preferredCarPark: { id: '29', name: 'Kellyville (north)', kind: 'car-park' as const },
     };
 
     const driving = buildPlanRequest(inputs({ choices, savedParkingSpots: [spot] }), NOW);

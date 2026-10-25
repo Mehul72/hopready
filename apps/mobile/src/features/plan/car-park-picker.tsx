@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import type { CarParkStatus } from '@/api';
-import { Card, EmptyState, ErrorState, ListRow, LoadingState } from '@/components';
+import { AppText, Card, EmptyState, ErrorState, ListRow, LoadingState } from '@/components';
+import { useSavedParkingSpots } from '@/storage';
 import { MIN_TOUCH_TARGET, RADII, SPACING, useTheme } from '@/theme';
 import { useCarParks } from '@/trip';
 
@@ -12,6 +13,14 @@ import type { PreferredCarPark } from './plan-choices';
 export interface CarParkPickerProps {
   selectedId: string | null;
   onSelect: (carPark: PreferredCarPark | null) => void;
+}
+
+interface Option {
+  key: string;
+  title: string;
+  subtitle?: string;
+  selected: boolean;
+  onPress: () => void;
 }
 
 function matches(carPark: CarParkStatus, filter: string): boolean {
@@ -26,8 +35,45 @@ function byName(a: CarParkStatus, b: CarParkStatus): number {
   return a.name.localeCompare(b.name, 'en-AU');
 }
 
-// The documented Transport Park&Ride car parks, to pick one the planner tries first.
-export function CarParkPicker({ selectedId, onSelect }: CarParkPickerProps) {
+// The chosen row shows a tick, and VoiceOver reads "selected" after its name.
+function OptionsCard({ options }: { options: Option[] }) {
+  const { colours } = useTheme();
+  return (
+    <Card padded={false} style={styles.card}>
+      {options.map((option, index) => (
+        <View key={option.key}>
+          {index > 0 ? (
+            <View style={[styles.separator, { backgroundColor: colours.separator }]} />
+          ) : null}
+          <ListRow
+            title={option.title}
+            subtitle={option.subtitle}
+            leadingSymbol={option.selected ? 'checkmark.circle.fill' : 'circle'}
+            onPress={option.onPress}
+            accessibilityLabel={[option.title, option.subtitle, option.selected ? 'selected' : null]
+              .filter(Boolean)
+              .join(', ')}
+          />
+        </View>
+      ))}
+    </Card>
+  );
+}
+
+function Heading({ children }: { children: string }) {
+  return (
+    <AppText
+      variant="subheadline"
+      weight="semibold"
+      tone="secondary"
+      accessibilityRole="header"
+      style={styles.heading}>
+      {children}
+    </AppText>
+  );
+}
+
+function ParkAndRideCarParks({ selectedId, onSelect }: CarParkPickerProps) {
   const { colours } = useTheme();
   const carParks = useCarParks();
   const [filter, setFilter] = useState('');
@@ -60,7 +106,7 @@ export function CarParkPicker({ selectedId, onSelect }: CarParkPickerProps) {
 
   const listed = carParks.data.carParks.filter((carPark) => matches(carPark, filter)).sort(byName);
   return (
-    <View style={styles.container} testID="car-park-picker">
+    <>
       <TextInput
         value={filter}
         onChangeText={setFilter}
@@ -75,42 +121,61 @@ export function CarParkPicker({ selectedId, onSelect }: CarParkPickerProps) {
         ]}
         testID="car-park-filter"
       />
-      <Card padded={false} style={styles.card}>
-        <ListRow
-          title="No preferred car park"
-          leadingSymbol={selectedId === null ? 'checkmark.circle.fill' : 'circle'}
-          onPress={() => onSelect(null)}
-          accessibilityLabel={`No preferred car park${selectedId === null ? ', selected' : ''}`}
+      {listed.length > 0 ? (
+        <OptionsCard
+          options={listed.map((carPark) => ({
+            key: carPark.id,
+            title: carPark.name,
+            subtitle: carPark.stationName ?? undefined,
+            selected: carPark.id === selectedId,
+            onPress: () => onSelect({ id: carPark.id, name: carPark.name, kind: 'car-park' }),
+          }))}
         />
-        {listed.map((carPark) => {
-          const selected = carPark.id === selectedId;
-          return (
-            <View key={carPark.id}>
-              <View style={[styles.separator, { backgroundColor: colours.separator }]} />
-              <ListRow
-                title={carPark.name}
-                subtitle={carPark.stationName ?? undefined}
-                leadingSymbol={selected ? 'checkmark.circle.fill' : 'circle'}
-                onPress={() => onSelect({ id: carPark.id, name: carPark.name })}
-                accessibilityLabel={[
-                  carPark.name,
-                  carPark.stationName,
-                  selected ? 'selected' : null,
-                ]
-                  .filter(Boolean)
-                  .join(', ')}
-              />
-            </View>
-          );
-        })}
-      </Card>
-      {listed.length === 0 ? (
+      ) : (
         <EmptyState
           title="No car parks match"
           message="Try part of the car park or station name."
           symbol="magnifyingglass"
         />
-      ) : null}
+      )}
+    </>
+  );
+}
+
+// Where the planner tries to park first: a spot the person saved, or a documented Transport
+// Park&Ride car park. Saved spots are on the phone, so they stay listed when car parks cannot load.
+export function CarParkPicker({ selectedId, onSelect }: CarParkPickerProps) {
+  const spots = useSavedParkingSpots();
+  return (
+    <View style={styles.container} testID="car-park-picker">
+      <OptionsCard
+        options={[
+          {
+            key: 'none',
+            title: 'No preferred car park',
+            selected: selectedId === null,
+            onPress: () => onSelect(null),
+          },
+        ]}
+      />
+      <Heading>Your parking spots</Heading>
+      {spots.length > 0 ? (
+        <OptionsCard
+          options={spots.map((spot) => ({
+            key: spot.id,
+            title: spot.name,
+            subtitle: 'Saved by you. Rules and spaces unknown.',
+            selected: spot.id === selectedId,
+            onPress: () => onSelect({ id: spot.id, name: spot.name, kind: 'saved-spot' }),
+          }))}
+        />
+      ) : (
+        <AppText variant="footnote" tone="secondary">
+          Parking spots you add in Saved appear here.
+        </AppText>
+      )}
+      <Heading>Park&Ride car parks</Heading>
+      <ParkAndRideCarParks selectedId={selectedId} onSelect={onSelect} />
     </View>
   );
 }
@@ -118,6 +183,9 @@ export function CarParkPicker({ selectedId, onSelect }: CarParkPickerProps) {
 const styles = StyleSheet.create({
   container: {
     gap: SPACING.sm,
+  },
+  heading: {
+    paddingTop: SPACING.md,
   },
   input: {
     minHeight: MIN_TOUCH_TARGET,

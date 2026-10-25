@@ -1,4 +1,4 @@
-import { DEFAULT_PREFERENCES } from '@hopready/core';
+import { DEFAULT_PREFERENCES, type SavedParkingSpot } from '@hopready/core';
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
@@ -28,6 +28,17 @@ function pressAlertButton(text: string) {
   const button = buttons.find((candidate) => candidate.text === text);
   if (!button?.onPress) throw new Error(`The alert has no "${text}" button`);
   button.onPress();
+}
+
+// By Rouse Hill Station, away from Chatswood, so it is used for a trip from Kellyville to
+// Chatswood only when preferred.
+function saveStreetSpot(): SavedParkingSpot {
+  const added = appStorage.parkingSpots.add('Street spot by Rouse Hill Station', {
+    lat: -33.6925,
+    lon: 150.9235,
+  });
+  if (added.status !== 'added') throw new Error('The parking spot was not saved');
+  return added.item;
 }
 
 describe('trip options', () => {
@@ -111,7 +122,7 @@ describe('trip options', () => {
       excludedTransitModes: ['ferry'],
       navigationApp: 'waze',
     });
-    planChoices.setPreferredCarPark({ id: '29', name: 'Kellyville (north)' });
+    planChoices.setPreferredCarPark({ id: '29', name: 'Kellyville (north)', kind: 'car-park' });
     planChoices.setPreferredStation(DEMO_PLACES.castleTowers);
     const user = userEvent.setup();
     await renderApp('/trip-options');
@@ -177,22 +188,112 @@ describe('preferred stops', () => {
     await user.type(within(picker).getByLabelText('Filter car parks'), 'Kellyville');
     await user.press(within(picker).getByRole('button', { name: /^Kellyville \(north\)/ }));
 
-    expect(planChoices.get().preferredCarPark).toEqual({ id: '29', name: 'Kellyville (north)' });
+    expect(planChoices.get().preferredCarPark).toEqual({
+      id: '29',
+      name: 'Kellyville (north)',
+      kind: 'car-park',
+    });
     await waitFor(() => expect(screen.queryByTestId('car-park-picker')).not.toBeOnTheScreen());
     expect(
       screen.getByRole('button', { name: /^Preferred car park, Kellyville \(north\)/ }),
     ).toBeOnTheScreen();
   });
 
+  it('offers saved parking spots beside the car parks, and plans with the one chosen', async () => {
+    freezeClockAt(TUESDAY_0730);
+    const spot = saveStreetSpot();
+    await act(async () => {
+      planDraft.setRoute(DEMO_PLACES.kellyvilleHome, DEMO_PLACES.chatswoodOffice);
+    });
+    const user = userEvent.setup();
+    await renderApp('/');
+    await user.press(screen.getByRole('button', { name: /^Trip options, / }));
+
+    await user.press(screen.getByRole('button', { name: /^Preferred car park, None/ }));
+    const picker = await screen.findByTestId('car-park-picker');
+    expect(within(picker).getByRole('header', { name: 'Your parking spots' })).toBeOnTheScreen();
+    expect(within(picker).getByRole('header', { name: 'Park&Ride car parks' })).toBeOnTheScreen();
+    expect(
+      await within(picker).findByRole('button', { name: /^Kellyville \(north\)/ }),
+    ).toBeOnTheScreen();
+    await user.press(
+      within(picker).getByRole('button', {
+        name: 'Street spot by Rouse Hill Station, Saved by you. Rules and spaces unknown.',
+      }),
+    );
+
+    expect(planChoices.get().preferredCarPark).toEqual({
+      id: spot.id,
+      name: 'Street spot by Rouse Hill Station',
+      kind: 'saved-spot',
+    });
+    expect(
+      screen.getByRole('button', {
+        name: /^Preferred car park, Street spot by Rouse Hill Station/,
+      }),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Done' }));
+    await user.press(screen.getByRole('button', { name: 'Plan trip' }));
+
+    expect(planSession.getState().request).toMatchObject({
+      preferredCarParkId: spot.id,
+      savedParkingSpots: [spot],
+    });
+    await screen.findAllByTestId(/^route-card-/);
+    const parkedAt = planSession
+      .getState()
+      .response?.itineraries.map((itinerary) => itinerary.parking?.carPark.id);
+    expect(parkedAt).toContain(spot.id);
+  });
+
+  it('treats a preferred parking spot as no preference once it is deleted', async () => {
+    freezeClockAt(TUESDAY_0730);
+    const spot = saveStreetSpot();
+    planChoices.setPreferredCarPark({ id: spot.id, name: spot.name, kind: 'saved-spot' });
+    await act(async () => {
+      planDraft.setRoute(DEMO_PLACES.kellyvilleHome, DEMO_PLACES.chatswoodOffice);
+    });
+    const user = userEvent.setup();
+    await renderApp('/trip-options');
+    expect(
+      screen.getByRole('button', {
+        name: /^Preferred car park, Street spot by Rouse Hill Station/,
+      }),
+    ).toBeOnTheScreen();
+
+    // As when the person deletes it in Saved.
+    await act(async () => {
+      appStorage.parkingSpots.remove(spot.id);
+    });
+    await user.press(screen.getByRole('button', { name: /^Preferred car park, None/ }));
+    const picker = await screen.findByTestId('car-park-picker');
+    expect(
+      within(picker).getByRole('button', { name: 'No preferred car park, selected' }),
+    ).toBeOnTheScreen();
+    expect(
+      within(picker).getByText('Parking spots you add in Saved appear here.'),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Done' }));
+
+    expect(screen.queryByRole('button', { name: /prefers Street spot/ })).not.toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Plan trip' }));
+    expect(planSession.getState().request).not.toHaveProperty('preferredCarParkId');
+  });
+
   it('explains when the car park list cannot load in live mode, and offers demo mode', async () => {
     appStorage.settings.setDemoMode(false);
+    saveStreetSpot();
     const user = userEvent.setup();
     await renderApp('/trip-options');
 
     await user.press(screen.getByRole('button', { name: /^Preferred car park, None/ }));
 
     expect(await screen.findByText("Couldn't load car parks")).toBeOnTheScreen();
+    // Saved spots are on the phone, so they can still be chosen.
+    expect(
+      screen.getByRole('button', { name: /^Street spot by Rouse Hill Station, / }),
+    ).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Turn on demo mode' }));
-    expect(await screen.findByTestId('car-park-picker')).toBeOnTheScreen();
+    expect(await screen.findByRole('button', { name: /^Kellyville \(north\)/ })).toBeOnTheScreen();
   });
 });

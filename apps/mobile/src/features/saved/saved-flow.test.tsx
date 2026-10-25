@@ -234,7 +234,7 @@ describe('favourite routes', () => {
   });
 
   it('plans a saved route with the preferred stops from Trip options, as the Plan tab does', async () => {
-    planChoices.setPreferredCarPark({ id: '28', name: 'Tallawong P3' });
+    planChoices.setPreferredCarPark({ id: '28', name: 'Tallawong P3', kind: 'car-park' });
     planChoices.setPreferredStation(DEMO_STATIONS_TALLAWONG);
     appStorage.favouriteRoutes.add({
       label: 'Commute',
@@ -252,6 +252,26 @@ describe('favourite routes', () => {
       preferredCarParkId: '28',
       preferredStop: DEMO_STATIONS_TALLAWONG,
     });
+  });
+
+  it('stops preferring a parking spot once it is deleted, as the Plan tab does', async () => {
+    const added = appStorage.parkingSpots.add('Street spot', { lat: -33.6925, lon: 150.9235 });
+    if (added.status !== 'added') throw new Error('The parking spot was not saved');
+    planChoices.setPreferredCarPark({ id: added.item.id, name: 'Street spot', kind: 'saved-spot' });
+    appStorage.favouriteRoutes.add({
+      label: 'Commute',
+      origin: DEMO_PLACES.rouseHillHome,
+      destination: DEMO_PLACES.chatswoodOffice,
+    });
+    await renderApp('/saved');
+    const user = userEvent.setup();
+
+    answerNextAlert('Delete');
+    await user.press(screen.getByRole('button', { name: 'Delete Street spot' }));
+    await user.press(screen.getByRole('button', { name: 'Commute, Rouse Hill to Chatswood' }));
+
+    expect(await screen.findByText('Results screen')).toBeOnTheScreen();
+    expect(planSession.getState().request).not.toHaveProperty('preferredCarParkId');
   });
 
   it('deletes a route after confirming', async () => {
