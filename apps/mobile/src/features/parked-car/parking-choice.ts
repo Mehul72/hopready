@@ -9,7 +9,7 @@ import {
 } from '@hopready/core';
 
 import { CURRENT_LOCATION_LABEL } from '@/location';
-import type { ParkedCarState } from '@/storage';
+import type { ActiveTrip, ParkedCarState } from '@/storage';
 
 import { formatSydneyDay } from '../itinerary/trip-text';
 
@@ -35,6 +35,21 @@ export interface SuggestedCarPark {
   carParkId: string;
   name: string;
   coordinate: Coordinate;
+}
+
+// A followed trip hints where the car is only on the day it runs. One followed last week would
+// suggest a car park, and start the pin, far from where the car is today.
+export function itineraryFollowedToday(
+  activeTrip: ActiveTrip | null,
+  nowMs: number,
+): Itinerary | null {
+  if (!activeTrip) return null;
+  const today = sydneyDateKey(new Date(nowMs));
+  const { departAt, arriveAt } = activeTrip.itinerary;
+  // Either end counts, for a trip that runs past midnight.
+  return sydneyDateKey(departAt) === today || sydneyDateKey(arriveAt) === today
+    ? activeTrip.itinerary
+    : null;
 }
 
 export function suggestedCarParkOf(

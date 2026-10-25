@@ -6,11 +6,13 @@ import { AppText, Banner, Button, Screen, SegmentedControl } from '@/components'
 import { appStorage, useActiveTrip, useParkedCar } from '@/storage';
 import { SPACING } from '@/theme';
 
+import { useCurrentMinute } from '../itinerary/use-current-minute';
 import { useDisplayedTrip } from '../itinerary/use-displayed-trip';
 import { writeOrAlert } from '../saved/storage-writes';
 import { closeParkingSheet } from './close-sheet';
 import {
   driveEndOf,
+  itineraryFollowedToday,
   parkedCarFrom,
   parkedCarName,
   type ParkingChoice,
@@ -44,9 +46,9 @@ function ReplacesEarlierNotice() {
 // Where the car really is, as the person says. "Take me home" routes back through exactly this.
 export function ConfirmParkingScreen({ itineraryId, initialArrival }: ConfirmParkingScreenProps) {
   const trip = useDisplayedTrip(itineraryId ?? '');
-  const activeTrip = useActiveTrip();
-  // Opened without a trip (from the Car tab), the trip being followed is the best guess.
-  const itinerary = trip?.itinerary ?? activeTrip?.itinerary;
+  const followedToday = itineraryFollowedToday(useActiveTrip(), useCurrentMinute());
+  // Opened without a trip (from the Car tab), the trip followed today is the best guess.
+  const itinerary = trip?.itinerary ?? followedToday;
   const suggestion = suggestedCarParkOf(itinerary);
   // A pin for a spot in none of the lists starts where the trip expected to leave the car.
   const pinStart = suggestion?.coordinate ?? driveEndOf(itinerary);

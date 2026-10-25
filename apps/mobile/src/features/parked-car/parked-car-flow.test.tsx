@@ -319,6 +319,20 @@ describe('confirming where the car is', () => {
     expect(screen.getByRole('button', { name: 'Save where I parked' })).toBeDisabled();
   });
 
+  it('takes no hints from a trip followed on another day', async () => {
+    // Friday's drive and park, still stored on Tuesday morning.
+    follow(parkAndRideItinerary({ departAt: '2026-10-22T20:40:00.000Z' }));
+    await renderApp('/car');
+
+    await userEvent
+      .setup()
+      .press(screen.getByRole('button', { name: 'Tell HopReady where you parked' }));
+
+    expect(await screen.findByTestId('confirm-parking')).toBeOnTheScreen();
+    expect(screen.queryByRole('radio', { name: /Suggested by your trip/ })).toBeNull();
+    expect(screen.queryByRole('radio', { name: /^Somewhere else/ })).toBeNull();
+  });
+
   it('offers saved parking spots', async () => {
     appStorage.parkingSpots.add('Kerb on Example Road', { lat: -33.7, lon: 150.94 });
     await renderApp('/parked-car/confirm');
