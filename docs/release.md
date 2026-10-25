@@ -27,6 +27,8 @@ A successful upload is not the end of it. Apple then processes the build, which 
 
 ## TestFlight checklist
 
+Before the first upload, list `Frameworks/` inside the production build (`unzip -l HopReady.ipa | grep Frameworks/`). Apple requires a privacy manifest, and a signature, for SDKs on its list of commonly used third-party SDKs. HopReady removed `expo-image` so SDWebImage is no longer included. Hermes (`hermesvm.framework`) is also on Apple's list and the React Native build of it carries no manifest of its own; if App Store Connect answers the upload with ITMS-91061 naming it, update Expo and React Native to the latest patch release before working around it.
+
 1. Run `pnpm check` on the commit being built. The iOS simulator build and Maestro flows pass (see docs/testing.md).
 2. The production API is deployed, and `GET /v1/health` reports `transit`, `driving` and `carParks` as `configured`.
 3. `EXPO_PUBLIC_API_BASE_URL` for the production profile points at that API.
@@ -101,12 +103,14 @@ park and ride,commuter parking,metro,train,bus,transfer,trip planner,door to doo
 
 > HopReady plans trips in Greater Sydney, Australia, that combine driving, commuter parking, walking and public transport. No login is needed.
 >
+> On first launch HopReady explains what live planning sends and asks for agreement. Tap "Agree and continue" (or "Use demo mode instead" to try built-in sample trips).
+>
 > Live results only exist for Greater Sydney. If you are testing elsewhere:
 >
-> 1. Plan tab: type "Box Hill NSW" as the start and "1 Help Street, Chatswood" as the destination. Choose Arrive by, a weekday, 9:00 am (times are Sydney time). Turn on "I'll drive and park", then tap Plan. The options include driving to a Sydney Metro car park, then the metro.
-> 2. Open an option to see the timeline and map. Tap "I parked here" to confirm the car park.
-> 3. Car tab: tap "Take me home". It plans public transport back to the car, then the drive.
-> 4. Location access is optional. Every screen works with typed places.
+> 1. Plan tab: tap From and type "Box Hill NSW", then tap To and type "1 Help Street, Chatswood". Choose Arrive by, a weekday, 9:00 am (times are Sydney time). "Public transport" and "I'll drive and park" are already ticked: leave them on and tap Plan trip.
+> 2. Open an option labelled "Drive and park" (not "Drive") to see the timeline and map. Tap "I parked here", choose the suggested car park, then tap "Save where I parked".
+> 3. Car tab: tap "Take me home". Outside Sydney it asks "Where are you now?": type "1 Help Street, Chatswood". Then "Where's home?": type "Box Hill NSW". It plans public transport back to the car, then the drive home.
+> 4. Location access is optional. When it is off, or you are outside Sydney, the app asks you to type a place.
 >
 > Demo mode (Settings > Demo mode) shows sample trips from built-in data. It is labelled on every screen while on, and is never mixed with live results.
 >
