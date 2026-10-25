@@ -95,6 +95,11 @@ export function repeatRecentRequest(
     recent.trip.kind === 'outbound'
       ? { trip: recent.trip, access: recent.access }
       : returnTripFor(parkedCar);
+  // A preferred parking spot deleted since is no preference now, as in Trip options.
+  const preferredId = recent.preferredCarParkId;
+  const preferredSpotDeleted =
+    (recent.savedParkingSpots ?? []).some((spot) => spot.id === preferredId) &&
+    !saved.parkingSpots.some((spot) => spot.id === preferredId);
   return leaveNowRequest(
     {
       origin: recent.origin,
@@ -102,7 +107,7 @@ export function repeatRecentRequest(
       ...tripAndAccess,
       now,
       extras: {
-        ...(recent.preferredCarParkId ? { preferredCarParkId: recent.preferredCarParkId } : {}),
+        ...(preferredId && !preferredSpotDeleted ? { preferredCarParkId: preferredId } : {}),
         ...(recent.preferredStop ? { preferredStop: recent.preferredStop } : {}),
       },
     },

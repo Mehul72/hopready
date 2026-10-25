@@ -309,6 +309,40 @@ describe('recent searches', () => {
     });
   });
 
+  it('drops a preferred parking spot deleted since the search', async () => {
+    const added = appStorage.parkingSpots.add('Street spot', { lat: -33.6925, lon: 150.9235 });
+    if (added.status !== 'added') throw new Error('The parking spot was not saved');
+    const recent = demoCommuteRequest({
+      access: { transit: true, drive: true, dropOff: false },
+      preferredCarParkId: added.item.id,
+      savedParkingSpots: [added.item],
+    });
+    appStorage.recentRequests.record(recent);
+    appStorage.parkingSpots.remove(added.item.id);
+    await renderApp('/saved');
+    const { title, subtitle } = describeRecentRequest(recent);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: `${title}, ${subtitle}` }));
+
+    expect(await screen.findByText('Results screen')).toBeOnTheScreen();
+    expect(planSession.getState().request).not.toHaveProperty('preferredCarParkId');
+  });
+
+  it('keeps a preferred Park&Ride car park when repeating a search', async () => {
+    const recent = demoCommuteRequest({
+      access: { transit: true, drive: true, dropOff: false },
+      preferredCarParkId: '28',
+    });
+    appStorage.recentRequests.record(recent);
+    await renderApp('/saved');
+    const { title, subtitle } = describeRecentRequest(recent);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: `${title}, ${subtitle}` }));
+
+    expect(await screen.findByText('Results screen')).toBeOnTheScreen();
+    expect(planSession.getState().request).toMatchObject({ preferredCarParkId: '28' });
+  });
+
   it('plans a recent trip home through where the car is now', async () => {
     appStorage.recentRequests.record(
       demoCommuteRequest({
