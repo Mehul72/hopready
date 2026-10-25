@@ -78,6 +78,7 @@ Fixture and simulator results only. No test has reached the real TfNSW or Apple 
 - **Live providers are unverified.** The TfNSW parser is tested against samples built from the published schema, not recorded responses, and no Apple Maps call has been made (docs/testing.md).
 - **The demo world** uses real stops but generated timetables. It shows the planner's rules hold, not what TfNSW will return (docs/testing.md).
 - **Station entrances and exits** are never named. TfNSW may send details in fields HopReady does not read yet, so the timeline says they are not provided and to follow the station signs (docs/design/routing.md).
+- **Services already left** cannot be checked again. Once a followed trip has started, only the services still to come are planned, so a delay on the service being ridden, and a connection it then misses, is not seen. The trip screen says so (docs/design/routing.md).
 - **Fares and accessibility** are always shown as unknown. TfNSW removed Opal fares from the Trip Planner API in October 2023 (docs/design/routing.md).
 - **Only the three best car parks** by drive time are checked per plan (docs/decisions/0001).
 - **Walking speed** is not sent to TfNSW, because no parameter for it has been verified; slow walkers get TfNSW's walking times stretched instead (docs/design/routing.md).
