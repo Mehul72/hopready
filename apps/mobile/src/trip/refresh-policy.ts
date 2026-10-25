@@ -104,8 +104,8 @@ export function refreshableRequest(request: PlanRequest, now: Date): PlanRequest
   return { ...request, time: { type: 'depart', at: toIso(now) } };
 }
 
-// A search planned again: refreshable, and a trip home through the car as it is now. Null when the
-// trip home no longer fits the car (see withCurrentCar).
+// A search planned again, with a "leave at" time that has passed moved up to now. Null for a trip
+// home that no longer fits the car (see withCurrentCar).
 export function replanRequest(
   request: PlanRequest,
   parkedCar: ParkedCarState,

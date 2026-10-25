@@ -10,7 +10,7 @@ import { freezeClockAt, renderApp, TUESDAY_0730 } from '@/features/plan/test-har
 import { planSession } from '@/state';
 import { appStorage } from '@/storage';
 import { fitToCoordinates } from '@/test-support/mocks/react-native-maps';
-import { PLACES, planRequest, planResponse, transitItinerary } from '@/test-support/trips';
+import { place, PLACES, planRequest, planResponse, transitItinerary } from '@/test-support/trips';
 import { tripService } from '@/trip';
 
 beforeEach(() => {
@@ -305,12 +305,13 @@ describe('refreshing', () => {
 });
 
 describe('a trip home', () => {
-  it('asks for Take me home again, instead of refreshing, once the car is removed', async () => {
-    const car: ParkedCar = {
-      location: PLACES.tallawongCarPark,
-      carParkId: '26',
-      confirmedAt: TUESDAY_0730.toISOString(),
-    };
+  const car: ParkedCar = {
+    location: PLACES.tallawongCarPark,
+    carParkId: '26',
+    confirmedAt: TUESDAY_0730.toISOString(),
+  };
+
+  async function showTripHome() {
     appStorage.parkedCar.markParked(car, 'Tallawong P1');
     jest.spyOn(tripService, 'planTrip').mockResolvedValue(
       planResponse([transitItinerary({ departAt: TUESDAY_0730.toISOString() })], {
@@ -326,6 +327,24 @@ describe('a trip home', () => {
     );
     await renderApp('/results');
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeOnTheScreen();
+  }
+
+  it('says the options are out of date as soon as the car is moved', async () => {
+    await showTripHome();
+
+    await act(async () => {
+      appStorage.parkedCar.markParked(
+        { ...car, location: place('Pinned location', -33.6951, 150.9071), carParkId: null },
+        null,
+      );
+    });
+
+    expect(screen.getByTestId('trip-home-out-of-date')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeOnTheScreen();
+  });
+
+  it('asks for Take me home again, instead of refreshing, once the car is removed', async () => {
+    await showTripHome();
 
     await act(async () => {
       appStorage.parkedCar.clear();

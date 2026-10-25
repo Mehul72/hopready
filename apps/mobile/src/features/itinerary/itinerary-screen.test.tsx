@@ -19,6 +19,7 @@ import { planSession } from '@/state';
 import { appStorage } from '@/storage';
 import {
   parkAndRideItinerary,
+  place,
   PLACES,
   planRequest,
   planResponse,
@@ -508,7 +509,7 @@ describe('a followed trip home', () => {
     confirmedAt: WEEKDAY_MORNING.toISOString(),
   };
 
-  it('asks for Take me home again once the parked car is removed', async () => {
+  async function followTripHome() {
     appStorage.parkedCar.markParked(car, 'Tallawong P1');
     const home = transitItinerary({ departAt: addMinutes(WEEKDAY_MORNING, 10) });
     jest.spyOn(tripService, 'planTrip').mockResolvedValue(planResponse([home], { mode: 'demo' }));
@@ -522,6 +523,28 @@ describe('a followed trip home', () => {
     planSession.select(home.id);
     await renderApp(`/itinerary/${home.id}`);
     expect(screen.queryByTestId('trip-home-out-of-date')).not.toBeOnTheScreen();
+  }
+
+  it('says straight away that the trip home is out of date once the car is moved', async () => {
+    await followTripHome();
+
+    await act(async () => {
+      appStorage.parkedCar.markParked(
+        { ...car, location: place('Pinned location', -33.6951, 150.9071), carParkId: null },
+        null,
+      );
+    });
+
+    expect(
+      screen.getByLabelText(
+        'Warning. This trip home is out of date. Your car details changed after it was planned. Tap Take me home on the Car tab to plan it again.',
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Check for changes' })).not.toBeOnTheScreen();
+  });
+
+  it('asks for Take me home again once the parked car is removed', async () => {
+    await followTripHome();
 
     await act(async () => {
       appStorage.parkedCar.clear();

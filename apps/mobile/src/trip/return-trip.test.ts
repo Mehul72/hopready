@@ -44,12 +44,24 @@ describe('withCurrentCar', () => {
     expect(withCurrentCar(out, parked(PARKED_AT_TALLAWONG))).toBe(out);
   });
 
-  it('takes a trip home through the corrected spot', () => {
+  it('keeps a trip home through a car confirmed again in the same spot', () => {
     const home = tripHome({ kind: 'return-via-car', parkedCar: PARKED_AT_TALLAWONG });
-    expect(withCurrentCar(home, parked(CORRECTED))).toEqual({
+    const again: ParkedCar = { ...PARKED_AT_TALLAWONG, confirmedAt: '2026-10-26T21:10:00.000Z' };
+    expect(withCurrentCar(home, parked(again))).toEqual({
       ...home,
-      trip: { kind: 'return-via-car', parkedCar: CORRECTED },
+      trip: { kind: 'return-via-car', parkedCar: again },
     });
+  });
+
+  it('gives up on a trip home through where the car was before it moved', () => {
+    const home = tripHome({ kind: 'return-via-car', parkedCar: PARKED_AT_TALLAWONG });
+    expect(withCurrentCar(home, parked(CORRECTED))).toBeNull();
+    // A pin nudged within the same car park still moves the car.
+    const nudged: ParkedCar = {
+      ...PARKED_AT_TALLAWONG,
+      location: { ...PLACES.tallawongCarPark, coordinate: { lat: -33.6931, lon: 150.90526 } },
+    };
+    expect(withCurrentCar(home, parked(nudged))).toBeNull();
   });
 
   it('gives up on a trip home through a car that was removed or never there', () => {

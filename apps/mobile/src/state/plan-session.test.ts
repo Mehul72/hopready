@@ -476,6 +476,7 @@ describe('a trip home after the parked car changed', () => {
     trip: { kind: 'return-via-car', parkedCar: PARKED },
   });
   const CHANGES: [string, (storage: AppStorage) => void][] = [
+    ['the car is moved', (storage) => storage.parkedCar.markParked(CORRECTED, null)],
     ['the car is removed', (storage) => storage.parkedCar.clear()],
     [
       'the person says they were dropped off',
@@ -505,27 +506,26 @@ describe('a trip home after the parked car changed', () => {
     return context;
   }
 
-  it('refreshes the results through the corrected spot', async () => {
-    const { session, storage, trips } = await plannedTripHome();
-    storage.parkedCar.markParked(CORRECTED, null);
+  it('still refreshes and checks a trip home after the car is confirmed again in its spot', async () => {
+    const again: ParkedCar = { ...PARKED, confirmedAt: START.toISOString() };
+    const planned = await plannedTripHome();
+    planned.storage.parkedCar.markParked(again, 'Tallawong P1');
 
-    void session.refresh();
+    void planned.session.refresh();
 
-    expect(lastPending(trips.pending).request).toMatchObject({
-      origin: tripHome.origin,
-      trip: { kind: 'return-via-car', parkedCar: CORRECTED },
-    });
-  });
-
-  it('checks the followed trip through the corrected spot', async () => {
-    const { session, storage, trips } = followedTripHome();
-    storage.parkedCar.markParked(CORRECTED, null);
-
-    void session.refreshActiveTrip();
-
-    expect(lastPending(trips.pending).request.trip).toEqual({
+    expect(lastPending(planned.trips.pending).request.trip).toEqual({
       kind: 'return-via-car',
-      parkedCar: CORRECTED,
+      parkedCar: again,
+    });
+
+    const followed = followedTripHome();
+    followed.storage.parkedCar.markParked(again, 'Tallawong P1');
+
+    void followed.session.refreshActiveTrip();
+
+    expect(lastPending(followed.trips.pending).request.trip).toEqual({
+      kind: 'return-via-car',
+      parkedCar: again,
     });
   });
 

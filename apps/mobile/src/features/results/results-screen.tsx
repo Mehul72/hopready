@@ -156,8 +156,8 @@ export function ResultsScreen() {
   // Refreshing could only plan back to the car as it was, so the banner asks for Take me home.
   const canRefresh = response !== null && !tripHomeOutOfDate;
 
-  // A "leave at" time that passed meanwhile moves up to now, and a trip home follows the car as it
-  // is now. Out of date, it is not planned at all.
+  // A "leave at" time that passed meanwhile moves up to now. A trip home that no longer fits the
+  // car is not planned at all.
   function planAgain(base: PlanRequest) {
     const next = replanRequest(base, appStorage.parkedCar.get(), new Date());
     if (next) void planSession.plan(next);

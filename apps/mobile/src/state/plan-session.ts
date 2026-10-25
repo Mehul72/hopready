@@ -100,8 +100,8 @@ export interface PlanSession {
   subscribe: (listener: () => void) => () => void;
   // Starts a new search. Any search still running is cancelled and its answer ignored.
   plan: (request: PlanRequest) => Promise<PlanOutcome>;
-  // Re-plans the latest request, at most once every 30 seconds. A trip home goes through the car
-  // as it is now. Never rejects.
+  // Re-plans the latest request, at most once every 30 seconds, unless it is a trip home that no
+  // longer fits the car. Never rejects.
   refresh: () => Promise<RefreshOutcome>;
   // Makes an option from the latest results the active trip. Returns null if it is not there.
   select: (itineraryId: string) => Itinerary | null;
