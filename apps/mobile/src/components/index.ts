@@ -28,7 +28,13 @@ export {
   type SegmentOption,
 } from './segmented-control';
 export { spokenMinutes, Stepper, type StepperProps } from './stepper';
-export { TIMING_STYLES, TimingBadge, type TimingBadgeProps } from './timing-badge';
+export {
+  SAMPLE_REALTIME_STYLE,
+  TIMING_STYLES,
+  TimingBadge,
+  type TimingBadgeProps,
+  timingStyleFor,
+} from './timing-badge';
 export { regionFor, TripMap, type TripMapProps } from './trip-map';
 export {
   buildMapModel,

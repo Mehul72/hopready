@@ -97,7 +97,9 @@ describe('planning a trip from the Plan tab', () => {
       /Parking at [^:]+: About \d+ spaces? free, updated (just now|\d+ minutes? ago)\./,
     );
     expect(label).toContain('Spaces can fill before you arrive.');
-    expect(label).toContain('Live times.');
+    // Demo trips replay a made-up live feed, so they are never called live.
+    expect(label).toContain('Sample times for demo mode, not live.');
+    expect(label).not.toContain('Live times');
   });
 
   it('opens the chosen option without following it yet', async () => {

@@ -12,10 +12,11 @@ import {
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { AppText, Banner, Button, Card, ModeIcon, TIMING_STYLES, TimingBadge } from '@/components';
+import { AppText, Banner, Button, Card, ModeIcon, TimingBadge, timingStyleFor } from '@/components';
 import { LEG_VISUALS, legVisualKind, SPACING } from '@/theme';
 
 import { describeOccupancy, SPACES_CAN_FILL_NOTE } from '../shared/occupancy-wording';
+import { isSampleLeg } from '../shared/sample-data';
 import { openLink } from './open-link';
 import {
   ALERT_TONES,
@@ -293,7 +294,8 @@ function TransitRow({ leg }: { leg: TransitLeg }) {
   const stops = stopCount(leg.stopCount);
   const delay = describeDelay(leg);
   const arrive = formatSydneyTime(leg.end);
-  const timing = TIMING_STYLES[leg.timing].spoken;
+  const sample = isSampleLeg(leg);
+  const timing = timingStyleFor(leg.timing, sample).spoken;
   const spokenParts = [
     `${modeName} ${title}`,
     `From ${leg.from.name}, ${platform}`,
@@ -318,7 +320,7 @@ function TransitRow({ leg }: { leg: TransitLeg }) {
             {[`To ${leg.to.name}, arrive ${arrive}`, stops].filter(Boolean).join(' · ')}
           </Detail>
           <View style={styles.badges}>
-            <TimingBadge timing={leg.timing} />
+            <TimingBadge timing={leg.timing} sample={sample} />
             {delay ? (
               <AppText variant="footnote" weight="semibold">
                 {delay.text}

@@ -11,6 +11,8 @@ import {
 
 import type { BannerTone } from '@/components';
 
+import { isSampleItinerary, isSampleLeg } from '../shared/sample-data';
+
 // Plain words for itinerary data. Everything a screen shows about a trip is worded here, so the
 // same fact reads the same everywhere, and VoiceOver gets whole words instead of abbreviations.
 
@@ -118,6 +120,13 @@ export function stopCount(count: number | null): string | null {
 // Only live legs have a delay to report; a timetable time says nothing about running late.
 export function describeDelay(leg: TransitLeg): Wording | null {
   if (leg.timing !== 'realtime') return null;
+  const delay = liveDelay(leg);
+  return isSampleLeg(leg)
+    ? { text: `${delay.text} (sample)`, spoken: `${delay.spoken} in the sample data` }
+    : delay;
+}
+
+function liveDelay(leg: TransitLeg): Wording {
   const minutes = Math.round(secondsBetween(leg.scheduledStart, leg.start) / 60);
   if (minutes === 0) return { text: 'On time', spoken: 'on time' };
   if (minutes > 0) {
@@ -136,6 +145,9 @@ export const ALERT_TONES: Readonly<Record<ServiceAlert['severity'], BannerTone>>
 export function describeRealtimeCoverage(itinerary: Itinerary): Wording | null {
   const hasTransit = itinerary.legs.some((leg) => leg.kind === 'transit');
   if (!hasTransit) return null;
+  if (isSampleItinerary(itinerary) && itinerary.realtime !== 'none') {
+    return { text: 'Sample live times', spoken: 'Sample times for demo mode, not live.' };
+  }
   switch (itinerary.realtime) {
     case 'full':
       return { text: 'Live times', spoken: 'Public transport times are live.' };

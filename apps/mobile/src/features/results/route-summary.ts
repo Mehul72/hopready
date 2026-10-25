@@ -11,6 +11,7 @@ import { LEG_VISUALS, type LegVisualKind, legVisualKind } from '@/theme';
 
 import { selfDriveSeconds } from './itinerary-order';
 import { describeOccupancy, SPACES_CAN_FILL_NOTE, type Wording } from '../shared/occupancy-wording';
+import { isSampleItinerary } from '../shared/sample-data';
 import { STRATEGY_LABELS } from './plan-explanations';
 
 const SECONDS_PER_MINUTE = 60;
@@ -142,12 +143,13 @@ export function tripFacts(itinerary: Itinerary): TripFacts {
   };
 }
 
-export type TimingSummary = 'live' | 'partly-live' | 'timetable' | 'estimate';
+export type TimingSummary = 'live' | 'partly-live' | 'sample-live' | 'timetable' | 'estimate';
 
 export function timingSummary(itinerary: Itinerary): TimingSummary {
   const hasTransit = itinerary.legs.some((leg) => leg.kind === 'transit');
   // Without a service, every time comes from a drive estimate.
   if (!hasTransit) return 'estimate';
+  if (isSampleItinerary(itinerary) && itinerary.realtime !== 'none') return 'sample-live';
   if (itinerary.realtime === 'full') return 'live';
   return itinerary.realtime === 'partial' ? 'partly-live' : 'timetable';
 }
@@ -155,6 +157,7 @@ export function timingSummary(itinerary: Itinerary): TimingSummary {
 export const TIMING_SUMMARY_WORDING: Readonly<Record<TimingSummary, Wording>> = {
   live: { text: 'Live', spoken: 'Live times' },
   'partly-live': { text: 'Partly live', spoken: 'Some times live, others from the timetable' },
+  'sample-live': { text: 'Sample live', spoken: 'Sample times for demo mode, not live' },
   timetable: { text: 'Timetable', spoken: 'Timetable times, not live' },
   estimate: { text: 'Estimate', spoken: 'Estimated drive time' },
 };

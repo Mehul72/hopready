@@ -169,6 +169,17 @@ describe('LegRow', () => {
     expect(screen.queryByText(/Walk 0 min/)).not.toBeOnTheScreen();
   });
 
+  it('never calls a demo service live, even when it carries a delay', async () => {
+    await renderLeg(
+      transitLeg({ timing: 'realtime', start: addMinutes(START, 3), end: addMinutes(START, 43) }),
+    );
+
+    expect(screen.getByText('Sample live')).toBeOnTheScreen();
+    expect(screen.getByText('3 min late (sample)')).toBeOnTheScreen();
+    expect(screen.queryByText('Live')).not.toBeOnTheScreen();
+    expect(screen.queryByLabelText(/Live time from the operator/)).not.toBeOnTheScreen();
+  });
+
   it('says when no platform is provided, and labels timetable times', async () => {
     await renderLeg(transitLeg());
 
@@ -187,6 +198,7 @@ describe('LegRow', () => {
   it('shows the platform, live delay and alerts of a live service', async () => {
     await renderLeg(
       transitLeg({
+        source: 'tfnsw-trip-planner',
         timing: 'realtime',
         start: addMinutes(START, 3),
         end: addMinutes(START, 43),

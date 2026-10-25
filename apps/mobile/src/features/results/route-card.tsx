@@ -53,6 +53,7 @@ export interface RouteCardProps {
 function TimingPill({ summary }: { summary: TimingSummary }) {
   const { colours } = useTheme();
   if (summary === 'live') return <TimingBadge timing="realtime" />;
+  if (summary === 'sample-live') return <TimingBadge timing="realtime" sample />;
   if (summary === 'timetable') return <TimingBadge timing="scheduled" />;
   if (summary === 'estimate') return <TimingBadge timing="estimated" />;
   // Partly live is not a single leg timing, so it borrows the live badge's look with its own words.
