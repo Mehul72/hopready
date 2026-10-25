@@ -55,7 +55,7 @@ interface FacilityDetails {
 
 export class TfnswCarParkProvider implements CarParkProvider {
   readonly name = PROVIDER;
-  private facilityList: Stored<CarParkFacility[]> | null = null;
+  private facilityNames: Stored<Map<string, string>> | null = null;
   private readonly detailsById = new Map<string, Stored<FacilityDetails>>();
   // A null value records that the latest answer had no usable occupancy, so it is not asked again
   // within the minute.
@@ -68,39 +68,20 @@ export class TfnswCarParkProvider implements CarParkProvider {
   ) {}
 
   async listFacilities(signal: AbortSignal): Promise<CarParkFacility[]> {
-    if (this.facilityList && this.ageMs(this.facilityList) < FACILITY_LIST_TTL_MS) {
-      return this.facilityList.value;
-    }
-
-    let namesById: Map<string, string>;
-    try {
-      namesById = await this.fetchFacilityNames(signal);
-    } catch (error) {
-      // Names, places and capacity rarely change, so yesterday's list beats no car parks at all.
-      if (!this.facilityList || signal.aborted) throw error;
-      return this.staleList();
-    }
-    // An empty list is a glitch, not news: keeping it for a day would hide every car park.
-    if (namesById.size === 0) {
-      this.report({ kind: 'empty-facility-list' });
-      return this.facilityList ? this.staleList() : [];
-    }
-
-    const ids = [...namesById.keys()].filter(
-      (id) => FACILITY_ID.test(id) && !HISTORICAL_ONLY_FACILITY_IDS.has(id),
-    );
-    const stale = ids.filter((id) => {
-      const details = this.detailsById.get(id);
-      return !details || this.ageMs(details) >= FACILITY_LIST_TTL_MS;
-    });
-    const outcomes = await mapSettled(stale, FACILITY_CONCURRENCY, (id) =>
+    const namesById = await this.currentFacilityNames(signal);
+    const ids = [...namesById.keys()].filter(isLiveFacilityId);
+    // The catalogue already places every documented car park, so only unknown ones cost a details
+    // call. Catalogued entrances and capacities fill in from the occupancy answers plans ask for,
+    // which keeps a fresh isolate from spending about 40 TfNSW requests on one list.
+    const toFetch = ids.filter((id) => !findCataloguedCarPark(id) && !this.hasFreshDetails(id));
+    const outcomes = await mapSettled(toFetch, FACILITY_CONCURRENCY, (id) =>
       this.fetchFacility(id, signal),
     );
 
     const unavailable: string[] = [];
     let firstFailure: ProviderError | undefined;
     outcomes.forEach((outcome, index) => {
-      const id = stale[index]!;
+      const id = toFetch[index]!;
       if (outcome.status === 'fulfilled') {
         this.rememberDetails(id, outcome.value);
         return;
@@ -118,22 +99,40 @@ export class TfnswCarParkProvider implements CarParkProvider {
     if (unavailable.length > 0) {
       this.report({ kind: 'facility-details-unavailable', facilityIds: unavailable });
     }
+    return this.assemble(ids, namesById);
+  }
 
-    const facilities = this.assemble(ids, namesById);
-    // A list missing details because of a passing failure is served once and fetched again next time.
-    if (unavailable.length === 0) {
-      this.facilityList = { value: facilities, storedAtMs: this.nowMs() };
+  private async currentFacilityNames(signal: AbortSignal): Promise<Map<string, string>> {
+    if (this.facilityNames && this.ageMs(this.facilityNames) < FACILITY_LIST_TTL_MS) {
+      return this.facilityNames.value;
     }
-    return facilities;
+    let namesById: Map<string, string>;
+    try {
+      namesById = await this.fetchFacilityNames(signal);
+    } catch (error) {
+      // Names rarely change, so yesterday's list beats no car parks at all.
+      if (!this.facilityNames || signal.aborted) throw error;
+      return this.staleNames();
+    }
+    // An empty list is a glitch, not news: keeping it for a day would hide every car park.
+    if (namesById.size === 0) {
+      this.report({ kind: 'empty-facility-list' });
+      return this.facilityNames ? this.staleNames() : namesById;
+    }
+    this.facilityNames = { value: namesById, storedAtMs: this.nowMs() };
+    return namesById;
+  }
+
+  private hasFreshDetails(id: string): boolean {
+    const details = this.detailsById.get(id);
+    return details !== undefined && this.ageMs(details) < FACILITY_LIST_TTL_MS;
   }
 
   async occupancy(
     facilityIds: readonly string[],
     signal: AbortSignal,
   ): Promise<Map<string, Occupancy>> {
-    const ids = [...new Set(facilityIds)].filter(
-      (id) => FACILITY_ID.test(id) && !HISTORICAL_ONLY_FACILITY_IDS.has(id),
-    );
+    const ids = [...new Set(facilityIds)].filter(isLiveFacilityId);
     const known = new Map<string, Occupancy>();
     const toFetch: string[] = [];
     for (const id of ids) {
@@ -158,7 +157,8 @@ export class TfnswCarParkProvider implements CarParkProvider {
         failed.push(id);
         return;
       }
-      const occupancy = this.rememberOccupancy(id, outcome.value);
+      // The same answer carries the entrance and capacity, which improves the facility list too.
+      const occupancy = this.rememberDetails(id, outcome.value);
       if (occupancy) known.set(id, occupancy);
       else unreadable.push(id);
     });
@@ -204,10 +204,10 @@ export class TfnswCarParkProvider implements CarParkProvider {
     });
   }
 
-  private rememberDetails(id: string, feed: CarParkFacilityFeed): void {
+  private rememberDetails(id: string, feed: CarParkFacilityFeed): Occupancy | null {
     this.detailsById.set(id, { value: { feed }, storedAtMs: this.nowMs() });
     // Each detail response also carries live occupancy, which saves a call if it is asked for soon.
-    this.rememberOccupancy(id, feed);
+    return this.rememberOccupancy(id, feed);
   }
 
   private rememberOccupancy(id: string, feed: CarParkFacilityFeed): Occupancy | null {
@@ -222,6 +222,7 @@ export class TfnswCarParkProvider implements CarParkProvider {
   ): CarParkFacility[] {
     const facilities: CarParkFacility[] = [];
     const withoutLocation: string[] = [];
+    const outsideCoverage: string[] = [];
     const invalid: string[] = [];
     for (const id of ids) {
       const facility = facilityFrom(
@@ -232,6 +233,10 @@ export class TfnswCarParkProvider implements CarParkProvider {
       );
       if (facility === 'no-location') {
         withoutLocation.push(id);
+        continue;
+      }
+      if (facility === 'outside-coverage') {
+        outsideCoverage.push(id);
         continue;
       }
       const parsed = facility ? facilityOutputSchema.safeParse(facility) : null;
@@ -245,6 +250,13 @@ export class TfnswCarParkProvider implements CarParkProvider {
         facilityIds: withoutLocation,
       });
     }
+    if (outsideCoverage.length > 0) {
+      this.report({
+        kind: 'facilities-left-out',
+        reason: 'outside-coverage',
+        facilityIds: outsideCoverage,
+      });
+    }
     if (invalid.length > 0) {
       this.report({
         kind: 'facilities-left-out',
@@ -255,11 +267,11 @@ export class TfnswCarParkProvider implements CarParkProvider {
     return facilities;
   }
 
-  private staleList(): CarParkFacility[] {
-    const list = this.facilityList;
-    if (!list) return [];
-    this.report({ kind: 'stale-facility-list', ageHours: Math.floor(this.ageMs(list) / HOUR_MS) });
-    return list.value;
+  private staleNames(): Map<string, string> {
+    const names = this.facilityNames;
+    if (!names) return new Map();
+    this.report({ kind: 'stale-facility-list', ageHours: Math.floor(this.ageMs(names) / HOUR_MS) });
+    return names.value;
   }
 
   private nowMs(): number {
@@ -271,12 +283,16 @@ export class TfnswCarParkProvider implements CarParkProvider {
   }
 }
 
+function isLiveFacilityId(id: string): boolean {
+  return FACILITY_ID.test(id) && !HISTORICAL_ONLY_FACILITY_IDS.has(id);
+}
+
 function facilityFrom(
   id: string,
   listedName: string | null,
   feed: CarParkFacilityFeed | null,
   catalogued: CataloguedCarPark | undefined,
-): CarParkFacility | 'no-location' | null {
+): CarParkFacility | 'no-location' | 'outside-coverage' | null {
   // The feed's location is the car park entrance. Outside Greater Sydney it is either a typo (the
   // documentation prints one latitude without its minus sign) or a car park HopReady does not cover.
   const feedEntrance = feedCoordinate(feed);
@@ -286,6 +302,8 @@ function facilityFrom(
     catalogued?.station.coordinate ??
     null;
   if (!coordinate) return 'no-location';
+  // Car parks such as Kiama are real but outside the area HopReady plans trips in.
+  if (!isWithinGreaterSydney(coordinate)) return 'outside-coverage';
 
   const name = nonEmptyText(feed?.facility_name, listedName);
   if (!name) return null;

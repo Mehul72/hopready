@@ -1,0 +1,38 @@
+{
+  "tsn": "999001",
+  "time": "846276303",
+  "spots": "180",
+  "zones": [
+    {
+      "spots": "180",
+      "zone_id": "1",
+      "occupancy": {
+        "loop": "39",
+        "total": "36",
+        "monthlies": null,
+        "open_gate": null,
+        "transients": null
+      },
+      "zone_name": "MainArea",
+      "parent_zone_id": "0"
+    }
+  ],
+  "ParkID": 1,
+  "location": {
+    "suburb": "Thornleigh",
+    "address": "Example Street",
+    "latitude": "-33.731",
+    "longitude": "151.079"
+  },
+  "occupancy": {
+    "loop": "39",
+    "total": "36",
+    "monthlies": null,
+    "open_gate": null,
+    "transients": null
+  },
+  "MessageDate": "2026-10-26T07:45:03",
+  "facility_id": "491",
+  "facility_name": "Park&Ride - Example (not catalogued)",
+  "tfnsw_facility_id": "999001TPR001"
+}

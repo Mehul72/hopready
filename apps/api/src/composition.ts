@@ -125,7 +125,9 @@ export function budgetedFetch(
 
 // Leaving out a mode the traveller excluded, or one HopReady cannot show, is expected; anything
 // unreadable or stale points at drift in TfNSW's data and is worth a look.
-const EXPECTED_TFNSW_OMISSIONS = new Set(['excluded-mode', 'unsupported-mode']);
+// Omissions that happen by design: modes the traveller excluded or HopReady cannot show, and real
+// car parks outside the area HopReady covers (Kiama). They are logged as information, not warnings.
+const EXPECTED_TFNSW_OMISSIONS = new Set(['excluded-mode', 'unsupported-mode', 'outside-coverage']);
 
 function logTfnswDiagnostic(logger: Logger, event: TfnswDiagnosticEvent): void {
   const expected =

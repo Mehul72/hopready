@@ -15,7 +15,7 @@ export type TfnswDiagnostic =
   | { kind: 'stops-dropped'; reason: 'unreadable'; count: number }
   | {
       kind: 'facilities-left-out';
-      reason: 'no-usable-location' | 'invalid-facility';
+      reason: 'no-usable-location' | 'outside-coverage' | 'invalid-facility';
       facilityIds: string[];
     }
   | {
