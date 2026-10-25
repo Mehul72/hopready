@@ -365,6 +365,7 @@ describe('LegRow', () => {
     const carringtonStreet = place('Wynyard Station, Carrington St', -33.8653, 151.2056, 'stop');
     const warringahMall = place('Warringah Mall, Pittwater Rd', -33.767526, 151.268564, 'stop');
     const central = place('Central Station', -33.884024, 151.206203, 'stop');
+    const martinPlace = place('Martin Place Station', -33.867648, 151.210583, 'stop');
 
     it('sets the change against the transfer buffer on the walk, on screen and for VoiceOver', async () => {
       await renderStepOf(
@@ -428,5 +429,58 @@ describe('LegRow', () => {
         ),
       ).toBeOnTheScreen();
     });
+
+    it('follows the change with the station entrance on a walk to the metro', async () => {
+      await renderStepOf(
+        [
+          service('B1', 'bus', { to: wynyard, start: addMinutes(START, -54), end: START }),
+          { ...walkLeg(640), from: wynyard, to: martinPlace, end: addMinutes(START, 8) },
+          service('M1', 'metro', { from: martinPlace, start: addMinutes(START, 8) }),
+        ],
+        1,
+      );
+
+      expect(
+        screen.getByText('Entrance details not provided. Follow the station signs.'),
+      ).toBeOnTheScreen();
+      expect(
+        screen.getByLabelText(
+          `${leaveTime}. Walk 8 minutes to Martin Place Station, 640 metres. Change at Wynyard Station: 8 minutes including the walk; your transfer buffer is 3 minutes. Entrance details not provided. Follow the station signs.`,
+        ),
+      ).toBeOnTheScreen();
+    });
+
+    it('keeps both notes on a change of stop with no walking time', async () => {
+      await renderStepOf(
+        [
+          service('B1', 'bus', { to: wynyard, start: addMinutes(START, -54), end: START }),
+          { ...walkLeg(null), from: wynyard, to: martinPlace, end: START },
+          service('M1', 'metro', { from: martinPlace, start: addMinutes(START, 8) }),
+        ],
+        1,
+      );
+
+      expect(
+        screen.getByLabelText(
+          `${leaveTime}. Change to Martin Place Station. Walking time not given. Change at Wynyard Station: 8 minutes including the walk; your transfer buffer is 3 minutes. Entrance details not provided. Follow the station signs.`,
+        ),
+      ).toBeOnTheScreen();
+    });
+  });
+
+  it('says the station exit is not provided on the walk out, on screen and for VoiceOver', async () => {
+    await renderStepOf(
+      [transitLeg({ start: addMinutes(START, -40), end: START }), walkLeg(488)],
+      1,
+    );
+
+    expect(
+      screen.getByText('Exit details not provided. Follow the station signs.'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        `${leaveTime}. Walk 7 minutes to 1 Help St, Chatswood, 490 metres. Exit details not provided. Follow the station signs.`,
+      ),
+    ).toBeOnTheScreen();
   });
 });

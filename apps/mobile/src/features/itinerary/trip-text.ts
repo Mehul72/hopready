@@ -7,6 +7,7 @@ import {
   type ServiceAlert,
   SYDNEY_TIME_ZONE,
   type TransitLeg,
+  type TransitMode,
 } from '@hopready/core';
 
 import type { BannerTone } from '@/components';
@@ -144,10 +145,11 @@ export function describeStepNotes(
   transferBufferMinutes: number | null,
 ): StepNotes[] {
   const changes = changeNotes(legs, transferBufferMinutes);
-  return legs.map((_, index) => {
-    const change = changes.get(index);
-    return change ? [change] : [];
-  });
+  return legs.map((_, index) =>
+    [changes.get(index), stationAccessNote(legs, index)].filter(
+      (note): note is Wording => note !== undefined,
+    ),
+  );
 }
 
 // Every two services in a row are a change, as in the planner's transfer check. The note goes on
@@ -186,6 +188,41 @@ function describeChange(
     text: `${text}; your transfer buffer is ${transferBufferMinutes} min.`,
     spoken: `${spoken}; your transfer buffer is ${plural(transferBufferMinutes, 'minute')}.`,
   };
+}
+
+// Train and metro stations have several ways in and out, unlike bus, light rail and ferry stops.
+// Nothing HopReady reads from TfNSW names the one a walk uses, and an exit is never guessed.
+const STATION_MODES: ReadonlySet<TransitMode> = new Set<TransitMode>(['train', 'metro']);
+
+function stationAccessNote(legs: readonly Leg[], index: number): Wording | undefined {
+  const walk = legs[index];
+  if (walk?.kind !== 'walk') return undefined;
+  const leavesStation = isStationService(legBeside(legs, index, -1));
+  const entersStation = isStationService(legBeside(legs, index, 1));
+  // A change of platform inside one station passes no entrance or exit.
+  if (leavesStation && entersStation && walk.from.name === walk.to.name) return undefined;
+  const missing = missingStationDetails(leavesStation, entersStation);
+  if (!missing) return undefined;
+  const text = `${missing} not provided. Follow the station signs.`;
+  return { text, spoken: text };
+}
+
+function missingStationDetails(leavesStation: boolean, entersStation: boolean): string | null {
+  if (leavesStation && entersStation) return 'Exit and entrance details';
+  if (leavesStation) return 'Exit details';
+  if (entersStation) return 'Entrance details';
+  return null;
+}
+
+// The leg before (-1) or after (1) the one at `index`, looking past a wait at the same stop.
+function legBeside(legs: readonly Leg[], index: number, direction: -1 | 1): Leg | undefined {
+  let position = index + direction;
+  while (legs[position]?.kind === 'wait') position += direction;
+  return legs[position];
+}
+
+function isStationService(leg: Leg | undefined): boolean {
+  return leg?.kind === 'transit' && STATION_MODES.has(leg.mode);
 }
 
 export const ALERT_TONES: Readonly<Record<ServiceAlert['severity'], BannerTone>> = {

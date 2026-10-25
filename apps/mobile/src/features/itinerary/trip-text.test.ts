@@ -54,6 +54,7 @@ const STOPS = {
   warringahMall: place('Warringah Mall, Pittwater Rd', -33.767526, 151.268564, 'stop'),
   wynyard: place('Wynyard Station', -33.865945, 151.206103, 'stop'),
   martinPlace: place('Martin Place Station', -33.867648, 151.210583, 'stop'),
+  barangaroo: place('Barangaroo Station', -33.859577, 151.202615, 'stop'),
   central: place('Central Station', -33.884024, 151.206203, 'stop'),
 };
 
@@ -249,6 +250,56 @@ describe('changes between services', () => {
     ];
 
     expect(describeStepNotes(legs, 3)).toEqual([[], []]);
+  });
+});
+
+describe('station entrances and exits', () => {
+  const sentence = (text: string) => ({ text, spoken: text });
+
+  it('says on walks into and out of a station that the entrance and exit are not provided', () => {
+    const legs = [
+      walk(PLACES.rouseHillHome, PLACES.tallawongStation, [-12, -3]),
+      wait(PLACES.tallawongStation, [-3, 0]),
+      ride('M1', 'metro', PLACES.tallawongStation, PLACES.chatswoodStation, [0, 40]),
+      walk(PLACES.chatswoodStation, PLACES.chatswoodOffice, [40, 47]),
+    ];
+
+    expect(describeStepNotes(legs, 3)).toEqual([
+      [sentence('Entrance details not provided. Follow the station signs.')],
+      [],
+      [],
+      [sentence('Exit details not provided. Follow the station signs.')],
+    ]);
+  });
+
+  it('names both on a walk between stations, after the change', () => {
+    const legs = [
+      ride('T1', 'train', STOPS.central, STOPS.wynyard, [0, 4]),
+      walk(STOPS.wynyard, STOPS.barangaroo, [4, 12]),
+      ride('M1', 'metro', STOPS.barangaroo, PLACES.chatswoodStation, [14, 24]),
+    ];
+
+    expect(describeStepNotes(legs, 3)[1]).toEqual([
+      expect.objectContaining({ text: expect.stringMatching(/^Change at Wynyard Station:/) }),
+      sentence('Exit and entrance details not provided. Follow the station signs.'),
+    ]);
+  });
+
+  it('says nothing on a change of platform inside one station, or at a bus stop', () => {
+    const insideCentral = [
+      ride('T1', 'train', STOPS.wynyard, STOPS.central, [0, 6]),
+      walk(STOPS.central, STOPS.central, [6, 9]),
+      ride('T8', 'train', STOPS.central, PLACES.chatswoodStation, [12, 40]),
+    ];
+    const byBus = [
+      walk(place('3 Example Street, Collaroy', -33.733, 151.2985), STOPS.collaroy, [-5, 0]),
+      ride('B1', 'bus', STOPS.collaroy, STOPS.wynyard, [0, 54]),
+    ];
+
+    expect(describeStepNotes(insideCentral, 3)[1]).toEqual([
+      expect.objectContaining({ text: expect.stringMatching(/^Change at Central Station:/) }),
+    ]);
+    expect(describeStepNotes(byBus, 3)).toEqual([[], []]);
   });
 });
 
