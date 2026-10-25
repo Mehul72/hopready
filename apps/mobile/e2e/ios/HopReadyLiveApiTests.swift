@@ -16,8 +16,15 @@ final class HopReadyLiveApiTests: HopReadyTestCase {
     }
     keepScreenshot("live-01-agreement")
     agree.tap()
+    // Demo mode is off, so nothing is labelled as demo until the API itself answers in demo mode.
+    let demoLabel = app.descendants(matching: .any).matching(
+      NSPredicate(format: "label BEGINSWITH %@", "Demo mode.")
+    ).firstMatch
+    XCTAssertFalse(demoLabel.exists, "Labelled as demo before the API answered")
 
     planDriveAndParkTrip()
+    // This API serves its sample data, so its answers carry the demo label.
+    XCTAssertTrue(demoLabel.waitForExistence(timeout: 10), "The demo API's answers are not labelled")
     let option = app.buttons.matching(
       NSPredicate(format: "identifier BEGINSWITH %@", "route-card-")
     ).firstMatch
