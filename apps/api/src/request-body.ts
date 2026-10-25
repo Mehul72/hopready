@@ -1,9 +1,21 @@
 export type JsonBodyResult =
-  { ok: true; value: unknown } | { ok: false; reason: 'too-large' | 'invalid-json' };
+  | { ok: true; value: unknown }
+  | { ok: false; reason: 'too-large' | 'invalid-json' | 'not-declared-json' };
+
+// Browsers post text and form bodies to other sites without asking first. Requiring JSON makes
+// them ask (a CORS preflight), which this API never approves, so a web page cannot make its
+// visitors' browsers spend HopReady's provider allowance.
+function isDeclaredJson(contentType: string | null): boolean {
+  const mediaType = contentType?.split(';')[0]?.trim().toLowerCase();
+  return mediaType === 'application/json';
+}
 
 // Reads a JSON body while counting bytes, so an oversized body is refused without buffering it,
 // whether or not the client declared its length.
 export async function readJsonBody(request: Request, maxBytes: number): Promise<JsonBodyResult> {
+  if (!isDeclaredJson(request.headers.get('content-type'))) {
+    return { ok: false, reason: 'not-declared-json' };
+  }
   const declaredLength = request.headers.get('content-length');
   if (declaredLength !== null && Number(declaredLength) > maxBytes) {
     return { ok: false, reason: 'too-large' };

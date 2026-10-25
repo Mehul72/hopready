@@ -74,6 +74,10 @@ Every response carries `Cache-Control: no-store`, `X-Content-Type-Options: nosni
 `X-Request-Id` that matches the `requestId` in logs and error bodies. There are no CORS headers:
 the only client is the native app.
 
+POST bodies must be declared as `Content-Type: application/json`; anything else gets a 415
+(`unsupported-media-type`). Browsers can only send JSON to another site after a CORS preflight,
+which this API never approves, so a web page cannot spend its provider allowance.
+
 The app sends `X-HopReady-Install: <random version 4 UUID>` with every request. It is used only as
 a rate limit key. A request without it is limited by its address instead. A value that is not a
 version 4 UUID gets a 400.

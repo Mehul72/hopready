@@ -139,10 +139,45 @@ describe('POST /v1/plan', () => {
 
   it('rejects an empty body as not JSON', async () => {
     const { app } = testApp({ providers: { transit: fakeTransit() } });
-    const response = await app.request('/v1/plan', { method: 'POST' });
+    const response = await app.request('/v1/plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    });
 
     expect(response.status).toBe(400);
     expect((await errorOf(response)).code).toBe('invalid-json');
+  });
+
+  it.each([
+    ['text/plain;charset=UTF-8', '/v1/plan'],
+    ['application/x-www-form-urlencoded', '/v1/plan'],
+    ['multipart/form-data; boundary=x', '/v1/places/search'],
+    [null, '/v1/places/search'],
+  ])(
+    'refuses a %s body to %s, which a web page could send without asking',
+    async (contentType, path) => {
+      const transit = fakeTransit();
+      const { app } = testApp({ providers: { transit } });
+      const body = path === '/v1/plan' ? planRequest() : { query: 'Central', near: null };
+      const response = await app.request(path, {
+        method: 'POST',
+        headers: contentType === null ? {} : { 'content-type': contentType },
+        body: JSON.stringify(body),
+      });
+
+      expect(response.status).toBe(415);
+      expect((await errorOf(response)).code).toBe('unsupported-media-type');
+      expect(transit.queries).toHaveLength(0);
+    },
+  );
+
+  it('accepts JSON declared with a charset', async () => {
+    const { app } = testApp({ providers: { transit: fakeTransit() } });
+    const response = await postJson(app, '/v1/plan', planRequest(), {
+      'content-type': 'application/json; charset=utf-8',
+    });
+
+    expect(response.status).toBe(200);
   });
 
   it('names the first invalid field without echoing its value', async () => {

@@ -78,6 +78,7 @@ const KIND_FOR_ERROR_CODE: ReadonlyMap<string, ApiErrorKind> = new Map<string, A
   ['invalid-json', 'rejected'],
   ['invalid-request', 'rejected'],
   ['payload-too-large', 'rejected'],
+  ['unsupported-media-type', 'rejected'],
   ['not-found', 'rejected'],
   ['method-not-allowed', 'rejected'],
   ['provider-unavailable', 'server'],

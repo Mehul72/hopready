@@ -6,6 +6,7 @@ export const API_ERROR_CODES = [
   'invalid-json',
   'invalid-request',
   'payload-too-large',
+  'unsupported-media-type',
   'not-found',
   'method-not-allowed',
   'outside-coverage',
@@ -42,6 +43,11 @@ export const API_ERRORS: Readonly<Record<ApiErrorCode, ApiErrorDefinition>> = {
     status: 413,
     retryable: false,
     message: 'The request is too large.',
+  },
+  'unsupported-media-type': {
+    status: 415,
+    retryable: false,
+    message: 'Send the request body as JSON, with Content-Type: application/json.',
   },
   'not-found': {
     status: 404,

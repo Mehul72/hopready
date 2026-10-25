@@ -136,7 +136,14 @@ export function createApp(deps: AppDeps) {
   }
 
   function sendBodyError(c: AppContext, body: Extract<JsonBodyResult, { ok: false }>): Response {
-    return sendError(c, body.reason === 'too-large' ? 'payload-too-large' : 'invalid-json');
+    switch (body.reason) {
+      case 'too-large':
+        return sendError(c, 'payload-too-large');
+      case 'not-declared-json':
+        return sendError(c, 'unsupported-media-type');
+      case 'invalid-json':
+        return sendError(c, 'invalid-json');
+    }
   }
 
   function sendValidationError(c: AppContext, error: z.ZodError): Response {
