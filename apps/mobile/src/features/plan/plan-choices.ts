@@ -83,6 +83,21 @@ export function createPlanChoicesStore(
 // Read through usePlanChoices or planChoicesInForce, so a deleted parking spot is never preferred.
 export const planChoices = createPlanChoicesStore(sqliteBackend, appStorage.onDataDeleted);
 
+// A spot's name can come from Apple (docs/OWNER-ACTIONS.md, item 22), so a copy must not outlive the
+// spot. The read-time check above still covers a failed write here.
+appStorage.parkingSpots.subscribe(() => {
+  const carPark = planChoices.get().preferredCarPark;
+  if (carPark?.kind !== 'saved-spot') return;
+  if (appStorage.parkingSpots.get().some((spot) => spot.id === carPark.id)) return;
+  try {
+    planChoices.setPreferredCarPark(null);
+  } catch (error) {
+    console.warn(
+      `HopReady: could not forget a deleted preferred parking spot (${error instanceof Error ? error.name : 'unknown'}).`,
+    );
+  }
+});
+
 // Plans only send the parking spots still saved, so a preferred spot deleted since counts as no
 // preference, rather than one that Trip options shows but no trip can use.
 function choicesInForce(choices: PlanChoices, spots: readonly SavedParkingSpot[]): PlanChoices {

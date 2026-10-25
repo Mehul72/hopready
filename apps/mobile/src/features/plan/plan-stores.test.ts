@@ -104,6 +104,8 @@ describe('saved plan choices', () => {
 
     appStorage.parkingSpots.remove(spot.id);
     expect(planChoicesInForce().preferredCarPark).toBeNull();
+    // The stored copy goes too, not only the copy plans read.
+    expect(planChoices.get().preferredCarPark).toBeNull();
 
     planChoices.setPreferredCarPark({ id: '29', name: 'Kellyville (north)', kind: 'car-park' });
     expect(planChoicesInForce().preferredCarPark).toMatchObject({ id: '29' });
