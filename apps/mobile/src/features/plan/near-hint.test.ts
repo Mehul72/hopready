@@ -47,6 +47,22 @@ describe('lookUpNearHint', () => {
     );
   });
 
+  it('does not hold up search when the permission check itself stalls', async () => {
+    jest.useFakeTimers();
+    jest
+      .mocked(Location.getForegroundPermissionsAsync)
+      .mockImplementationOnce(() => new Promise<never>(() => undefined));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const hint = lookUpNearHint();
+    await jest.advanceTimersByTimeAsync(NEAR_HINT_TIMEOUT_MS);
+
+    await expect(hint).resolves.toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      'HopReady: searching without a location hint (NearHintTimeout).',
+    );
+  });
+
   it('searches without a hint when the position fails, logging no position', async () => {
     jest.mocked(Location.getForegroundPermissionsAsync).mockImplementation(async () => GRANTED);
     jest

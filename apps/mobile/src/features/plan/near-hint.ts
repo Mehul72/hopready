@@ -20,29 +20,23 @@ function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown';
 }
 
+async function readNearHint(): Promise<Coordinate | null> {
+  if (!(await hasLocationPermission())) return null;
+  // About a kilometre is all the hint needs, and a coarse fix arrives quickly.
+  const position = await getCurrentPositionAsync({ accuracy: Accuracy.Low });
+  return { lat: position.coords.latitude, lon: position.coords.longitude };
+}
+
 // Where the person is, roughly, to rank nearby search results first. It only ever reads a position
 // when location access was already granted: a search must never trigger the permission prompt.
+// Search waits for this, so the permission check is under the same time limit as the fix.
 export async function lookUpNearHint(): Promise<Coordinate | null> {
-  let granted: boolean;
-  try {
-    granted = await hasLocationPermission();
-  } catch (error) {
-    console.warn(`HopReady: could not read location permission (${errorName(error)}).`);
-    return null;
-  }
-  if (!granted) return null;
-
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new NearHintTimeout()), NEAR_HINT_TIMEOUT_MS);
     });
-    // About a kilometre is all the hint needs, and a coarse fix arrives quickly.
-    const position = await Promise.race([
-      getCurrentPositionAsync({ accuracy: Accuracy.Low }),
-      timeout,
-    ]);
-    return { lat: position.coords.latitude, lon: position.coords.longitude };
+    return await Promise.race([readNearHint(), timeout]);
   } catch (error) {
     // Search works without the hint; only the reason is logged, never a position.
     console.warn(`HopReady: searching without a location hint (${errorName(error)}).`);
