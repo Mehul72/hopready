@@ -1,4 +1,4 @@
-import { type Itinerary, secondsBetween } from '@hopready/core';
+import { buildItinerary, type Itinerary, type Leg, secondsBetween } from '@hopready/core';
 
 export interface ItineraryMatch {
   itinerary: Itinerary;
@@ -34,4 +34,40 @@ export function matchItinerary(
         Math.abs(secondsBetween(previous.departAt, b.departAt)),
     )[0];
   return closest ? { itinerary: closest, exact: false } : null;
+}
+
+// The services legs ride, each as a run: the same service leaving at the same timetabled time.
+function runsOf(legs: readonly Leg[]): string {
+  return legs
+    .flatMap((leg) =>
+      leg.kind === 'transit' ? [`${leg.mode}:${leg.service.name}:${leg.scheduledStart}`] : [],
+    )
+    .join('|');
+}
+
+// For a trip that has started, checked by planning the rest of it from the next stop
+// (restOfTripRequest). The trip still runs when an option rides every service still to come, on
+// the same runs; joined to the part already travelled, that option is the trip with the latest
+// times, and keeps its id because it is the same trip. Null after a cancellation or a missed
+// connection.
+export function matchRestOfTrip(
+  trip: Itinerary,
+  fromLegIndex: number,
+  candidates: readonly Itinerary[],
+): ItineraryMatch | null {
+  const runsToCome = runsOf(trip.legs.slice(fromLegIndex));
+  const same = candidates.find((candidate) => runsOf(candidate.legs) === runsToCome);
+  if (!same) return null;
+  const boardingIndex = same.legs.findIndex((leg) => leg.kind === 'transit');
+  // Waits are worked out again from the new times.
+  const travelled = trip.legs.slice(0, fromLegIndex).filter((leg) => leg.kind !== 'wait');
+  const updated = buildItinerary({
+    strategy: trip.strategy,
+    legs: [...travelled, ...same.legs.slice(boardingIndex)],
+    parking: trip.parking,
+    fare: trip.fare,
+    alerts: same.alerts,
+    notes: [...new Set([...trip.notes, ...same.notes])],
+  });
+  return { itinerary: { ...updated, id: trip.id }, exact: true };
 }

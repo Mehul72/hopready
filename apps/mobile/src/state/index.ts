@@ -1,6 +1,7 @@
 export {
   type ActiveTripRefresh,
   type ActiveTripRefreshStatus,
+  type CheckOutcome,
   createPlanSession,
   type PlanOutcome,
   type PlanSession,

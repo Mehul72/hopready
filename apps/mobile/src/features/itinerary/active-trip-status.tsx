@@ -1,18 +1,21 @@
-import {
-  formatSydneyTime,
-  isBefore,
-  type Itinerary,
-  type PlanRequest,
-  toIso,
-} from '@hopready/core';
+import { formatSydneyTime, type Itinerary, type PlanRequest, toIso } from '@hopready/core';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { AppText, Banner, Card } from '@/components';
+import { describeWait } from '@/api';
+import { AppText, Banner, Button, Card } from '@/components';
 import { type ActiveTripRefresh, planSession } from '@/state';
 import { appStorage } from '@/storage';
 import { SPACING } from '@/theme';
-import { refreshableRequest, replanRequest, useTripHomeOutOfDate } from '@/trip';
+import {
+  MANUAL_REFRESH_MIN_INTERVAL_SECONDS,
+  partToCheck,
+  refreshableRequest,
+  replanRequest,
+  useDataMode,
+  useTripHomeOutOfDate,
+} from '@/trip';
 
 import { showResultsFor } from '../saved/plan-requests';
 import { writeOrAlert } from '../saved/storage-writes';
@@ -77,28 +80,100 @@ function AlternativeCard({
   );
 }
 
-// What the latest check of the followed trip found. Shown only on the followed trip.
+interface CheckNote {
+  text: string;
+  // The note is about these times; a check that brings newer ones makes it out of date.
+  plannedAt: string | null;
+}
+
+// When the followed trip's times arrived, and a way to check them again, as the results have.
+function CheckForChanges({
+  plannedAt,
+  canCheck,
+  checking,
+}: {
+  plannedAt: string | null;
+  canCheck: boolean;
+  checking: boolean;
+}) {
+  const [note, setNote] = useState<CheckNote | null>(null);
+
+  async function check() {
+    setNote(null);
+    const outcome = await planSession.checkActiveTrip();
+    if (outcome.status === 'too-soon') {
+      setNote({
+        text: `This trip was checked less than ${MANUAL_REFRESH_MIN_INTERVAL_SECONDS} seconds ago. You can check again in ${describeWait(outcome.retryInSeconds)}.`,
+        plannedAt,
+      });
+    }
+  }
+
+  if (!plannedAt && !canCheck) return null;
+  return (
+    <>
+      <View style={styles.checkRow}>
+        {plannedAt ? (
+          <AppText
+            variant="subheadline"
+            tone="secondary"
+            tabularNumbers
+            accessibilityLabel={`Times checked at ${formatSydneyTime(plannedAt)}`}
+            style={styles.checkedAt}
+            testID="times-checked-at">
+            {`Checked ${formatSydneyTime(plannedAt)}`}
+          </AppText>
+        ) : null}
+        {canCheck ? (
+          <Button
+            variant="plain"
+            label="Check for changes"
+            symbol="arrow.clockwise"
+            loading={checking}
+            onPress={() => void check()}
+            accessibilityHint="Plans what is left of your trip again, at most every 30 seconds"
+          />
+        ) : null}
+      </View>
+      {note && note.plannedAt === plannedAt ? (
+        <Banner tone="info" message={note.text} announce testID="check-too-soon" />
+      ) : null}
+    </>
+  );
+}
+
+// The followed trip's times and what the latest check of it found. Shown only on the followed
+// trip.
 export function ActiveTripStatus({ trip, nowMs }: { trip: DisplayedTrip; nowMs: number }) {
-  const { activeTripRefresh: refresh, itinerary, request } = trip;
-  const tripHomeOutOfDate = useTripHomeOutOfDate(request);
+  const mode = useDataMode();
+  const tripHomeOutOfDate = useTripHomeOutOfDate(trip.request);
   if (!trip.isActive) return null;
   // What a check found is about the car as it was, so it gives way to asking for Take me home.
   if (tripHomeOutOfDate) return <TripHomeOutOfDate />;
-  // Once the trip has started, checking it again cannot find it (refresh-policy.ts).
-  const canCheckAgain = isBefore(new Date(nowMs), itinerary.departAt);
+  // Once every service has left, there is nothing left to check (refresh-policy.ts).
+  const canCheck = partToCheck(trip, new Date(nowMs), mode) !== null;
+  return (
+    <>
+      <CheckForChanges
+        plannedAt={trip.plannedAt}
+        canCheck={canCheck}
+        checking={trip.activeTripRefresh.status === 'refreshing'}
+      />
+      <CheckResult trip={trip} canCheck={canCheck} />
+    </>
+  );
+}
 
+function CheckResult({ trip, canCheck }: { trip: DisplayedTrip; canCheck: boolean }) {
+  const { activeTripRefresh: refresh, itinerary, request } = trip;
   switch (refresh.status) {
     case 'idle':
       return null;
     case 'refreshing':
       return <Banner tone="info" message="Checking this trip for changes." />;
     case 'updated':
-      return (
-        <Banner
-          tone="info"
-          message={`Checked ${refresh.checkedAt ? `at ${formatSydneyTime(refresh.checkedAt)}` : 'just now'}. This trip is still on, with the latest times.`}
-        />
-      );
+      // When it was checked is on the line above.
+      return <Banner tone="info" message="This trip is still on, with the latest times." />;
     case 'replaced':
       return (
         <Banner
@@ -146,11 +221,11 @@ export function ActiveTripStatus({ trip, nowMs }: { trip: DisplayedTrip; nowMs: 
           title="Couldn't check this trip"
           message={refresh.error?.message ?? 'Something went wrong. Try again.'}
           action={
-            canCheckAgain
+            canCheck
               ? {
                   label: 'Try again',
                   onPress: () => {
-                    void planSession.refreshActiveTrip();
+                    void planSession.checkActiveTrip();
                   },
                 }
               : undefined
@@ -162,6 +237,16 @@ export function ActiveTripStatus({ trip, nowMs }: { trip: DisplayedTrip; nowMs: 
 }
 
 const styles = StyleSheet.create({
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  checkedAt: {
+    flexShrink: 1,
+  },
   alternatives: {
     gap: SPACING.sm,
   },

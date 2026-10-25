@@ -1,12 +1,21 @@
-import { addMinutes } from '@hopready/core';
+import {
+  addMinutes,
+  buildItinerary,
+  type Itinerary,
+  type Leg,
+  planRequestSchema,
+  type TransitLeg,
+} from '@hopready/core';
 
 import type { ActiveTrip } from '@/storage';
-import { parkAndRideItinerary, planRequest, transitItinerary } from '@/test-support/trips';
+import { parkAndRideItinerary, PLACES, planRequest, transitItinerary } from '@/test-support/trips';
 
-import { matchItinerary } from './itinerary-match';
+import { matchItinerary, matchRestOfTrip } from './itinerary-match';
 import {
   manualRefreshAvailability,
+  partToCheck,
   refreshableRequest,
+  restOfTripRequest,
   shouldRefreshActiveTripOnResume,
 } from './refresh-policy';
 
@@ -68,9 +77,84 @@ describe('refresh on resume', () => {
     expect(shouldRefreshActiveTripOnResume(activeTrip({ mode: 'live' }), NOW, 'demo')).toBe(false);
   });
 
-  it('skips a trip that has already started, which planning again could not find', () => {
+  it('checks the rest of a trip that has started, from the service that has not left', () => {
+    // Five minutes into the walk to the station, with the metro still to come.
     const started = activeTrip({ itinerary: transitItinerary({ departAt: addMinutes(NOW, -5) }) });
-    expect(shouldRefreshActiveTripOnResume(started, NOW, 'live')).toBe(false);
+    expect(shouldRefreshActiveTripOnResume(started, NOW, 'live')).toBe(true);
+    expect(partToCheck(started, NOW, 'live')).toEqual({
+      kind: 'rest-of-trip',
+      legIndex: 1,
+      leg: started.itinerary.legs[1],
+    });
+  });
+
+  it('has nothing left to check once every service has left', () => {
+    const onTheMetro = activeTrip({
+      itinerary: transitItinerary({ departAt: addMinutes(NOW, -15) }),
+    });
+    expect(partToCheck(onTheMetro, NOW, 'live')).toBeNull();
+    expect(shouldRefreshActiveTripOnResume(onTheMetro, NOW, 'live')).toBe(false);
+  });
+
+  it('counts a newer check that left the trip as it was', () => {
+    expect(shouldRefreshActiveTripOnResume(activeTrip(), NOW, 'live', secondsAgo(30))).toBe(false);
+    expect(shouldRefreshActiveTripOnResume(activeTrip(), NOW, 'live', secondsAgo(61))).toBe(true);
+  });
+});
+
+describe('restOfTripRequest', () => {
+  const metro = parkAndRideItinerary({ departAt: NOW.toISOString() }).legs.find(
+    (leg): leg is TransitLeg => leg.kind === 'transit',
+  )!;
+  const out = planRequest({
+    preferredCarParkId: '26',
+    preferredStop: PLACES.tallawongStation,
+    savedParkingSpots: [
+      { id: 'spot', name: 'Work', coordinate: PLACES.chatswoodOffice.coordinate },
+    ],
+  });
+
+  it('plans from the stop of the next service, when it leaves, by public transport only', () => {
+    const rest = restOfTripRequest(out, metro);
+    expect(rest).toEqual({
+      origin: PLACES.tallawongStation,
+      destination: out.destination,
+      time: { type: 'depart', at: metro.start },
+      access: { transit: true, drive: false, dropOff: false },
+      preferences: out.preferences,
+      trip: { kind: 'outbound' },
+    });
+    // The same schema the API checks every plan request against.
+    expect(planRequestSchema.safeParse(rest).success).toBe(true);
+  });
+
+  it('asks from the start of the minute the service leaves, so the service itself is found', () => {
+    const late = { ...metro, start: '2026-10-26T21:12:30.000Z' };
+    expect(restOfTripRequest(out, late).time).toEqual({
+      type: 'depart',
+      at: '2026-10-26T21:12:00.000Z',
+    });
+  });
+
+  it('keeps a trip home going back through the car', () => {
+    const home = planRequest({
+      origin: PLACES.chatswoodOffice,
+      destination: PLACES.rouseHillHome,
+      trip: {
+        kind: 'return-via-car',
+        parkedCar: {
+          location: PLACES.tallawongCarPark,
+          carParkId: '26',
+          confirmedAt: secondsAgo(600),
+        },
+      },
+    });
+    expect(restOfTripRequest(home, metro)).toMatchObject({
+      origin: PLACES.tallawongStation,
+      destination: PLACES.rouseHillHome,
+      access: home.access,
+      trip: home.trip,
+    });
   });
 });
 
@@ -120,5 +204,54 @@ describe('matchItinerary', () => {
 
   it('reports nothing when the chosen option is no longer offered', () => {
     expect(matchItinerary(chosen, [transitItinerary({ departAt: NOW.toISOString() })])).toBeNull();
+  });
+});
+
+describe('matchRestOfTrip', () => {
+  // Drive and park done, the metro still to come.
+  const started = parkAndRideItinerary({ departAt: '2026-10-26T20:50:00.000Z' });
+  const metroIndex = started.legs.findIndex((leg) => leg.kind === 'transit');
+
+  // What planning from the station offers: the metro and the walk after it, `lateMinutes` late.
+  function restFromStation(trip: Itinerary, lateMinutes = 0): Itinerary {
+    const shift = (leg: Leg): Leg => ({
+      ...leg,
+      start: addMinutes(leg.start, lateMinutes),
+      end: addMinutes(leg.end, lateMinutes),
+    });
+    const fromMetro = trip.legs.slice(trip.legs.findIndex((leg) => leg.kind === 'transit'));
+    return buildItinerary({ strategy: 'transit-only', legs: fromMetro.map(shift) });
+  }
+
+  it('joins the latest times of the same runs to the part already travelled', () => {
+    const running = restFromStation(started, 3);
+    const nextRun = restFromStation(parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z' }));
+
+    const match = matchRestOfTrip(started, metroIndex, [nextRun, running]);
+
+    expect(match?.exact).toBe(true);
+    // The same trip, so it keeps its id, its start and its car park.
+    expect(match?.itinerary).toMatchObject({
+      id: started.id,
+      strategy: 'park-and-ride',
+      departAt: started.departAt,
+      arriveAt: addMinutes(started.arriveAt, 3),
+      parking: started.parking,
+    });
+    // Waiting three minutes for the late metro shows as a wait.
+    expect(match?.itinerary.legs.map((leg) => leg.kind)).toEqual([
+      'drive',
+      'park',
+      'walk',
+      'wait',
+      'transit',
+      'walk',
+    ]);
+  });
+
+  it('finds nothing when a service still to come is not offered on its run', () => {
+    const nextRun = restFromStation(parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z' }));
+    expect(matchRestOfTrip(started, metroIndex, [nextRun])).toBeNull();
+    expect(matchRestOfTrip(started, metroIndex, [])).toBeNull();
   });
 });

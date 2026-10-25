@@ -4,7 +4,7 @@ import { type ParkedCarState, useParkedCar } from '@/storage';
 
 type Access = PlanRequest['access'];
 
-const PUBLIC_TRANSPORT_ONLY: Access = { transit: true, drive: false, dropOff: false };
+export const PUBLIC_TRANSPORT_ONLY: Access = { transit: true, drive: false, dropOff: false };
 const VIA_PARKED_CAR: Access = { transit: true, drive: true, dropOff: false };
 
 // Going back after the outbound trip: through the car only when the person confirmed parking it.

@@ -10,6 +10,8 @@ export interface DisplayedTrip {
   itinerary: Itinerary;
   // The search it came from, for saving the route. Null only if the session lost it.
   request: PlanRequest | null;
+  // When these times arrived, from the search or the latest check of the followed trip.
+  plannedAt: string | null;
   mode: 'live' | 'demo';
   // The person chose to follow this trip; it is refreshed when the app comes back.
   isActive: boolean;
@@ -22,6 +24,7 @@ function followedTrip(activeTrip: ActiveTrip, session: PlanSessionState): Displa
   return {
     itinerary: activeTrip.itinerary,
     request: activeTrip.request,
+    plannedAt: activeTrip.plannedAt,
     mode: activeTrip.mode,
     isActive: true,
     inResults: false,
@@ -65,6 +68,7 @@ export function findDisplayedTrip(
     return {
       itinerary: fromResults,
       request,
+      plannedAt: session.plannedAt,
       mode: response.mode,
       isActive: activeTrip?.itinerary.id === itineraryId,
       inResults: true,

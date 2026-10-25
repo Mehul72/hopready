@@ -1,4 +1,4 @@
-export { type ItineraryMatch, matchItinerary } from './itinerary-match';
+export { type ItineraryMatch, matchItinerary, matchRestOfTrip } from './itinerary-match';
 export {
   PLACE_SEARCH_DEBOUNCE_MS,
   tripQueryKeys,
@@ -9,11 +9,14 @@ export {
 export {
   MANUAL_REFRESH_MIN_INTERVAL_SECONDS,
   manualRefreshAvailability,
+  partToCheck,
   type RefreshAvailability,
   refreshableRequest,
   replanRequest,
+  restOfTripRequest,
   RESUME_REFRESH_MIN_AGE_SECONDS,
   shouldRefreshActiveTripOnResume,
+  type TripPart,
 } from './refresh-policy';
 export { returnTripFor, useTripHomeOutOfDate, withCurrentCar } from './return-trip';
 export {

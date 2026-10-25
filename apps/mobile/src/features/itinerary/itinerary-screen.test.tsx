@@ -1,5 +1,6 @@
 import {
   addMinutes,
+  buildItinerary,
   DEFAULT_PREFERENCES,
   type DriveLeg,
   type Itinerary,
@@ -352,6 +353,94 @@ describe('the followed trip after a refresh', () => {
       ),
     ).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+  });
+});
+
+describe('checking a followed trip for changes', () => {
+  async function followParkAndRide() {
+    const response = await planDemoCommute();
+    const itinerary = firstWithStrategy(response, 'park-and-ride');
+    planSession.select(itinerary.id);
+    await renderApp(`/itinerary/${itinerary.id}`);
+    return { response, itinerary };
+  }
+
+  it('says when the times were checked, and holds off another check for 30 seconds', async () => {
+    await followParkAndRide();
+    const plan = jest.spyOn(tripService, 'planTrip');
+
+    expect(screen.getByLabelText('Times checked at 7:30 am')).toBeOnTheScreen();
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Check for changes' }));
+
+    expect(plan).not.toHaveBeenCalled();
+    expect(screen.getByTestId('check-too-soon')).toHaveTextContent(
+      /This trip was checked less than 30 seconds ago\. You can check again in \d+ seconds\./,
+    );
+  });
+
+  it('notices at the car park that the metro was cancelled during the drive', async () => {
+    const { itinerary } = await followParkAndRide();
+    const metro = itinerary.legs.find((leg) => leg.kind === 'transit');
+    if (!metro) throw new Error('Expected a metro leg');
+    // The demo cancels this run once the scenario starts, while the person is driving.
+    await act(async () => {
+      appStorage.settings.setDemoScenario('cancelled-service');
+    });
+    jest.setSystemTime(new Date(addMinutes(itinerary.departAt, 1)));
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Check for changes' }));
+
+    expect(
+      await screen.findByLabelText(/^Error\. This trip is no longer offered\./),
+    ).toBeOnTheScreen();
+    const { alternatives } = planSession.getState().activeTripRefresh;
+    expect(alternatives.length).toBeGreaterThan(0);
+    expect(
+      alternatives.every((alternative) => alternative.legs[0]?.from.name === metro.from.name),
+    ).toBe(true);
+    for (const alternative of alternatives) {
+      expect(
+        screen.getByRole('button', { name: describeTripSummary(alternative) }),
+      ).toBeOnTheScreen();
+    }
+  });
+
+  it('checks the rest of the trip after leaving, and offers what still runs', async () => {
+    const { response, itinerary } = await followParkAndRide();
+    const metro = itinerary.legs.find((leg) => leg.kind === 'transit');
+    if (!metro || metro.kind !== 'transit') throw new Error('Expected a metro leg');
+    const laterMetro = {
+      ...metro,
+      start: addMinutes(metro.start, 10),
+      end: addMinutes(metro.end, 10),
+      scheduledStart: addMinutes(metro.scheduledStart, 10),
+      scheduledEnd: addMinutes(metro.scheduledEnd, 10),
+    };
+    const alternative = buildItinerary({ strategy: 'transit-only', legs: [laterMetro] });
+    const plan = jest
+      .spyOn(tripService, 'planTrip')
+      .mockResolvedValue({ ...response, itineraries: [alternative] });
+    // A minute into the drive to the car park.
+    jest.setSystemTime(new Date(addMinutes(itinerary.departAt, 1)));
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Check for changes' }));
+
+    expect(plan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        origin: metro.from,
+        access: { transit: true, drive: false, dropOff: false },
+      }),
+      expect.anything(),
+    );
+    expect(
+      await screen.findByLabelText(/^Error\. This trip is no longer offered\./),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: describeTripSummary(alternative) }));
+    expect(appStorage.activeTrip.get()).toMatchObject({
+      itinerary: { id: alternative.id },
+      request: { origin: metro.from },
+    });
   });
 });
 

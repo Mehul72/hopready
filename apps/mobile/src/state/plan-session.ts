@@ -1,6 +1,7 @@
 import {
   type Clock,
   type Itinerary,
+  laterOf,
   type PlanRequest,
   type PlanResponse,
   systemClock,
@@ -9,13 +10,23 @@ import {
 import { useSyncExternalStore } from 'react';
 
 import { type ApiError, toApiError } from '@/api';
-import { type AppStorage, appStorage, useActiveTrip, useSettings } from '@/storage';
-import { matchItinerary } from '@/trip/itinerary-match';
+import {
+  type ActiveTrip,
+  type AppStorage,
+  appStorage,
+  useActiveTrip,
+  useSettings,
+} from '@/storage';
+import { matchItinerary, matchRestOfTrip } from '@/trip/itinerary-match';
 import {
   manualRefreshAvailability,
+  partToCheck,
+  refreshableRequest,
   replanRequest,
+  restOfTripRequest,
   shouldRefreshActiveTripOnResume,
 } from '@/trip/refresh-policy';
+import { withCurrentCar } from '@/trip/return-trip';
 import { type TripService, tripService } from '@/trip/trip-service';
 
 import { useApiAnswerMode } from './api-answer-mode';
@@ -29,9 +40,10 @@ export type ActiveTripRefreshStatus =
   // The same services, with updated times.
   | 'updated'
   // The chosen run is gone, but the same option (strategy, car park, first service) is offered
-  // on another run, and the active trip now follows that one.
+  // on another run, and the active trip now follows that one. Only before the trip starts.
   | 'replaced'
-  // Nothing like the chosen option is offered any more; `alternatives` holds what is.
+  // Nothing like the chosen option is offered any more, or once it has started, the services
+  // still to come are not; `alternatives` holds what is.
   | 'no-longer-offered'
   | 'failed';
 
@@ -74,6 +86,15 @@ export type RefreshOutcome =
   // A trip home that no longer fits the car (withCurrentCar). It is not planned again.
   | { status: 'car-changed' };
 
+export type CheckOutcome =
+  // The check ran, or the trip changed while it did. What it found, a failure included, is in
+  // `activeTripRefresh`.
+  | { status: 'checked' }
+  | { status: 'nothing-to-check' }
+  | { status: 'busy' }
+  | { status: 'too-soon'; retryInSeconds: number }
+  | { status: 'car-changed' };
+
 export interface PlanSession {
   getState: () => PlanSessionState;
   subscribe: (listener: () => void) => () => void;
@@ -84,9 +105,11 @@ export interface PlanSession {
   refresh: () => Promise<RefreshOutcome>;
   // Makes an option from the latest results the active trip. Returns null if it is not there.
   select: (itineraryId: string) => Itinerary | null;
-  // Re-plans the active trip when the refresh-on-resume rule says so; the outcome lands in
-  // `activeTripRefresh`. Never rejects.
+  // Re-plans the active trip, or the rest of it once it has started, when the refresh-on-resume
+  // rule says so; the outcome lands in `activeTripRefresh`. Never rejects.
   refreshActiveTrip: () => Promise<void>;
+  // The same check when the person asks for it, at most once every 30 seconds. Never rejects.
+  checkActiveTrip: () => Promise<CheckOutcome>;
   reset: () => void;
 }
 
@@ -188,24 +211,56 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
     for (const listener of [...listeners]) listener();
   }
 
-  async function refreshActiveTrip(): Promise<void> {
-    if (activeTripRun) return;
+  // When the active trip last got an answer. A check that found it no longer offered leaves the
+  // trip and its plannedAt as they were, so that check counts too. A failed one never does, so
+  // "Try again" is never held back.
+  function lastAnsweredAt(trip: ActiveTrip): string {
+    const { status, checkedAt } = state.activeTripRefresh;
+    return status === 'no-longer-offered' && checkedAt
+      ? laterOf(trip.plannedAt, checkedAt)
+      : trip.plannedAt;
+  }
+
+  // Plans the active trip again, or the rest of it once it has started, and records what changed
+  // in `activeTripRefresh`. On resume it waits a minute after the last answer; when the person
+  // asks, 30 seconds. Never rejects.
+  async function checkActiveTrip(trigger: 'resume' | 'asked'): Promise<CheckOutcome> {
+    if (activeTripRun) return { status: 'busy' };
     const run = new AbortController();
     activeTripRun = run;
     try {
       const trip = storage.activeTrip.get();
-      if (!trip || !shouldRefreshActiveTripOnResume(trip, clock.now(), trips.currentMode())) {
-        return;
+      const now = clock.now();
+      const mode = trips.currentMode();
+      const part = trip ? partToCheck(trip, now, mode) : null;
+      if (!trip || !part) return { status: 'nothing-to-check' };
+      const answeredAt = lastAnsweredAt(trip);
+      if (trigger === 'resume') {
+        if (!shouldRefreshActiveTripOnResume(trip, now, mode, answeredAt)) {
+          return { status: 'nothing-to-check' };
+        }
+      } else {
+        const availability = manualRefreshAvailability(answeredAt, now);
+        if (!availability.allowed) {
+          return { status: 'too-soon', retryInSeconds: availability.retryInSeconds };
+        }
       }
-      const request = replanRequest(trip.request, storage.parkedCar.get(), clock.now());
+      const tripWithCar = withCurrentCar(trip.request, storage.parkedCar.get());
       // The trip screen asks for Take me home again instead.
-      if (!request) return;
+      if (!tripWithCar) return { status: 'car-changed' };
+      const request =
+        part.kind === 'whole-trip'
+          ? refreshableRequest(tripWithCar, now)
+          : restOfTripRequest(tripWithCar, part.leg);
       setState({ activeTripRefresh: { ...IDLE_ACTIVE_TRIP_REFRESH, status: 'refreshing' } });
       const response = await trips.planTrip(request, { signal: run.signal });
       // Ignore the answer if the session was reset or the person chose another trip meanwhile.
-      if (run.signal.aborted || storage.activeTrip.get() !== trip) return;
+      if (run.signal.aborted || storage.activeTrip.get() !== trip) return { status: 'checked' };
       const checkedAt = toIso(clock.now());
-      const match = matchItinerary(trip.itinerary, response.itineraries);
+      const match =
+        part.kind === 'whole-trip'
+          ? matchItinerary(trip.itinerary, response.itineraries)
+          : matchRestOfTrip(trip.itinerary, part.legIndex, response.itineraries);
       if (!match) {
         setState({
           activeTripRefresh: {
@@ -217,10 +272,11 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
             checkedAt,
           },
         });
-        return;
+        return { status: 'checked' };
       }
       storage.activeTrip.start({
-        request,
+        // Only the rest was planned, but the trip followed is still the whole one.
+        request: part.kind === 'whole-trip' ? request : tripWithCar,
         itinerary: match.itinerary,
         plannedAt: checkedAt,
         mode: response.mode,
@@ -235,8 +291,9 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
           checkedAt,
         },
       });
+      return { status: 'checked' };
     } catch (error) {
-      if (run.signal.aborted) return;
+      if (run.signal.aborted) return { status: 'checked' };
       const apiError = toApiError(error);
       if (apiError.kind === 'unexpected') reportUnexpected(apiError);
       setState({
@@ -249,6 +306,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
           checkedAt: toIso(clock.now()),
         },
       });
+      return { status: 'checked' };
     } finally {
       if (activeTripRun === run) activeTripRun = null;
     }
@@ -313,7 +371,10 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
       setState({ selectedItineraryId: itineraryId, activeTripRefresh: IDLE_ACTIVE_TRIP_REFRESH });
       return itinerary;
     },
-    refreshActiveTrip,
+    refreshActiveTrip: async () => {
+      await checkActiveTrip('resume');
+    },
+    checkActiveTrip: () => checkActiveTrip('asked'),
     reset,
   };
 }

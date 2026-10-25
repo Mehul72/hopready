@@ -1,4 +1,12 @@
-import { addMinutes, type ParkedCar, type PlanRequest, type PlanResponse } from '@hopready/core';
+import {
+  addMinutes,
+  buildItinerary,
+  type Itinerary,
+  type ParkedCar,
+  type PlanRequest,
+  type PlanResponse,
+  type TransitLeg,
+} from '@hopready/core';
 
 import { ApiError } from '@/api/errors';
 import { type AppStorage, createAppStorage } from '@/storage/app-storage';
@@ -307,6 +315,144 @@ describe('refreshActiveTrip', () => {
       status: 'failed',
       error: { kind: 'offline' },
     });
+  });
+});
+
+describe('a followed trip that has started', () => {
+  // Left five minutes ago and driving to the car park; the metro leaves in twelve minutes.
+  const started = parkAndRideItinerary({ departAt: addMinutes(START, -5) });
+  const metro = started.legs.find((leg): leg is TransitLeg => leg.kind === 'transit')!;
+  const request = planRequest();
+
+  function followingStartedTrip(plannedSecondsAgo = 120) {
+    const context = setUp();
+    context.storage.activeTrip.start({
+      request,
+      itinerary: started,
+      plannedAt: new Date(START.getTime() - plannedSecondsAgo * 1000).toISOString(),
+      mode: 'live',
+    });
+    return context;
+  }
+
+  // What planning from the station offers: the rest of `trip`, `lateMinutes` late.
+  function restFromStation(trip: Itinerary, lateMinutes = 0): Itinerary {
+    const fromMetro = trip.legs.slice(trip.legs.findIndex((leg) => leg.kind === 'transit'));
+    return buildItinerary({
+      strategy: 'transit-only',
+      legs: fromMetro.map((leg) => ({
+        ...leg,
+        start: addMinutes(leg.start, lateMinutes),
+        end: addMinutes(leg.end, lateMinutes),
+      })),
+    });
+  }
+
+  it('checks the rest of it on resume, from the station the metro leaves', () => {
+    const { session, trips } = followingStartedTrip();
+
+    void session.refreshActiveTrip();
+
+    expect(lastPending(trips.pending).request).toEqual({
+      origin: metro.from,
+      destination: request.destination,
+      time: { type: 'depart', at: metro.start },
+      access: { transit: true, drive: false, dropOff: false },
+      preferences: request.preferences,
+      trip: { kind: 'outbound' },
+    });
+  });
+
+  it('keeps following the whole trip, with the latest times, while its services run', async () => {
+    const { session, storage, trips } = followingStartedTrip();
+    const checked = session.refreshActiveTrip();
+    lastPending(trips.pending).resolve(planResponse([restFromStation(started, 3)]));
+    await checked;
+
+    expect(session.getState().activeTripRefresh).toMatchObject({ status: 'updated' });
+    expect(storage.activeTrip.get()).toMatchObject({
+      request,
+      itinerary: {
+        id: started.id,
+        departAt: started.departAt,
+        arriveAt: addMinutes(started.arriveAt, 3),
+      },
+      plannedAt: START.toISOString(),
+    });
+  });
+
+  it('offers what runs from the station when a service still to come is cancelled', async () => {
+    const { session, storage, trips } = followingStartedTrip();
+    const checked = session.refreshActiveTrip();
+    const searched = lastPending(trips.pending);
+    const nextRun = restFromStation(parkAndRideItinerary({ departAt: START.toISOString() }));
+    searched.resolve(planResponse([nextRun]));
+    await checked;
+
+    expect(session.getState().activeTripRefresh).toMatchObject({
+      status: 'no-longer-offered',
+      alternatives: [nextRun],
+      request: searched.request,
+    });
+    expect(storage.activeTrip.get()?.itinerary).toEqual(started);
+  });
+
+  it('has nothing to check once the metro has left', async () => {
+    const { session, trips, advanceSeconds } = followingStartedTrip();
+    advanceSeconds(13 * 60);
+
+    await session.refreshActiveTrip();
+
+    await expect(session.checkActiveTrip()).resolves.toEqual({ status: 'nothing-to-check' });
+    expect(trips.service.planTrip).not.toHaveBeenCalled();
+  });
+});
+
+describe('checkActiveTrip', () => {
+  function following(plannedSecondsAgo: number) {
+    const context = setUp();
+    context.storage.activeTrip.start({
+      request: planRequest(),
+      itinerary: parkAndRide,
+      plannedAt: new Date(START.getTime() - plannedSecondsAgo * 1000).toISOString(),
+      mode: 'live',
+    });
+    return context;
+  }
+
+  it('checks when asked, at most every 30 seconds', async () => {
+    const { session, trips, advanceSeconds } = following(10);
+    await expect(session.checkActiveTrip()).resolves.toEqual({
+      status: 'too-soon',
+      retryInSeconds: 20,
+    });
+    advanceSeconds(20);
+
+    const checked = session.checkActiveTrip();
+    lastPending(trips.pending).resolve(planResponse([parkAndRide]));
+
+    await expect(checked).resolves.toEqual({ status: 'checked' });
+    expect(session.getState().activeTripRefresh.status).toBe('updated');
+  });
+
+  it('counts a check that found the trip no longer offered, but never a failed one', async () => {
+    const { session, trips, advanceSeconds } = following(120);
+    const failed = session.checkActiveTrip();
+    lastPending(trips.pending).reject(new ApiError('offline'));
+    await failed;
+
+    const retried = session.checkActiveTrip();
+    lastPending(trips.pending).resolve(planResponse([transit]));
+    await retried;
+    expect(session.getState().activeTripRefresh.status).toBe('no-longer-offered');
+
+    advanceSeconds(10);
+    await expect(session.checkActiveTrip()).resolves.toEqual({
+      status: 'too-soon',
+      retryInSeconds: 20,
+    });
+    await session.refreshActiveTrip();
+    expect(trips.service.planTrip).toHaveBeenCalledTimes(2);
   });
 });
 
