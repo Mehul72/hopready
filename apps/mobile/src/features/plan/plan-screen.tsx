@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 
 import { AppText, Banner, Button, Card, ListRow, Screen } from '@/components';
+import { FollowedTripCard } from '@/features/itinerary';
 import { useNow } from '@/features/results/use-now';
 import { planSession } from '@/state';
 import {
@@ -166,6 +167,7 @@ export function PlanScreen() {
       <AppText variant="largeTitle" accessibilityRole="header">
         Plan a trip
       </AppText>
+      <FollowedTripCard now={now} />
       <PlaceFields
         origin={draft.origin}
         destination={draft.destination}
