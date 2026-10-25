@@ -2,7 +2,7 @@ import type { Itinerary } from '@hopready/core';
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { fireEvent, userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor } from 'expo-router/testing-library';
-import { Alert, type AlertButton } from 'react-native';
+import { AccessibilityInfo, Alert, type AlertButton } from 'react-native';
 
 import { planSession } from '@/state';
 import { appStorage, createAppStorage, sqliteBackend } from '@/storage';
@@ -270,17 +270,45 @@ describe('confirming where the car is', () => {
   it("starts the pin where the followed trip's drive ends when it suggests no car park", async () => {
     follow(driveOnlyItinerary({ departAt: '2026-10-26T20:00:00.000Z' }));
     await renderApp('/parked-car/confirm');
+
+    await userEvent.setup().press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+
+    expect(
+      screen.getByRole('radio', {
+        name: 'Somewhere else, Pin at 1 Help St, Chatswood. Move it to where you parked.',
+      }),
+    ).toBeChecked();
+    const { lat, lon } = PLACES.chatswoodOffice.coordinate;
+    expect(screen.getByTestId('map-marker')).toHaveProp('coordinate', {
+      latitude: lat,
+      longitude: lon,
+    });
+  });
+
+  it('says where the pin is, and saves it only once it has been moved', async () => {
+    follow(parkAndRideItinerary({ departAt: '2026-10-26T20:40:00.000Z' }));
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    await renderApp('/parked-car/confirm');
     const user = userEvent.setup();
 
     await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
-    await user.press(screen.getByRole('button', { name: 'Save where I parked' }));
+    expect(
+      screen.getByRole('radio', {
+        name: 'Somewhere else, Pin at Tallawong P1. Move it to where you parked.',
+      }),
+    ).toBeChecked();
+    // Saved unmoved, the pin would only repeat the trip's guess under another name.
+    expect(screen.getByRole('button', { name: 'Save where I parked' })).toBeDisabled();
 
-    expect(appStorage.parkedCar.get()).toMatchObject({
-      status: 'parked',
-      parkedCar: {
-        location: { name: 'Pinned location', coordinate: PLACES.chatswoodOffice.coordinate },
-      },
-    });
+    await user.press(screen.getByRole('button', { name: 'Move pin west' }));
+    await user.press(screen.getByRole('button', { name: 'Move pin west' }));
+
+    expect(announce).toHaveBeenLastCalledWith('Pin 20 metres west of Tallawong P1.');
+    expect(screen.getByText('Pin 20 m west of Tallawong P1.')).toBeOnTheScreen();
+    expect(
+      screen.getByRole('radio', { name: 'Somewhere else, Pin 20 metres west of Tallawong P1.' }),
+    ).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Save where I parked' })).toBeEnabled();
   });
 
   it('keeps a moved pin when Somewhere else is chosen again', async () => {

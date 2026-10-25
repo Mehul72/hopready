@@ -11,6 +11,8 @@ export interface ChoiceRowProps {
   badge?: string;
   selected: boolean;
   onPress: () => void;
+  // Defaults to the title, badge and subtitle read together.
+  accessibilityLabel?: string;
   accessibilityHint?: string;
   disabled?: boolean;
   testID?: string;
@@ -24,6 +26,7 @@ export function ChoiceRow({
   badge,
   selected,
   onPress,
+  accessibilityLabel,
   accessibilityHint,
   disabled = false,
   testID,
@@ -32,7 +35,7 @@ export function ChoiceRow({
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityLabel={[title, badge, subtitle].filter(Boolean).join(', ')}
+      accessibilityLabel={accessibilityLabel ?? [title, badge, subtitle].filter(Boolean).join(', ')}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ checked: selected, disabled }}
       disabled={disabled}

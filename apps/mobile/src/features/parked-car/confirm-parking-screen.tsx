@@ -11,11 +11,11 @@ import { useDisplayedTrip } from '../itinerary/use-displayed-trip';
 import { writeOrAlert } from '../saved/storage-writes';
 import { closeParkingSheet } from './close-sheet';
 import {
-  driveEndOf,
   itineraryFollowedToday,
   parkedCarFrom,
   parkedCarName,
   type ParkingChoice,
+  pinStartOf,
   suggestedCarParkOf,
 } from './parking-choice';
 import { ParkingLocationPicker } from './parking-location-picker';
@@ -50,8 +50,8 @@ export function ConfirmParkingScreen({ itineraryId, initialArrival }: ConfirmPar
   // Opened without a trip (from the Car tab), the trip followed today is the best guess.
   const itinerary = trip?.itinerary ?? followedToday;
   const suggestion = suggestedCarParkOf(itinerary);
-  // A pin for a spot in none of the lists starts where the trip expected to leave the car.
-  const pinStart = suggestion?.coordinate ?? driveEndOf(itinerary);
+  // A pin for a spot in none of the lists starts where the trip expected the car to be left.
+  const pinStart = pinStartOf(itinerary);
   const [arrival, setArrival] = useState<ArrivalKind>(initialArrival);
   const [choice, setChoice] = useState<ParkingChoice | null>(null);
   const [placedPin, setPlacedPin] = useState<Coordinate | null>(null);

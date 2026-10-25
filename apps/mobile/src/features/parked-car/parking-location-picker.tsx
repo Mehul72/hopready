@@ -1,12 +1,13 @@
 import type { Coordinate } from '@hopready/core';
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { AccessibilityInfo, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText, Banner, Button, ErrorState, LoadingState } from '@/components';
 import { appStorage, useSavedParkingSpots } from '@/storage';
 import { MIN_TOUCH_TARGET, RADII, SPACING, useTheme } from '@/theme';
 import { useCarParks } from '@/trip';
 
+import type { Wording } from '../itinerary/trip-text';
 import { ChoiceRow } from '../settings/choice-row';
 import { findCurrentPlace } from '../saved/current-location';
 import { writeOrAlert } from '../saved/storage-writes';
@@ -14,6 +15,8 @@ import {
   choiceKey,
   type ParkingChoice,
   PINNED_LOCATION_NAME,
+  pinPosition,
+  type PinStart,
   type SuggestedCarPark,
 } from './parking-choice';
 import { PinDropMap } from './pin-drop-map';
@@ -23,7 +26,7 @@ const FILTER_FROM_COUNT = 8;
 
 export interface PinOption {
   // Where the pin starts: where the trip expected the car to be left.
-  start: Coordinate;
+  start: PinStart;
   // Where the person last put the pin. The screen keeps it, so trying another choice, or switching
   // to "I was dropped off" and back, never loses it.
   placed: Coordinate | null;
@@ -37,7 +40,9 @@ export interface ParkingLocationPickerProps {
   // a full car park. Without it, that choice is left out.
   pin?: PinOption;
   selected: ParkingChoice | null;
-  onSelect: (choice: ParkingChoice) => void;
+  // Null while "Somewhere else" is chosen but its pin has not been moved yet, so there is nothing
+  // to save.
+  onSelect: (choice: ParkingChoice | null) => void;
   // Goes up each time the place is chosen outside this list, such as by moving a pin, so a
   // location lookup still running is dropped instead of overriding that choice.
   choicesMadeElsewhere?: number;
@@ -49,6 +54,44 @@ function normalise(text: string): string {
 
 function pinAt(coordinate: Coordinate): ParkingChoice {
   return { kind: 'pin', name: PINNED_LOCATION_NAME, coordinate };
+}
+
+// What "Somewhere else" says: where the pin is once the person has moved it, or else what to do.
+function somewhereElseWording(pin: PinOption, chosen: boolean): Wording {
+  if (pin.placed) {
+    const position = pinPosition(pin.placed, pin.start);
+    return { text: `${position.text}.`, spoken: `${position.spoken}.` };
+  }
+  const text = chosen
+    ? `Pin at ${pin.start.name}. Move it to where you parked.`
+    : 'Put a pin on a map where you parked.';
+  return { text, spoken: text };
+}
+
+interface SomewhereElseProps {
+  pin: PinOption;
+  chosen: boolean;
+  onChoose: () => void;
+  onMovePin: (coordinate: Coordinate) => void;
+}
+
+// "Somewhere else": a pin the person moves from where the trip expected the car to where it is.
+function SomewhereElse({ pin, chosen, onChoose, onMovePin }: SomewhereElseProps) {
+  const wording = somewhereElseWording(pin, chosen);
+  return (
+    <>
+      <ChoiceRow
+        title="Somewhere else"
+        subtitle={wording.text}
+        accessibilityLabel={`Somewhere else, ${wording.spoken}`}
+        selected={chosen}
+        onPress={onChoose}
+      />
+      {chosen ? (
+        <PinDropMap coordinate={pin.placed ?? pin.start.coordinate} onMove={onMovePin} />
+      ) : null}
+    </>
+  );
 }
 
 function DocumentedCarParks({
@@ -163,6 +206,8 @@ export function ParkingLocationPicker({
   const [locating, setLocating] = useState(false);
   const [locationProblem, setLocationProblem] = useState<string | null>(null);
   const [showsAllCarParks, setShowsAllCarParks] = useState(false);
+  // "Somewhere else" is chosen, but its pin is still where the trip expected the car.
+  const [placingPin, setPlacingPin] = useState(false);
   const selectedKey = selected ? choiceKey(selected) : null;
   // A position fix can take several seconds. A choice made meanwhile, or leaving the screen, makes
   // a late answer stale: it must never replace where the person said the car is.
@@ -180,10 +225,19 @@ export function ParkingLocationPicker({
     locateRun.current += 1;
   }, [choicesMadeElsewhere]);
 
-  const choose = (choice: ParkingChoice) => {
+  const choose = (choice: ParkingChoice | null) => {
     locateRun.current += 1;
     setLocating(false);
+    // Only "Somewhere else" chooses nothing, while its pin waits to be moved.
+    setPlacingPin(choice === null);
     onSelect(choice);
+  };
+
+  const placePin = (option: PinOption, coordinate: Coordinate) => {
+    option.onPlace(coordinate);
+    choose(pinAt(coordinate));
+    // Only the map shows where the pin went, so VoiceOver hears it after every move.
+    AccessibilityInfo.announceForAccessibility(`${pinPosition(coordinate, option.start).spoken}.`);
   };
 
   const chooseCurrentLocation = async () => {
@@ -246,24 +300,14 @@ export function ParkingLocationPicker({
       ) : null}
 
       {pin ? (
-        <>
-          <ChoiceRow
-            title="Somewhere else"
-            subtitle="Put a pin on a map where you parked."
-            selected={selectedKey === 'pin'}
-            // A pin already moved comes back where it was left.
-            onPress={() => choose(pinAt(pin.placed ?? pin.start))}
-          />
-          {selected?.kind === 'pin' ? (
-            <PinDropMap
-              coordinate={selected.coordinate}
-              onMove={(coordinate) => {
-                pin.onPlace(coordinate);
-                choose(pinAt(coordinate));
-              }}
-            />
-          ) : null}
-        </>
+        <SomewhereElse
+          pin={pin}
+          chosen={selectedKey === 'pin' || (placingPin && selected === null)}
+          // A pin already moved comes back where it was left. An unmoved pin is not saved: it
+          // would only repeat where the trip expected the car, under another name.
+          onChoose={() => choose(pin.placed ? pinAt(pin.placed) : null)}
+          onMovePin={(coordinate) => placePin(pin, coordinate)}
+        />
       ) : null}
 
       {spots.length > 0 ? (
