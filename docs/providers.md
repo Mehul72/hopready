@@ -1,19 +1,21 @@
 # Providers, limits and running costs
 
-Facts below were read from official sources on 2026-10-25. Prices, quotas and terms change, so re-check before launch. The research notes and the links behind each figure are summarised in the decision records (`docs/decisions/`).
+Facts below were read from official sources on 2026-10-25. Prices, quotas and terms change, so re-check before launch. [Sources](#sources) lists every page relied on.
 
 ## Providers in use
 
-| Purpose                                  | Provider                                                                                   | Auth                                                             | Free allowance                                                                                                              | Hard limit behaviour                                                                                           |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Public transport journeys, stops, alerts | TfNSW Open Data: Trip Planner `/v1/tp/trip`, `/stop_finder`, `/departure_mon`, `/add_info` | `Authorization: apikey <token>`                                  | Bronze plan: 60,000 requests per day, 5 per second. Free; increases on request at no fee.                                   | HTTP 403 with `X-Error-Detail: Account Over Rate Limit` or `Over Quota Limit` (401, 429 and 503 also reported) |
-| Park&Ride occupancy and facilities       | TfNSW Car Park API `/v1/carpark`                                                           | Same token                                                       | Shares the account plan                                                                                                     | Same as above                                                                                                  |
-| Drive times and drive polylines          | Apple Maps Server API `/v1/etas`, `/v1/directions`                                         | ES256 JWT, exchanged at `/v1/token` for a 30-minute access token | 25,000 service calls per day per team, shared with MapKit JS                                                                | HTTP 429 until the next day; quota increases by request form, no paid tier published                           |
-| Address and place search                 | Apple Maps Server API `/v1/searchAutocomplete`, `/v1/search`                               | Same                                                             | Same pool                                                                                                                   | Same                                                                                                           |
-| Map display                              | Apple Maps through react-native-maps                                                       | None                                                             | No published limit for native MapKit                                                                                        | n/a                                                                                                            |
-| API hosting                              | Cloudflare Workers                                                                         | Account API token for deploys                                    | Free: 100,000 requests per day, 10 ms CPU per request. Paid: US$5/month including 10 million requests and 30 million CPU-ms | Free: Error 1027 past the daily request cap, Error 1102 past the CPU limit                                     |
-| Builds                                   | EAS (Expo)                                                                                 | `EXPO_TOKEN`                                                     | Free: 15 iOS builds a month, low-priority queue                                                                             | Builds stop until the next month; local `eas build --local` avoids the quota                                   |
-| Support and privacy pages, CI            | GitHub Pages and Actions                                                                   | Repository                                                       | Free for public repositories                                                                                                | n/a                                                                                                            |
+| Purpose                                  | Provider                                                                                         | Auth                                                             | Free allowance                                                                                                              | Hard limit behaviour                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Public transport journeys, stops, alerts | TfNSW Open Data: Trip Planner `/v1/tp/trip` (alerts come with each leg) and `/v1/tp/stop_finder` | `Authorization: apikey <token>`                                  | Bronze plan: 60,000 requests per day, 5 per second. Free; increases on request at no fee.                                   | HTTP 403 with `X-Error-Detail: Account Over Rate Limit` or `Over Quota Limit` (401, 429 and 503 also reported) |
+| Park&Ride occupancy and facilities       | TfNSW Car Park API `/v1/carpark`                                                                 | Same token                                                       | Shares the account plan                                                                                                     | Same as above                                                                                                  |
+| Drive times and drive polylines          | Apple Maps Server API `/v1/etas`, `/v1/directions`                                               | ES256 JWT, exchanged at `/v1/token` for a 30-minute access token | 25,000 service calls per day per team, shared with MapKit JS                                                                | HTTP 429 until the next day; quota increases by request form, no paid tier published                           |
+| Address and place search                 | Apple Maps Server API `/v1/searchAutocomplete`, `/v1/search`                                     | Same                                                             | Same pool                                                                                                                   | Same                                                                                                           |
+| Map display                              | Apple Maps through react-native-maps                                                             | None                                                             | No published limit for native MapKit                                                                                        | n/a                                                                                                            |
+| API hosting                              | Cloudflare Workers                                                                               | Account API token for deploys                                    | Free: 100,000 requests per day, 10 ms CPU per request. Paid: US$5/month including 10 million requests and 30 million CPU-ms | Free: Error 1027 past the daily request cap, Error 1102 past the CPU limit                                     |
+| Builds                                   | EAS (Expo)                                                                                       | `EXPO_TOKEN`                                                     | Free: 15 iOS builds a month, low-priority queue                                                                             | Builds stop until the next month; local `eas build --local` avoids the quota                                   |
+| Support and privacy pages, CI            | GitHub Pages and Actions                                                                         | Repository                                                       | Free for public repositories                                                                                                | n/a                                                                                                            |
+
+TfNSW's `/departure_mon` (departure boards) and `/add_info` (all current alerts) are not used. Each `/v1/tp/trip` journey already carries real-time times and the alerts that affect its legs, and v1 has no departure board or network-wide alerts screen.
 
 ## Terms that shape the product
 
@@ -21,6 +23,7 @@ Facts below were read from official sources on 2026-10-25. Prices, quotas and te
   - Licensed under CC BY 4.0. Credit "Transport for NSW" in text, without the logo.
   - Commercial use and App Store distribution are allowed.
   - Keep keys on the server. TfNSW asks for this, and for one key per application.
+  - No caching rule. The Hub Terms and the Acceptable Use Policy set none; they forbid excessive use. The API caches the car park list for 24 hours and each car park's occupancy for 60 seconds. The Car Park API documentation says occupancy updates every 15 seconds, on each counter change, or every 10 minutes, depending on the car park, so a cached figure is at most a minute behind the feed.
 - **TfNSW occupancy:**
   - Counts are estimates. TfNSW recommends showing availability as `spots − total`, with a "~" and a note that it may differ from reality.
   - Feeds have frozen for days during outages, so the app shows each figure's age and flags it as stale after 15 minutes.
@@ -30,39 +33,81 @@ Facts below were read from official sources on 2026-10-25. Prices, quotas and te
   - Real-time routing apps must show the notice "YOUR USE OF THIS REAL TIME ROUTE GUIDANCE APPLICATION IS AT YOUR SOLE RISK. LOCATION DATA MAY NOT BE ACCURATE." (DPLA §3.3.3(F)(iii)). It appears in Settings.
 - **Opal fares:** removed from the Trip Planner API on 16 October 2023. HopReady shows fares as unknown.
 
-## Calls per action (design figures from `planner.ts` and the API)
+## Calls per action
 
-| Action                                               | TfNSW calls                                                                                      | Apple calls                                                              | Worker requests |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ | --------------- |
-| Plan, public transport only                          | 1                                                                                                | 0                                                                        | 1               |
-| Plan, with "I'll drive and park"                     | 4 (1 transit-only plus up to 3 from car parks); car park list cached 24 h, occupancy cached 60 s | up to 1 ETA + 3 routes + 1 drive-only = 5                                | 1               |
-| Plan, with drop-off as well                          | up to 7                                                                                          | up to 8                                                                  | 1               |
-| Take me home through the car                         | 1                                                                                                | up to 2                                                                  | 1               |
-| Place search (each debounced query of 3+ characters) | 1                                                                                                | 1 autocomplete, plus up to 5 lookups for suggestions without coordinates | 1               |
+Counted on 2026-10-26 by running the planner (`packages/core/src/planner.ts`) against the demo providers with a counter on every provider method: Box Hill to Chatswood at 7.30 am on a Tuesday, with and without drop-off, and Rouse Hill to Barangaroo with drop-off.
+
+| Action                                               | TfNSW calls                                                                                                                                                                         | Apple calls                                                                                                                                                           | Worker requests |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Plan, public transport only                          | 1                                                                                                                                                                                   | 0                                                                                                                                                                     | 1               |
+| Plan, with "I'll drive and park"                     | up to 7: 1 public transport journey, 3 journeys from car parks, and up to 3 occupancy requests (one per car park not fetched in the last 60 s). The car park list is fetched daily. | 5 to 8: 1 drive time estimate (up to 10 car parks in one call), 3 routes to car parks, 1 drive-only route, and up to 3 more routes when traffic moves a start earlier | 1               |
+| Plan, with drop-off as well                          | up to 10 (up to 3 more journeys, from drop-off stations)                                                                                                                            | 9 to 15                                                                                                                                                               | 1               |
+| Take me home through the car                         | 1                                                                                                                                                                                   | up to 2                                                                                                                                                               | 1               |
+| Place search (each debounced query of 3+ characters) | 1                                                                                                                                                                                   | 1 autocomplete, plus up to 5 lookups for suggestions without coordinates                                                                                              | 1               |
+| Refresh of results, or of a followed trip            | the same as the plan it repeats (occupancy may come from the 60 s cache)                                                                                                            | the same as the plan it repeats                                                                                                                                       | 1               |
+
+Measured: drive and park made 4 journeys, 3 occupancy requests, 1 estimate and 4 routes. With drop-off as well it made 6 or 7 journeys, 3 occupancy requests, 2 estimates and 6 or 7 routes. The extra routes when traffic moves a start are the most the code can make, not a measured figure.
+
+A plan with driving sends up to 7 TfNSW requests at once, more than TfNSW's 5 per second. The API's rate gate (`apps/api/src/providers/tfnsw/rate-gate.ts`) queues the excess for up to 3 seconds, so it shows as about a second of extra wait, not a refusal. The gate only covers one Worker isolate, so busy periods can still exceed 5 per second across isolates.
 
 ## Monthly cost at three volumes
 
-Assumptions:
+Assumptions, stated so they can be checked against real use:
 
-- A "planned trip" is 1 plan with driving enabled plus 3 search queries.
-- That makes about 7 TfNSW calls, about 11 Apple calls and about 5 Worker requests per planned trip.
-- Traffic is spread over 30 days.
+- A "planned trip" is 3 place searches, 1 plan with driving, and 1 refresh of that plan (pull to refresh, or reopening the app while following the trip).
+- Each search makes 1 Apple autocomplete and, on average, 1 lookup.
+- A plan with driving makes about 6 Apple calls (5 to 8).
+- That makes about 17 TfNSW calls (3 + 7 + 7), about 18 Apple calls (6 + 6 + 6) and 5 Worker requests per planned trip.
+- Traffic is spread evenly over 30 days. Real traffic peaks in the morning and evening, so the per-second limits bind before the daily ones.
 
-| Planned trips per month | TfNSW calls per day | Apple calls per day | Within free limits?                            | Hosting cost                                                    |
-| ----------------------- | ------------------- | ------------------- | ---------------------------------------------- | --------------------------------------------------------------- |
-| 1,000                   | ~230                | ~370                | Yes                                            | US$0 on Workers Free, or US$5 on Paid                           |
-| 10,000                  | ~2,300              | ~3,700              | Yes                                            | US$5 (Paid is recommended because of the 10 ms CPU cap on Free) |
-| 100,000                 | ~23,000             | ~37,000             | TfNSW yes. Apple no: over the 25,000/day limit | US$5                                                            |
+| Planned trips per month | TfNSW calls per day | Apple calls per day | Within free limits?                                                   | Hosting cost                                                    |
+| ----------------------- | ------------------- | ------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1,000                   | ~570                | ~600                | Yes                                                                   | US$0 on Workers Free, or US$5 on Paid                           |
+| 10,000                  | ~5,700              | ~6,000              | Yes                                                                   | US$5 (Paid is recommended because of the 10 ms CPU cap on Free) |
+| 100,000                 | ~56,700             | ~60,000             | Apple no: over 25,000 a day. TfNSW just under 60,000 a day on average | US$5                                                            |
 
 What this means:
 
-- Apple is the first limit to bind, at roughly 65,000 to 70,000 planned trips a month. Before that point:
+- Apple is the first limit to bind, at roughly 40,000 planned trips a month (25,000 calls a day at 18 per trip). Before that point:
   - ask Apple for a quota increase (no published price);
   - reduce search calls, for example resolving only the chosen suggestion;
   - or add HERE as a second driving provider (US$2.92 per 1,000 time-aware routes after 5,000 free a month).
-- TfNSW's 5 requests per second can bind at busy peaks before the daily quota does. Ask TfNSW for a free increase before launch.
+- TfNSW's daily quota binds at roughly 105,000 planned trips a month, and its 5 requests per second can bind at busy peaks well before that. Ask TfNSW for a free increase before launch.
 - Fixed costs:
   - Apple Developer Program, which the owner already pays for.
   - A domain for the API, recommended before release; registry price depends on the name.
   - Workers Paid at US$5/month, recommended.
 - HopReady does not promise free unlimited operation. The API enforces daily budgets (`TFNSW_DAILY_CALL_BUDGET`, `APPLE_MAPS_DAILY_CALL_BUDGET`) so a burst of traffic degrades to "temporarily unavailable" instead of exceeding a provider's limits.
+
+## Sources
+
+Read on 2026-10-25 unless marked otherwise. Re-check prices, quotas and terms before launch.
+
+Transport for NSW:
+
+- Trip Planner APIs: https://opendata.transport.nsw.gov.au/data/dataset/trip-planner-apis
+- Car Park API, and its documentation (v2.4, update frequency per car park): https://opendata.transport.nsw.gov.au/data/dataset/car-park-api
+- API basics (authentication, rate limit errors): https://opendata.transport.nsw.gov.au/developers/api-basics
+- Data licence (CC BY 4.0): https://opendata.transport.nsw.gov.au/datalicence
+- Open Data Hub Terms: https://opendata.transport.nsw.gov.au/sites/default/files/2024-09/TfNSW-Open-Data-Portal-Terms.pdf
+- Acceptable Use Policy: https://opendata.transport.nsw.gov.au/sites/default/files/2024-09/TfNSW-Acceptable-Use-Policy.pdf
+- Open Data forum (quota increases, outages): https://opendataforum.transport.nsw.gov.au
+
+Apple:
+
+- Maps Server API tokens and keys: https://developer.apple.com/documentation/applemapsserverapi/creating-and-using-tokens-with-maps-server-api and https://developer.apple.com/documentation/applemapsserverapi/creating-a-maps-identifier-and-a-private-key
+- Estimated times of arrival: https://developer.apple.com/documentation/applemapsserverapi/-v1-etas
+- Daily usage and the quota increase request form: https://developer.apple.com/account/resources/services/maps-usage and https://developer.apple.com/contact/request/mapkitjs/
+- Place IDs (the storage exemption): https://developer.apple.com/documentation/mapkit/identifying-unique-locations-with-place-ids
+- Apple Developer Program License Agreement, including Attachment 6 (Apple Maps Service): https://developer.apple.com/support/terms/apple-developer-program-license-agreement/
+
+Alternatives considered (docs/decisions/0002):
+
+- HERE pricing and Routing v8: https://www.here.com/get-started/pricing and https://docs.here.com/routing/docs/routing-v8-get-started
+- Google Maps Platform pricing and service terms: https://developers.google.com/maps/billing-and-pricing/pricing and https://cloud.google.com/maps-platform/terms/maps-service-terms
+
+Hosting, builds and pages:
+
+- Cloudflare Workers pricing and limits (Errors 1027 and 1102): https://developers.cloudflare.com/workers/platform/pricing/ and https://developers.cloudflare.com/workers/platform/limits/
+- Expo plans and EAS Build: https://expo.dev/pricing and https://docs.expo.dev/build/setup/
+- GitHub Pages publishing sources and limits: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site and https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits
