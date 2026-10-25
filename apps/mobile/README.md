@@ -62,7 +62,7 @@ npx jest
 | `src/storage`      | Everything saved on the device, in `expo-sqlite/kv-store`: stores, hooks and `deleteAllData()`.                                                                                                                             |
 | `src/api`          | The HTTP client for the HopReady API, `ApiError`, and the TanStack Query client.                                                                                                                                            |
 | `src/trip`         | `tripService` (plans, place search and car parks, in live or demo mode), query hooks, the refresh policy and the resume hook.                                                                                               |
-| `src/state`        | `planSession`, the shared store for the latest search, its results and the active trip refresh.                                                                                                                             |
+| `src/state`        | `planSession`, the shared store for the latest search, its results and the active trip refresh; `apiAnswerMode`, the mode of the API's latest answer, which `useShowsDemoData` reads to show the demo banner.               |
 | `src/location`     | `requestCurrentPlace()` and the location permission hook.                                                                                                                                                                   |
 | `src/test-support` | Jest mocks for native modules, and builders for places, requests and itineraries.                                                                                                                                           |
 
