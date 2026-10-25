@@ -116,9 +116,11 @@ park and ride,commuter parking,metro,train,bus,transfer,trip planner,door to doo
 
 What the app does:
 
-- Saved data stays on the device.
+- Saved data stays on the device, and leaves it only inside a request the person makes. Planning with "I'll drive and park" sends the saved parking spots (names and positions); Take me home sends the parked car's position.
 - Trip and search requests reach the HopReady API, which keeps no locations, addresses or search text (logs exclude them).
-- The API sends locations and search text to Transport for NSW and Apple Maps, server to server, without any identifier.
+- The API sends positions and search text to Transport for NSW and Apple Maps, server to server, without any identifier. Place names stay with the API.
+- From the phone itself, Apple receives map tile requests (the area on screen) and, in live mode, iOS reverse-geocoding requests for the current location.
+- Searches carry the location rounded to about 1 km when location access was granted.
 - There is no analytics, advertising or tracking SDK.
 
 Apple's definition: data is "collected" only when it is retained beyond servicing the request.
@@ -127,6 +129,8 @@ Apple's definition: data is "collected" only when it is retained beyond servicin
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A, conservative (recommended until TfNSW's log retention is confirmed) | A provider may keep request logs that include coordinates or search text | Data Collected: **Location > Precise Location** and **Search History**. Both App Functionality, not used for tracking, **Linked to the user: No**. Neither carries any identifier, but a typed home address can be personal information under Australian privacy law, so read Apple's de-identification guidance before answering. |
 | B                                                                      | Neither the API nor any provider keeps the data after answering          | Data Not Collected                                                                                                                                                                                                                                                                                                                 |
+
+The app's privacy manifest (`apps/mobile/app.config.ts`) declares the option A data types. If option B is chosen, empty `NSPrivacyCollectedDataTypes` in the same change, so the manifest and the label agree.
 
 Also confirm in App Store Connect:
 

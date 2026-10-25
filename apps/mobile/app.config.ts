@@ -4,7 +4,7 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 // never from this file. Nothing here is secret: the app holds no provider keys.
 
 const LOCATION_PURPOSE =
-  'HopReady uses your location only when you ask, to start a trip from where you are.';
+  'HopReady uses your location to start trips from where you are and to show nearby places first when you search.';
 
 // Calm deep teal from the HopReady icon (src/theme/colours.ts), and its dark counterpart.
 const SPLASH_BACKGROUND = '#0E6F6E';
@@ -57,7 +57,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     privacyManifests: {
       NSPrivacyTracking: false,
       NSPrivacyTrackingDomains: [],
-      NSPrivacyCollectedDataTypes: [],
+      // Matches the App Privacy answers in docs/release.md (option A): places and searches leave
+      // the phone for providers that may log requests. Never linked to the person, never tracking.
+      NSPrivacyCollectedDataTypes: [
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePreciseLocation',
+          NSPrivacyCollectedDataTypeLinked: false,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeSearchHistory',
+          NSPrivacyCollectedDataTypeLinked: false,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+      ],
       NSPrivacyAccessedAPITypes: [
         {
           NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',

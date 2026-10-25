@@ -9,7 +9,7 @@
   <body>
     <main>
       <h1>HopReady privacy policy</h1>
-      <p class="lede">Draft. Last updated 25 October 2026.</p>
+      <p class="lede">Draft. Last updated 26 October 2026.</p>
       <p class="note">
         Before publishing: the publisher must confirm a contact email and review this policy against
         the released build.
@@ -23,14 +23,16 @@
           To plan a trip, the places involved are sent to HopReady's server, which asks Transport
           for NSW and Apple Maps for routes. HopReady's server does not keep them after answering.
         </li>
+        <li>HopReady asks before the first live request. Demo mode sends nothing to its server.</li>
       </ul>
 
       <h2>What stays on your iPhone</h2>
       <p>
         Home and work, favourite places and routes, recent searches, trip preferences, the location
         of your parked car, parking spots you saved, the trip you are on, and a random install
-        identifier. This is stored in the app's own storage and is never uploaded as a set. Settings
-        &gt; Delete all HopReady data erases it, as does deleting the app.
+        identifier. This is stored in the app's own storage. Parts of it leave the phone only inside
+        a request you make, as listed below, and never as a set. Settings &gt; Delete all HopReady
+        data erases it, as does deleting the app.
       </p>
 
       <h2>What is sent, and why</h2>
@@ -46,18 +48,34 @@
           <tr>
             <td>You plan a trip</td>
             <td>
-              Start, destination and (for a trip home) parked-car locations, the time, and your trip
-              preferences
+              Start and destination, the time and your trip preferences. With "I'll drive and park",
+              also the parking spots you saved (their names and positions). For Take me home, where
+              your car is.
             </td>
             <td>
-              HopReady's server, which sends locations and times to Transport for NSW (public
-              transport) and Apple Maps (drive times)
+              HopReady's server, which sends positions and times, not names, to Transport for NSW
+              (public transport) and Apple Maps (drive times)
             </td>
           </tr>
           <tr>
             <td>You search for a place</td>
-            <td>What you type, and your approximate location if you allowed location access</td>
+            <td>
+              What you type and, if you have allowed location access, your approximate location
+              (rounded to about 1 km) so nearby places come first
+            </td>
             <td>HopReady's server, which asks Transport for NSW (stops) and Apple Maps (places)</td>
+          </tr>
+          <tr>
+            <td>You use your current location, in live mode</td>
+            <td>Your position</td>
+            <td>
+              Apple, from your phone through iOS, to look up the street name. Demo mode skips this
+            </td>
+          </tr>
+          <tr>
+            <td>The app shows a map</td>
+            <td>The area on screen</td>
+            <td>Apple Maps, from your phone, to draw the map</td>
           </tr>
           <tr>
             <td>You check car parks</td>
@@ -77,15 +95,16 @@
         </tbody>
       </table>
       <p>
-        HopReady asks for your agreement before the first live search sends any of this. Demo mode
-        sends nothing.
+        HopReady asks for your agreement before the first live request sends any of this. Demo mode
+        sends nothing to HopReady's server; its maps still come from Apple.
       </p>
 
       <h2>Location</h2>
       <p>
-        HopReady only uses your location while the app is open, and only after you tap
-        <em>Use current location</em> and allow it. It never tracks you in the background. You can
-        always type a start point instead.
+        HopReady uses your location only while the app is open, and only after you allow it. It
+        reads your position when you tap <em>Use current location</em>, and, once you have allowed
+        access, to show nearby places first when you search. It never tracks you in the background.
+        You can always type a start point instead.
       </p>
 
       <h2>What HopReady's server keeps</h2>
@@ -99,15 +118,30 @@
 
       <h2>Transport for NSW and Apple</h2>
       <p>
-        Transport for NSW and Apple receive locations and search text from HopReady's server, not
-        from your phone, and without your identity or install identifier. They handle requests under
-        their own terms and privacy policies:
+        Transport for NSW and Apple receive locations and search text from HopReady's server,
+        without your identity or install identifier. Apple also receives requests straight from your
+        phone to draw maps and, in live mode, to name the street of your current location. HopReady
+        shares data only with services whose privacy commitments protect it at least as well as this
+        policy:
         <a href="https://www.transport.nsw.gov.au/about-us/transport-privacy/privacy-statement"
-          >Transport for NSW privacy</a
-        >
-        and <a href="https://www.apple.com/legal/privacy/">Apple privacy</a>. Maps shown in the app
-        come from Apple Maps under Apple's privacy policy.
+          >Transport for NSW</a
+        >, <a href="https://www.apple.com/legal/privacy/">Apple</a>, and
+        <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>, which runs HopReady's
+        server.
       </p>
+
+      <h2>Your choices</h2>
+      <ul>
+        <li>
+          Settings &gt; Live data use shows what is sent and lets you withdraw your agreement. Live
+          trips then stop until you agree again. Demo mode keeps working.
+        </li>
+        <li>
+          Settings &gt; Delete all HopReady data erases everything HopReady stored on your iPhone,
+          including the agreement.
+        </li>
+        <li>Location access can be changed at any time in the iOS Settings app.</li>
+      </ul>
 
       <h2>Children</h2>
       <p>HopReady is not directed at children under 13.</p>
