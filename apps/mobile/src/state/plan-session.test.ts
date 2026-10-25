@@ -295,8 +295,28 @@ describe('refreshActiveTrip', () => {
       status: 'no-longer-offered',
       alternatives: [transit],
       request: searched.request,
+      restOfTrip: null,
     });
     expect(storage.activeTrip.get()?.itinerary).toEqual(parkAndRide);
+  });
+
+  it('forgets what it found once another trip is followed instead', async () => {
+    const { session, storage, trips } = withActiveTrip(120);
+    const refreshed = session.refreshActiveTrip();
+    lastPending(trips.pending).resolve(planResponse([transit]));
+    await refreshed;
+    expect(session.getState().activeTripRefresh.status).toBe('no-longer-offered');
+
+    const instead = {
+      request: planRequest(),
+      itinerary: transit,
+      plannedAt: START.toISOString(),
+      mode: 'live' as const,
+    };
+    session.follow(instead);
+
+    expect(storage.activeTrip.get()).toEqual(instead);
+    expect(session.getState().activeTripRefresh.status).toBe('idle');
   });
 
   it('leaves a trip planned in the last minute alone', async () => {
@@ -393,6 +413,8 @@ describe('a followed trip that has started', () => {
       status: 'no-longer-offered',
       alternatives: [nextRun],
       request: searched.request,
+      // The alternatives start at the metro's stop, so following one keeps the legs before it.
+      restOfTrip: { fromLegIndex: started.legs.indexOf(metro) },
     });
     expect(storage.activeTrip.get()?.itinerary).toEqual(started);
   });

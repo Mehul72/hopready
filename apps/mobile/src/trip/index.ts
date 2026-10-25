@@ -1,4 +1,9 @@
-export { type ItineraryMatch, matchItinerary, matchRestOfTrip } from './itinerary-match';
+export {
+  type ItineraryMatch,
+  joinAlternative,
+  matchItinerary,
+  matchRestOfTrip,
+} from './itinerary-match';
 export {
   PLACE_SEARCH_DEBOUNCE_MS,
   tripQueryKeys,

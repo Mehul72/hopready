@@ -4,6 +4,7 @@ import {
   DEFAULT_PREFERENCES,
   type DriveLeg,
   type Itinerary,
+  type Leg,
   legSeconds,
   type ParkedCar,
   type PlanRequest,
@@ -399,11 +400,17 @@ describe('checking a followed trip for changes', () => {
     expect(
       alternatives.every((alternative) => alternative.legs[0]?.from.name === metro.from.name),
     ).toBe(true);
+    // Each option says it leaves from the station, not from home.
     for (const alternative of alternatives) {
       expect(
-        screen.getByRole('button', { name: describeTripSummary(alternative) }),
+        screen.getByRole('button', {
+          name: `From ${metro.from.name}. ${describeTripSummary(alternative)}`,
+        }),
       ).toBeOnTheScreen();
     }
+    expect(
+      screen.getAllByText(`${STRATEGY_LABELS['transit-only']} from ${metro.from.name}`),
+    ).toHaveLength(alternatives.length);
   });
 
   it('still finds the metro after it makes up the time it had lost', async () => {
@@ -468,11 +475,32 @@ describe('checking a followed trip for changes', () => {
     expect(
       await screen.findByLabelText(/^Error\. This trip is no longer offered\./),
     ).toBeOnTheScreen();
-    await user.press(screen.getByRole('button', { name: describeTripSummary(alternative) }));
-    expect(appStorage.activeTrip.get()).toMatchObject({
-      itinerary: { id: alternative.id },
-      request: { origin: metro.from },
+    await user.press(
+      screen.getByRole('button', {
+        name: `From ${metro.from.name}. ${describeTripSummary(alternative)}`,
+      }),
+    );
+
+    // Still the drive and park trip from home: the drive, the car park and I parked here stay.
+    const followed = appStorage.activeTrip.get();
+    expect(followed?.request).toEqual(demoCommuteRequest());
+    expect(followed?.itinerary).toMatchObject({
+      strategy: 'park-and-ride',
+      parking: itinerary.parking,
+      departAt: itinerary.departAt,
+      arriveAt: alternative.arriveAt,
     });
+    const notWaiting = (leg: Leg) => leg.kind !== 'wait';
+    expect(followed?.itinerary.legs.filter(notWaiting)).toEqual([
+      ...itinerary.legs.slice(0, itinerary.legs.indexOf(metro)).filter(notWaiting),
+      ...alternative.legs,
+    ]);
+    expect(await screen.findByRole('button', { name: 'I parked here' })).toBeOnTheScreen();
+    expect(
+      within(screen.getByTestId('trip-summary')).getByText(STRATEGY_LABELS['park-and-ride']),
+    ).toBeOnTheScreen();
+    // The warning was about the trip it replaced.
+    expect(screen.queryByLabelText(/This trip is no longer offered/)).not.toBeOnTheScreen();
   });
 });
 

@@ -47,6 +47,13 @@ export type ActiveTripRefreshStatus =
   | 'no-longer-offered'
   | 'failed';
 
+// Once the trip has started, a check plans only the rest of it, from the stop of its next service.
+export interface RestOfTripCheck {
+  // That service's leg on the trip as it was checked. Alternatives start at its stop, so following
+  // one keeps the legs before it.
+  fromLegIndex: number;
+}
+
 export interface ActiveTripRefresh {
   status: ActiveTripRefreshStatus;
   error: ApiError | null;
@@ -54,6 +61,8 @@ export interface ActiveTripRefresh {
   // For 'no-longer-offered': the search the alternatives answer, so following one or planning
   // again uses the same places and car.
   request: PlanRequest | null;
+  // For 'updated' and 'no-longer-offered' once the trip has started. Null for the whole trip.
+  restOfTrip: RestOfTripCheck | null;
   // For 'replaced': the run the person chose, so the screen can say what changed.
   previous: Itinerary | null;
   checkedAt: string | null;
@@ -105,6 +114,9 @@ export interface PlanSession {
   refresh: () => Promise<RefreshOutcome>;
   // Makes an option from the latest results the active trip. Returns null if it is not there.
   select: (itineraryId: string) => Itinerary | null;
+  // Follows another trip in place of the active one, such as an option a check offered instead.
+  // What that check found was about the trip it replaces, so it is cleared.
+  follow: (trip: ActiveTrip) => void;
   // Re-plans the active trip, or the rest of it once it has started, when the refresh-on-resume
   // rule says so; the outcome lands in `activeTripRefresh`. Never rejects.
   refreshActiveTrip: () => Promise<void>;
@@ -127,6 +139,7 @@ const IDLE_ACTIVE_TRIP_REFRESH: ActiveTripRefresh = {
   error: null,
   alternatives: [],
   request: null,
+  restOfTrip: null,
   previous: null,
   checkedAt: null,
 };
@@ -261,6 +274,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
         part.kind === 'whole-trip'
           ? matchItinerary(trip.itinerary, response.itineraries)
           : matchRestOfTrip(trip.itinerary, part.legIndex, response.itineraries);
+      const restOfTrip = part.kind === 'whole-trip' ? null : { fromLegIndex: part.legIndex };
       if (!match) {
         setState({
           activeTripRefresh: {
@@ -268,6 +282,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
             error: null,
             alternatives: response.itineraries,
             request,
+            restOfTrip,
             previous: null,
             checkedAt,
           },
@@ -287,6 +302,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
           error: null,
           alternatives: [],
           request: null,
+          restOfTrip,
           previous: match.exact ? null : trip.itinerary,
           checkedAt,
         },
@@ -302,6 +318,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
           error: apiError,
           alternatives: [],
           request: null,
+          restOfTrip: null,
           previous: null,
           checkedAt: toIso(clock.now()),
         },
@@ -370,6 +387,10 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
       storage.activeTrip.start({ request, itinerary, plannedAt, mode: response.mode });
       setState({ selectedItineraryId: itineraryId, activeTripRefresh: IDLE_ACTIVE_TRIP_REFRESH });
       return itinerary;
+    },
+    follow: (trip) => {
+      storage.activeTrip.start(trip);
+      setState({ activeTripRefresh: IDLE_ACTIVE_TRIP_REFRESH });
     },
     refreshActiveTrip: async () => {
       await checkActiveTrip('resume');

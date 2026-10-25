@@ -1,6 +1,7 @@
 import {
   addMinutes,
   buildItinerary,
+  type Fare,
   type Itinerary,
   type Leg,
   planRequestSchema,
@@ -10,7 +11,7 @@ import {
 import type { ActiveTrip } from '@/storage';
 import { parkAndRideItinerary, PLACES, planRequest, transitItinerary } from '@/test-support/trips';
 
-import { matchItinerary, matchRestOfTrip } from './itinerary-match';
+import { joinAlternative, matchItinerary, matchRestOfTrip } from './itinerary-match';
 import {
   manualRefreshAvailability,
   partToCheck,
@@ -225,22 +226,22 @@ describe('matchItinerary', () => {
   });
 });
 
+// Drive and park done, the metro still to come.
+const started = parkAndRideItinerary({ departAt: '2026-10-26T20:50:00.000Z' });
+const metroIndex = started.legs.findIndex((leg) => leg.kind === 'transit');
+
+// What planning from the station offers: the metro and the walk after it, `lateMinutes` late.
+function restFromStation(trip: Itinerary, lateMinutes = 0, fare?: Fare): Itinerary {
+  const shift = (leg: Leg): Leg => ({
+    ...leg,
+    start: addMinutes(leg.start, lateMinutes),
+    end: addMinutes(leg.end, lateMinutes),
+  });
+  const fromMetro = trip.legs.slice(trip.legs.findIndex((leg) => leg.kind === 'transit'));
+  return buildItinerary({ strategy: 'transit-only', legs: fromMetro.map(shift), fare });
+}
+
 describe('matchRestOfTrip', () => {
-  // Drive and park done, the metro still to come.
-  const started = parkAndRideItinerary({ departAt: '2026-10-26T20:50:00.000Z' });
-  const metroIndex = started.legs.findIndex((leg) => leg.kind === 'transit');
-
-  // What planning from the station offers: the metro and the walk after it, `lateMinutes` late.
-  function restFromStation(trip: Itinerary, lateMinutes = 0): Itinerary {
-    const shift = (leg: Leg): Leg => ({
-      ...leg,
-      start: addMinutes(leg.start, lateMinutes),
-      end: addMinutes(leg.end, lateMinutes),
-    });
-    const fromMetro = trip.legs.slice(trip.legs.findIndex((leg) => leg.kind === 'transit'));
-    return buildItinerary({ strategy: 'transit-only', legs: fromMetro.map(shift) });
-  }
-
   it('joins the latest times of the same runs to the part already travelled', () => {
     const running = restFromStation(started, 3);
     const nextRun = restFromStation(parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z' }));
@@ -271,5 +272,55 @@ describe('matchRestOfTrip', () => {
     const nextRun = restFromStation(parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z' }));
     expect(matchRestOfTrip(started, metroIndex, [nextRun])).toBeNull();
     expect(matchRestOfTrip(started, metroIndex, [])).toBeNull();
+  });
+});
+
+describe('joinAlternative', () => {
+  const FARE: Fare = {
+    status: 'known',
+    adultCents: 520,
+    currency: 'AUD',
+    source: 'tfnsw-trip-planner',
+  };
+
+  it('keeps the drive, the car park and the strategy, then follows the other option', () => {
+    const nextRun = restFromStation(
+      parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z' }),
+      0,
+      FARE,
+    );
+
+    const joined = joinAlternative(started, metroIndex, nextRun);
+
+    expect(joined).toMatchObject({
+      strategy: 'park-and-ride',
+      parking: started.parking,
+      departAt: started.departAt,
+      arriveAt: nextRun.arriveAt,
+      fare: FARE,
+    });
+    expect(joined.legs.slice(0, metroIndex)).toEqual(started.legs.slice(0, metroIndex));
+    // Ten minutes at the station until the later metro.
+    expect(joined.legs.map((leg) => leg.kind)).toEqual([
+      'drive',
+      'park',
+      'walk',
+      'wait',
+      'transit',
+      'walk',
+    ]);
+    // Another trip, so it has its own id.
+    expect(joined.id).not.toBe(started.id);
+  });
+
+  it('leaves the fare unknown once a service of the trip was ridden', () => {
+    // Off the metro, with only the walk to the office left.
+    const walkIndex = started.legs.length - 1;
+    const walkOn = buildItinerary({
+      strategy: 'transit-only',
+      legs: started.legs.slice(walkIndex),
+      fare: FARE,
+    });
+    expect(joinAlternative(started, walkIndex, walkOn).fare).toEqual({ status: 'unknown' });
   });
 });

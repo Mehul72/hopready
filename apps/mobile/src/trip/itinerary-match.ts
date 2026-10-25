@@ -45,6 +45,13 @@ function runsOf(legs: readonly Leg[]): string {
     .join('|');
 }
 
+// The legs of a trip that has started, up to its next service, then `rest` from that service's
+// stop. Waits are worked out again from the new times.
+function joinedLegs(trip: Itinerary, fromLegIndex: number, rest: readonly Leg[]): Leg[] {
+  const travelled = trip.legs.slice(0, fromLegIndex).filter((leg) => leg.kind !== 'wait');
+  return [...travelled, ...rest];
+}
+
 // For a trip that has started, checked by planning the rest of it from the next stop
 // (restOfTripRequest). The trip still runs when an option rides every service still to come, on
 // the same runs; joined to the part already travelled, that option is the trip with the latest
@@ -59,15 +66,33 @@ export function matchRestOfTrip(
   const same = candidates.find((candidate) => runsOf(candidate.legs) === runsToCome);
   if (!same) return null;
   const boardingIndex = same.legs.findIndex((leg) => leg.kind === 'transit');
-  // Waits are worked out again from the new times.
-  const travelled = trip.legs.slice(0, fromLegIndex).filter((leg) => leg.kind !== 'wait');
   const updated = buildItinerary({
     strategy: trip.strategy,
-    legs: [...travelled, ...same.legs.slice(boardingIndex)],
+    legs: joinedLegs(trip, fromLegIndex, same.legs.slice(boardingIndex)),
     parking: trip.parking,
     fare: trip.fare,
     alerts: same.alerts,
     notes: [...new Set([...trip.notes, ...same.notes])],
   });
   return { itinerary: { ...updated, id: trip.id }, exact: true };
+}
+
+// Another option for the rest of a trip that has started, planned the same way, joined to the part
+// already travelled. A drive and park or drop-off trip keeps its drive, car park and strategy, so
+// the trip still shows where to drive and still offers I parked here.
+export function joinAlternative(
+  trip: Itinerary,
+  fromLegIndex: number,
+  alternative: Itinerary,
+): Itinerary {
+  const rodeAService = trip.legs.slice(0, fromLegIndex).some((leg) => leg.kind === 'transit');
+  return buildItinerary({
+    strategy: trip.strategy,
+    legs: joinedLegs(trip, fromLegIndex, alternative.legs),
+    parking: trip.parking,
+    // The alternative's fare covers its own services only.
+    fare: rodeAService ? { status: 'unknown' } : alternative.fare,
+    alerts: alternative.alerts,
+    notes: [...new Set([...trip.notes, ...alternative.notes])],
+  });
 }

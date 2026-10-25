@@ -9,6 +9,7 @@ import { type ActiveTripRefresh, planSession } from '@/state';
 import { appStorage } from '@/storage';
 import { SPACING } from '@/theme';
 import {
+  joinAlternative,
   MANUAL_REFRESH_MIN_INTERVAL_SECONDS,
   partToCheck,
   refreshableRequest,
@@ -25,23 +26,32 @@ import { duration } from './trip-text';
 import type { DisplayedTrip } from './use-displayed-trip';
 
 // Follows another option after the chosen one stopped being offered. The alternatives come from
-// the same refresh, so the trip keeps the search they answer and the same mode.
+// the same refresh, so the trip keeps the search they answer and the same mode. Once the trip has
+// started, they cover only the rest of it: the part already travelled stays, and so does the
+// search for the whole trip.
 function followAlternative(alternative: Itinerary, refresh: ActiveTripRefresh) {
   const activeTrip = appStorage.activeTrip.get();
-  const { request } = refresh;
+  const { request, restOfTrip } = refresh;
   if (!activeTrip || !request) return;
   const now = new Date();
+  const followed = restOfTrip
+    ? {
+        request: activeTrip.request,
+        itinerary: joinAlternative(activeTrip.itinerary, restOfTrip.fromLegIndex, alternative),
+      }
+    : { request: refreshableRequest(request, now), itinerary: alternative };
   const started = writeOrAlert(
     () =>
-      appStorage.activeTrip.start({
-        request: refreshableRequest(request, now),
-        itinerary: alternative,
+      planSession.follow({
+        ...followed,
         plannedAt: refresh.checkedAt ?? toIso(now),
         mode: activeTrip.mode,
       }),
     "Couldn't switch to this option",
   );
-  if (started.ok) router.replace({ pathname: '/itinerary/[id]', params: { id: alternative.id } });
+  if (started.ok) {
+    router.replace({ pathname: '/itinerary/[id]', params: { id: followed.itinerary.id } });
+  }
 }
 
 // Through replanRequest, so a trip home never goes back to a car that has moved or gone.
@@ -58,14 +68,18 @@ function AlternativeCard({
   refresh: ActiveTripRefresh;
 }) {
   const total = duration(shownDurationSeconds(alternative));
+  // Once the trip has started, an option leaves from the stop of its next service, not from where
+  // the trip began, so someone still on the way there can tell where Leave applies.
+  const from = refresh.restOfTrip ? (refresh.request?.origin.name ?? null) : null;
+  const summary = describeTripSummary(alternative);
   return (
     <Card
       onPress={() => followAlternative(alternative, refresh)}
-      accessibilityLabel={describeTripSummary(alternative)}
+      accessibilityLabel={from ? `From ${from}. ${summary}` : summary}
       accessibilityHint="Follows this option instead">
       <View style={styles.alternative}>
         <AppText variant="subheadline" tone="secondary" weight="semibold">
-          {optionLabel(alternative)}
+          {from ? `${optionLabel(alternative)} from ${from}` : optionLabel(alternative)}
         </AppText>
         <AppText variant="headline" tabularNumbers>
           {`Leave ${formatSydneyTime(alternative.departAt)} · Arrive ${formatSydneyTime(alternative.arriveAt)}`}
@@ -179,8 +193,6 @@ function CheckResult({ trip, canCheck }: { trip: DisplayedTrip; canCheck: boolea
         />
       );
     case 'no-longer-offered': {
-      // This itinerary is one of the options offered now, so the warning is about another one.
-      if (refresh.alternatives.some((alternative) => alternative.id === itinerary.id)) return null;
       if (refresh.alternatives.length === 0) {
         const searched = refresh.request ?? request;
         return (
