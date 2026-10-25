@@ -3,7 +3,7 @@ import { act, renderRouter, screen, testRouter } from 'expo-router/testing-libra
 import { Linking, Text } from 'react-native';
 
 import TabsLayout from '@/app/(tabs)/_layout';
-import RootLayout from '@/app/_layout';
+import RootLayout, { unstable_settings as rootSettings } from '@/app/_layout';
 import DataUseRoute from '@/app/data-use';
 import WelcomeRoute from '@/app/welcome';
 import { appStorage, LIVE_DATA_CONSENT_VERSION } from '@/storage';
@@ -25,7 +25,7 @@ function placeholder(name: string) {
 }
 
 const ROUTES = {
-  _layout: RootLayout,
+  _layout: { default: RootLayout, unstable_settings: rootSettings },
   '(tabs)/_layout': TabsLayout,
   '(tabs)/index': placeholder('Plan'),
   '(tabs)/car': placeholder('Car'),

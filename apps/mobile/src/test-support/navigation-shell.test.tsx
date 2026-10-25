@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 
 // Lives outside src/app: every file there becomes a route and ships in the app bundle.
 import TabsLayout from '@/app/(tabs)/_layout';
-import RootLayout from '@/app/_layout';
+import RootLayout, { unstable_settings as rootSettings } from '@/app/_layout';
 import { DEMO_BANNER_MESSAGE, DEMO_BANNER_TITLE } from '@/components/demo-mode-banner';
 import { appStorage } from '@/storage';
 
@@ -14,7 +14,7 @@ function placeholder(name: string) {
 }
 
 const ROUTES = {
-  _layout: RootLayout,
+  _layout: { default: RootLayout, unstable_settings: rootSettings },
   '(tabs)/_layout': TabsLayout,
   '(tabs)/index': placeholder('Plan'),
   '(tabs)/car': placeholder('Car'),
@@ -50,6 +50,15 @@ describe('navigation shell', () => {
     expect(screen.getByText('Correct parking screen')).toBeOnTheScreen();
     await testRouter.push('/data-use');
     expect(screen.getByText('Data use screen')).toBeOnTheScreen();
+  });
+
+  it('opens a sheet from a link over the tabs, so closing it lands on Plan', async () => {
+    await renderRouter(ROUTES, { initialUrl: '/trip-options' });
+    expect(screen.getByText('Trip options screen')).toBeOnTheScreen();
+
+    await act(async () => testRouter.back());
+
+    expect(screen.getByText('Plan screen')).toBeOnTheScreen();
   });
 
   it('never asks about live data in a build that cannot plan live trips', async () => {

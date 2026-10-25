@@ -13,6 +13,10 @@ import { appStorage } from '@/storage';
 import { NAVIGATION_THEMES, useColourScheme, useTheme } from '@/theme';
 import { useRefreshActiveTripOnResume } from '@/trip';
 
+// A link straight to a sheet (place search, trip options) opens it over the tabs, so closing it
+// lands somewhere instead of leaving an empty stack.
+export const unstable_settings = { anchor: '(tabs)' };
+
 const SHEET_PRESENTATIONS: ReadonlySet<string> = new Set([
   'modal',
   'transparentModal',
