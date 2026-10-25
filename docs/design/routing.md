@@ -4,7 +4,7 @@ This explains the rules in `packages/core/src/planner.ts` and why they are shape
 
 ## What it does not claim
 
-HopReady checks a small, explainable set of options and shows the ones that work. It does not search every combination of car park, station and service across Sydney, and it never calls a result optimal. Every response lists the car parks it checked and what happened to each.
+HopReady checks a small, explainable set of options and shows the ones that work, leaving out a car park or station that another one shown matches or beats (see "Only real choices"). It does not search every combination of car park, station and service across Sydney, and it never calls a result optimal. Every response lists the car parks it checked and what happened to each.
 
 ## Strategies
 
@@ -28,7 +28,7 @@ A traveller who was dropped off gets `transit-home` and is never sent back for a
    - The detour (origin to car park to destination) must be at most 1.6 times the direct distance.
    - A preferred car park (a Park&Ride car park, or a parking spot the person saved and chose in Trip options) skips the direction checks but not the driving limit.
 3. **Ranking.** One Apple ETA call for up to 8 shortlisted candidates. Candidates beyond `maxDriveMinutes` are dropped. The rest are scored by drive time plus a rough transit estimate (distance × 1.35 at 35 km/h, plus 8 minutes), and the best 3 are kept. The preferred car park always ranks first.
-4. **Explanation.** Each checked car park is reported with one outcome: `used`, `too-far-to-drive`, `not-towards-destination`, `no-workable-connection` or `provider-error`. A car park is `used` only when its option passes every feasibility check below; one whose drive runs past the limit in traffic is `too-far-to-drive`.
+4. **Explanation.** Each checked car park is reported with one outcome: `used`, `matched-by-another`, `too-far-to-drive`, `not-towards-destination`, `no-workable-connection` or `provider-error`. A car park is `used` only when its option passes every feasibility check below and is shown. One whose option works but is left out because a car park shown with it is as good (see "Only real choices") is `matched-by-another`. One whose drive runs past the limit in traffic is `too-far-to-drive`.
 
 Drop-off uses the stations served by those car parks, plus a preferred station, through the same steps. When no drop-off option works, an `unavailable` entry says whether no station was within the driving limit or no connection worked from the stations checked.
 
@@ -84,6 +84,17 @@ HopReady sends TfNSW no walking speed, because no parameter for it has been veri
 | `duplicate`                | The same services and car park as another option                                  |
 
 Counts of each reason come back with the response, so the app can explain an empty result ("some connections were shorter than your 3 min transfer buffer") instead of padding the list with poor options.
+
+## Only real choices
+
+After the feasibility checks, a `park-and-ride` or `drop-off` option is left out when a shown option of the same strategy is at least as good on everything the results can be sorted by, and as certain:
+
+- it arrives no later, drives no more and has no more changes, with times and drives read to the minute the way the cards show them;
+- it leaves no more than a minute earlier, because a minute is not worth a card of its own;
+- it has no service alert the other avoids, and at least as many live times (live, then partly live, then timetable);
+- for a car park, its occupancy is `known` (fresh) with more than 10% of the spaces free. An unknown, stale or nearly full count could mean no space on arrival, so the other car park stays as a fallback.
+
+The car park the traveller asked for is never left out this way. A station they asked for can lose a car park only to a better one at that same station. Options are compared strongest first, so an option is only ever left out behind one that is shown. Public transport only, `drive-only` and return trips are never left out this way.
 
 ## Unknown is unknown
 
