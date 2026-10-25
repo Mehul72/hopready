@@ -163,6 +163,15 @@ export const TIMING_SUMMARY_WORDING: Readonly<Record<TimingSummary, Wording>> = 
   estimate: { text: 'Estimate', spoken: 'Estimated drive time' },
 };
 
+// Live times from a check too long ago (staleCheckOf) may have changed, so they are described by
+// when they were checked instead of being called live.
+export function timingWording(summary: TimingSummary, staleCheckAt: string | null): Wording {
+  const live = summary === 'live' || summary === 'partly-live';
+  if (!live || staleCheckAt === null) return TIMING_SUMMARY_WORDING[summary];
+  const time = formatSydneyTime(staleCheckAt);
+  return { text: `Checked ${time}`, spoken: `Times checked at ${time} and may have changed` };
+}
+
 export interface AlertSummary {
   count: number;
   severity: ServiceAlert['severity'];
@@ -218,7 +227,12 @@ function capitalise(text: string): string {
 }
 
 // The whole card as one sentence, so VoiceOver users hear an option the way it looks.
-export function describeItinerary(itinerary: Itinerary, now: Date): string {
+// `staleCheckAt`, from staleCheckOf, words old live times by when they were checked.
+export function describeItinerary(
+  itinerary: Itinerary,
+  now: Date,
+  staleCheckAt: string | null = null,
+): string {
   const facts = tripFacts(itinerary);
   const parking = parkingSummary(itinerary, now);
   const alerts = alertSummary(itinerary);
@@ -231,7 +245,7 @@ export function describeItinerary(itinerary: Itinerary, now: Date): string {
     parking ? `Parking at ${parking.carParkName}: ${parking.occupancy.spoken}` : null,
     parking ? parking.note.replace(/\.$/, '') : null,
     parking?.rulesNote ? parking.rulesNote.replace(/\.$/, '') : null,
-    TIMING_SUMMARY_WORDING[timingSummary(itinerary)].spoken,
+    timingWording(timingSummary(itinerary), staleCheckAt).spoken,
     alerts?.wording.spoken ?? null,
     ...itinerary.notes.map((note) => note.replace(/\.$/, '')),
   ];

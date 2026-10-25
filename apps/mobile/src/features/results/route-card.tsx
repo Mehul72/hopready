@@ -45,17 +45,28 @@ const ALERT_STYLES: Readonly<
 export interface RouteCardProps {
   itinerary: Itinerary;
   now: Date;
+  // When the options were checked, once that is too long ago to call their times live
+  // (staleCheckOf).
+  staleCheckAt: string | null;
   // The option the person chose to follow, if it is this one.
   selected: boolean;
   onPress: () => void;
 }
 
-function TimingPill({ summary }: { summary: TimingSummary }) {
+function TimingPill({
+  summary,
+  staleCheckAt,
+}: {
+  summary: TimingSummary;
+  staleCheckAt: string | null;
+}) {
   const { colours } = useTheme();
-  if (summary === 'live') return <TimingBadge timing="realtime" />;
+  if (summary === 'live') return <TimingBadge timing="realtime" staleCheckAt={staleCheckAt} />;
   if (summary === 'sample-live') return <TimingBadge timing="realtime" sample />;
   if (summary === 'timetable') return <TimingBadge timing="scheduled" />;
   if (summary === 'estimate') return <TimingBadge timing="estimated" />;
+  // Old partly live times say when they were checked, as old live ones do.
+  if (staleCheckAt) return <TimingBadge timing="realtime" staleCheckAt={staleCheckAt} />;
   // Partly live is not a single leg timing, so it borrows the live badge's look with its own words.
   const style = TIMING_STYLES.realtime;
   return (
@@ -110,7 +121,7 @@ function StepChip({ step }: { step: LegStep }) {
 
 // One trip option. The whole card is a single button whose spoken label reads the option as one
 // sentence; the pieces inside are for the eye.
-export function RouteCard({ itinerary, now, selected, onPress }: RouteCardProps) {
+export function RouteCard({ itinerary, now, staleCheckAt, selected, onPress }: RouteCardProps) {
   const { colours } = useTheme();
   const facts = tripFacts(itinerary);
   const steps = legSteps(itinerary);
@@ -124,7 +135,7 @@ export function RouteCard({ itinerary, now, selected, onPress }: RouteCardProps)
     <Card
       onPress={onPress}
       selected={selected}
-      accessibilityLabel={describeItinerary(itinerary, now)}
+      accessibilityLabel={describeItinerary(itinerary, now, staleCheckAt)}
       accessibilityHint="Opens the steps and map for this option"
       testID={`route-card-${itinerary.id}`}>
       <View style={styles.content}>
@@ -132,7 +143,7 @@ export function RouteCard({ itinerary, now, selected, onPress }: RouteCardProps)
           <AppText variant="subheadline" tone="secondary" weight="semibold" style={styles.shrink}>
             {optionLabel(itinerary)}
           </AppText>
-          <TimingPill summary={timingSummary(itinerary)} />
+          <TimingPill summary={timingSummary(itinerary)} staleCheckAt={staleCheckAt} />
         </View>
         <View style={styles.timesRow}>
           <TimeBlock label="Leave" value={formatSydneyTime(itinerary.departAt)} />

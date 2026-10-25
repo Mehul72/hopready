@@ -1,4 +1,4 @@
-import { type Itinerary, legSeconds, type ParkedCar } from '@hopready/core';
+import { addMinutes, type Itinerary, legSeconds, type ParkedCar } from '@hopready/core';
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
@@ -12,6 +12,8 @@ import { appStorage } from '@/storage';
 import { fitToCoordinates } from '@/test-support/mocks/react-native-maps';
 import { place, PLACES, planRequest, planResponse, transitItinerary } from '@/test-support/trips';
 import { tripService } from '@/trip';
+
+import { describeItinerary } from './route-summary';
 
 beforeEach(() => {
   appStorage.deleteAllData();
@@ -301,6 +303,27 @@ describe('refreshing', () => {
     await waitFor(() => expect(planSession.getState().status).toBe('ready'));
     expect(plan).toHaveBeenCalledTimes(1);
     expect(planSession.getState().plannedAt).not.toBe(firstPlannedAt);
+  });
+});
+
+describe('how live the times are', () => {
+  it('stops calling options live once they were checked more than 15 minutes ago', async () => {
+    appStorage.settings.setDemoMode(false);
+    const live = transitItinerary({ departAt: addMinutes(TUESDAY_0730, 30), realtime: true });
+    jest.spyOn(tripService, 'planTrip').mockResolvedValue(planResponse([live]));
+    await planSession.plan(planRequest());
+    jest.setSystemTime(new Date(addMinutes(TUESDAY_0730, 16)));
+
+    await renderApp('/results');
+
+    const card = within(screen.getByTestId(`route-card-${live.id}`));
+    expect(card.getByText('Checked 7:30 am')).toBeOnTheScreen();
+    expect(card.queryByText('Live')).not.toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', {
+        name: describeItinerary(live, new Date(), TUESDAY_0730.toISOString()),
+      }),
+    ).toBeOnTheScreen();
   });
 });
 

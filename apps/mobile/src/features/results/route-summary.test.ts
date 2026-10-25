@@ -80,6 +80,20 @@ describe('describeItinerary', () => {
     );
   });
 
+  it('says when live times were checked, once that is too long ago to call them live', () => {
+    const live = parkAndRideItinerary({ departAt: DEPART, realtime: true });
+    const checkedAt = '2026-10-26T20:10:00.000Z';
+
+    const sentence = describeItinerary(live, NOW, checkedAt);
+
+    expect(sentence).toMatch(/Times checked at 7:10 am and may have changed\.$/);
+    expect(sentence).not.toContain('Live times');
+    // Timetable times were never live, so they say so whatever their age.
+    expect(describeItinerary(transitItinerary({ departAt: DEPART }), NOW, checkedAt)).toContain(
+      'Timetable times, not live.',
+    );
+  });
+
   it('says when times come from the timetable and when there are alerts', () => {
     const itinerary: Itinerary = {
       ...transitItinerary({ departAt: DEPART }),
