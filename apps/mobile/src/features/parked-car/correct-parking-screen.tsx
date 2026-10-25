@@ -1,0 +1,157 @@
+import { type Coordinate, haversineMetres } from '@hopready/core';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { AccessibilityInfo, Alert, StyleSheet, View } from 'react-native';
+
+import { AppText, Button, EmptyState, Screen } from '@/components';
+import { appStorage, type ParkedCarState, useActiveTrip, useParkedCar } from '@/storage';
+import { SPACING } from '@/theme';
+
+import { writeOrAlert } from '../saved/storage-writes';
+import { closeParkingSheet } from './close-sheet';
+import {
+  choiceCoordinate,
+  choiceKey,
+  parkedCarFrom,
+  parkedCarName,
+  type ParkingChoice,
+  suggestedCarParkOf,
+} from './parking-choice';
+import { ParkingLocationPicker } from './parking-location-picker';
+import { PinDropMap } from './pin-drop-map';
+
+type ParkedState = Extract<ParkedCarState, { status: 'parked' }>;
+
+// A pin moved this little is a nudge within the same car park or street, so it keeps its name.
+const SAME_SPOT_METRES = 300;
+const PINNED_LOCATION_NAME = 'Pinned location';
+
+// `onRemoved` runs after a successful removal, for screens that should then close.
+export function removeParkedCar(onRemoved?: () => void): void {
+  Alert.alert('Remove your parked car?', 'Take me home will no longer route you back to it.', [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Remove',
+      style: 'destructive',
+      onPress: () => {
+        const removed = writeOrAlert(
+          () => appStorage.parkedCar.clear(),
+          "Couldn't remove your parked car",
+        );
+        if (!removed.ok) return;
+        AccessibilityInfo.announceForAccessibility('Parked car removed.');
+        onRemoved?.();
+      },
+    },
+  ]);
+}
+
+function CorrectParkedCar({ state }: { state: ParkedState }) {
+  const original = state.parkedCar.location.coordinate;
+  // The followed trip's car park, unless that is already where the car is saved.
+  const tripCarPark = suggestedCarParkOf(useActiveTrip()?.itinerary);
+  const suggestion = tripCarPark?.carParkId === state.parkedCar.carParkId ? null : tripCarPark;
+  const [choice, setChoice] = useState<ParkingChoice | null>(null);
+  const pin = choice ? choiceCoordinate(choice) : original;
+  // Choosing a listed place re-centres the map on it; moving the pin by hand never does.
+  const mapKey = choice && choice.kind !== 'pin' ? choiceKey(choice) : 'pin';
+
+  const movePin = (coordinate: Coordinate) => {
+    const nearOriginal = haversineMetres(coordinate, original) <= SAME_SPOT_METRES;
+    setChoice({
+      kind: 'pin',
+      coordinate,
+      name: nearOriginal ? parkedCarName(state) : PINNED_LOCATION_NAME,
+    });
+  };
+
+  const save = () => {
+    if (!choice) return;
+    // The car has been there since it was first confirmed; only the place changes.
+    const record = parkedCarFrom(choice, state.parkedCar.confirmedAt);
+    const saved = writeOrAlert(
+      () => appStorage.parkedCar.markParked(record.parkedCar, record.carParkName),
+      "Couldn't save the new location",
+    );
+    if (!saved.ok) return;
+    AccessibilityInfo.announceForAccessibility('Saved the new location of your car.');
+    closeParkingSheet();
+  };
+
+  return (
+    <Screen
+      testID="correct-parking"
+      footer={
+        <Button
+          label="Save new location"
+          fullWidth
+          disabled={!choice}
+          accessibilityHint={choice ? undefined : 'Move the pin or choose a place first'}
+          onPress={save}
+        />
+      }>
+      <AppText tone="secondary">{`Saved now: ${parkedCarName(state)}`}</AppText>
+      <PinDropMap key={mapKey} coordinate={pin} onMove={movePin} />
+      <View style={styles.section}>
+        <AppText variant="title3" accessibilityRole="header">
+          Or choose a place
+        </AppText>
+        <ParkingLocationPicker
+          suggestion={suggestion}
+          selected={choice?.kind === 'pin' ? null : choice}
+          onSelect={setChoice}
+        />
+      </View>
+      <View style={styles.remove}>
+        <Button
+          variant="destructive"
+          label="Remove parked car"
+          onPress={() => removeParkedCar(closeParkingSheet)}
+        />
+      </View>
+    </Screen>
+  );
+}
+
+// Change where the car is, or forget it.
+export function CorrectParkingScreen() {
+  const parkedCar = useParkedCar();
+  if (parkedCar.status === 'parked') {
+    return <CorrectParkedCar key={parkedCar.parkedCar.confirmedAt} state={parkedCar} />;
+  }
+  return (
+    <Screen testID="correct-parking">
+      {parkedCar.status === 'dropped-off' ? (
+        <EmptyState
+          symbol="figure.wave"
+          title="You were dropped off"
+          message="There's no car to move. If you drove after all, tell HopReady where you parked."
+          action={{
+            label: 'I parked my car',
+            onPress: () => router.replace('/parked-car/confirm'),
+          }}
+        />
+      ) : (
+        <EmptyState
+          symbol="car"
+          title="No parked car"
+          message="There's nothing to correct yet. Tell HopReady where you parked instead."
+          action={{
+            label: 'Tell HopReady where you parked',
+            onPress: () => router.replace('/parked-car/confirm'),
+          }}
+        />
+      )}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  section: {
+    gap: SPACING.sm,
+  },
+  remove: {
+    paddingTop: SPACING.xl,
+    alignItems: 'flex-start',
+  },
+});
