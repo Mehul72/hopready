@@ -88,6 +88,12 @@ const TIME_GRACE_SECONDS = 60;
 const NEARLY_FULL_FREE_SHARE = 0.1;
 // Leaving a minute earlier is not worth a card of its own when nothing else is better.
 const LEAVE_EARLIER_SLACK_SECONDS = 60;
+// An option with more of its times live is more certain, so only it can hide one with fewer.
+const LIVE_TIMES_RANK: Readonly<Record<Itinerary['realtime'], number>> = {
+  none: 0,
+  partial: 1,
+  full: 2,
+};
 
 type TransferStrategy = 'park-and-ride' | 'drop-off';
 type CarParkOutcome = PlanResponse['checkedCarParks'][number]['outcome'];
@@ -1147,6 +1153,8 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
         shownSecondsBetween(b.arriveAt, a.arriveAt) ||
         shownDriveMinutes(a) - shownDriveMinutes(b) ||
         a.transfers - b.transfers ||
+        a.alerts.length - b.alerts.length ||
+        LIVE_TIMES_RANK[b.realtime] - LIVE_TIMES_RANK[a.realtime] ||
         Number(canCountOnASpace(b)) - Number(canCountOnASpace(a)) ||
         shownSecondsBetween(a.departAt, b.departAt),
     );
@@ -1166,13 +1174,16 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
 }
 
 // At least as good on everything the results can be sorted by, read the way the app shows it, without
-// having the traveller leave more than a minute earlier.
+// having the traveller leave more than a minute earlier. It must be as certain too: an alert the
+// other avoids, or fewer live times, leaves the other a real choice.
 function dominates(better: Itinerary, other: Itinerary): boolean {
   return (
     shownSecondsBetween(better.arriveAt, other.arriveAt) >= 0 &&
     shownDriveMinutes(better) <= shownDriveMinutes(other) &&
     better.transfers <= other.transfers &&
-    shownSecondsBetween(other.departAt, better.departAt) >= -LEAVE_EARLIER_SLACK_SECONDS
+    shownSecondsBetween(other.departAt, better.departAt) >= -LEAVE_EARLIER_SLACK_SECONDS &&
+    LIVE_TIMES_RANK[better.realtime] >= LIVE_TIMES_RANK[other.realtime] &&
+    better.alerts.every((alert) => other.alerts.some((same) => same.id === alert.id))
   );
 }
 

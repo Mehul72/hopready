@@ -9,6 +9,7 @@ import {
   type Place,
   type PlanRequest,
   type PlanResponse,
+  type ServiceAlert,
 } from './model';
 import { planTrip, type PlannerDeps } from './planner';
 import {
@@ -493,6 +494,29 @@ describe('leaving out car parks that are no better', () => {
   });
   const shownCarParks = (response: PlanResponse) =>
     response.itineraries.flatMap((it) => (it.parking ? [it.parking.carPark.id] : []));
+  const LIFTS_OUT: ServiceAlert = {
+    id: 'lifts-out-tallawong',
+    severity: 'severe',
+    title: 'Lifts out of service at Tallawong Station',
+  };
+  const withLiftsOut = (journey: TransitJourney): TransitJourney => ({
+    ...journey,
+    alerts: [LIFTS_OUT],
+  });
+  const onTimetable = (journey: TransitJourney): TransitJourney => ({
+    ...journey,
+    legs: journey.legs.map((leg) =>
+      leg.kind === 'transit' ? { ...leg, timing: 'scheduled' } : leg,
+    ),
+  });
+  const changingJourneysFrom = (
+    carParkName: string,
+    change: (journey: TransitJourney) => TransitJourney,
+  ) =>
+    fakeTransit((query) => {
+      const journeys = metroTimetable(query);
+      return query.from.name === carParkName ? journeys.map(change) : journeys;
+    });
 
   it('hides the slower car park only while the quicker one has a fresh count with room', async () => {
     const planWith = async (tallawongCount: Occupancy | null) =>
@@ -505,6 +529,39 @@ describe('leaving out car parks that are no better', () => {
     expect(await planWith(count(12))).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
     expect(await planWith(count(60, 45))).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
     expect(await planWith(null)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
+  });
+
+  describe('with a service alert or live times on one car park only', () => {
+    const planWith = async (transit: TransitProvider) =>
+      shownCarParks(
+        await planTrip(request(), deps({ transit, carParks: tallawongAndBellaVista(count(60)) })),
+      );
+
+    it('keeps the slower car park when only the quicker one has an alert', async () => {
+      expect(await planWith(changingJourneysFrom(TALLAWONG.name, withLiftsOut))).toEqual([
+        TALLAWONG.id,
+        BELLA_VISTA.id,
+      ]);
+      expect(await planWith(changingJourneysFrom(BELLA_VISTA.name, withLiftsOut))).toEqual([
+        TALLAWONG.id,
+      ]);
+    });
+
+    it('still hides the slower car park when both have the same alert', async () => {
+      const everyJourney = fakeTransit((query) => metroTimetable(query).map(withLiftsOut));
+
+      expect(await planWith(everyJourney)).toEqual([TALLAWONG.id]);
+    });
+
+    it('keeps the slower car park when only it has live times', async () => {
+      expect(await planWith(changingJourneysFrom(TALLAWONG.name, onTimetable))).toEqual([
+        TALLAWONG.id,
+        BELLA_VISTA.id,
+      ]);
+      expect(await planWith(changingJourneysFrom(BELLA_VISTA.name, onTimetable))).toEqual([
+        TALLAWONG.id,
+      ]);
+    });
   });
 
   it('still shows a slower car park the traveller asked for', async () => {
@@ -586,6 +643,25 @@ describe('leaving out car parks that are no better', () => {
       );
 
       expect(shownCarParks(response)).toEqual([TALLAWONG_P2.id]);
+    });
+
+    it('lists only the one without an alert, or with live times, when the rest reads the same', async () => {
+      const occupancy = new Map([
+        [TALLAWONG.id, count(60)],
+        [TALLAWONG_P2.id, count(60)],
+      ]);
+      // P1 comes first, so the planner has to look past it to the twin that is more certain.
+      const planWith = async (transit: TransitProvider) =>
+        shownCarParks(
+          await planTrip(request(), deps({ transit, carParks: tallawongTwins(occupancy) })),
+        );
+
+      expect(await planWith(changingJourneysFrom(TALLAWONG.name, withLiftsOut))).toEqual([
+        TALLAWONG_P2.id,
+      ]);
+      expect(await planWith(changingJourneysFrom(TALLAWONG.name, onTimetable))).toEqual([
+        TALLAWONG_P2.id,
+      ]);
     });
 
     it('still lists the car park asked for when a better one is at the station asked for', async () => {

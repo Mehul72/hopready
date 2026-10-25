@@ -664,12 +664,17 @@ describe('only real choices', () => {
     secondsBetween(floorToMinute(from), floorToMinute(to)) / 60;
   const shownDriveMinutes = (itinerary: Itinerary) => Math.round(itinerary.driveSeconds / 60);
 
-  // No worse on anything the results can be sorted by, and leaving at most a minute earlier.
+  const LIVE_TIMES_RANK: Record<Itinerary['realtime'], number> = { none: 0, partial: 1, full: 2 };
+
+  // No worse on anything the results can be sorted by, leaving at most a minute earlier, and as
+  // certain: no alert the other avoids and no fewer live times.
   const isNoWorse = (better: Itinerary, other: Itinerary) =>
     shownMinutesBetween(better.arriveAt, other.arriveAt) >= 0 &&
     shownDriveMinutes(better) <= shownDriveMinutes(other) &&
     better.transfers <= other.transfers &&
-    shownMinutesBetween(other.departAt, better.departAt) >= -1;
+    shownMinutesBetween(other.departAt, better.departAt) >= -1 &&
+    LIVE_TIMES_RANK[better.realtime] >= LIVE_TIMES_RANK[other.realtime] &&
+    better.alerts.every((alert) => other.alerts.some((same) => same.id === alert.id));
 
   // A drop-off needs no space. A car park needs a fresh count with more than a tenth of it free.
   const canCountOnASpace = (itinerary: Itinerary) => {
