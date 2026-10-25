@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildItinerary, findContinuityIssues, stableId, withWaitLegs } from './itinerary';
+import type { Place } from './model';
 import { drive, PLACES, transit, walk } from './test-support/legs';
 
 const { rouseHillHome, tallawongCarPark, tallawongStation, chatswoodStation, chatswoodOffice } =
@@ -109,6 +110,20 @@ describe('buildItinerary', () => {
 
   it('refuses an empty leg list', () => {
     expect(() => buildItinerary({ strategy: 'transit-only', legs: [] })).toThrow();
+  });
+});
+
+describe('itinerary ids', () => {
+  function driveOnlyFrom(origin: Place) {
+    return buildItinerary({
+      strategy: 'drive-only',
+      legs: [drive(origin, chatswoodOffice, '2026-10-26T20:35:00Z', '2026-10-26T21:20:00Z')],
+    });
+  }
+
+  it('tells drives to the same place from different starts apart', () => {
+    expect(driveOnlyFrom(rouseHillHome).id).not.toBe(driveOnlyFrom(tallawongCarPark).id);
+    expect(driveOnlyFrom(rouseHillHome).id).toBe(driveOnlyFrom(rouseHillHome).id);
   });
 });
 

@@ -117,6 +117,11 @@ export function itineraryFingerprint(strategy: Strategy, legs: readonly Leg[]): 
   const parts = legs.map((leg) => {
     if (leg.kind === 'transit') return `${leg.kind}:${leg.service.name}:${leg.scheduledStart}`;
     if (leg.kind === 'park') return `park:${leg.parking.carPark.id}`;
+    // Where a drive starts is part of the option: driving to the same office from two suburbs is
+    // two different trips, and a refresh re-plans from the same start, so matching still works.
+    if (leg.kind === 'drive' || leg.kind === 'ride') {
+      return `${leg.kind}:${leg.from.name}>${leg.to.name}`;
+    }
     return `${leg.kind}:${leg.to.name}`;
   });
   return stableId([strategy, ...parts]);
