@@ -10,6 +10,7 @@ import {
   type PlanRequest,
   type PlanResponse,
   type ServiceAlert,
+  type Strategy,
 } from './model';
 import { planTrip, type PlannerDeps } from './planner';
 import {
@@ -22,7 +23,7 @@ import {
   type TransitProvider,
   type TransitQuery,
 } from './providers';
-import { addMinutes, addSeconds, secondsBetween } from './time';
+import { addMinutes, addSeconds, isBefore, secondsBetween } from './time';
 import { place, transit, walk } from './test-support/legs';
 
 // ---------- a tiny deterministic world ----------
@@ -156,6 +157,40 @@ function metroJourney(
 function journeyArrivingAt(from: Place, to: Place, arrival: string): TransitJourney {
   const departs = addMinutes(arrival, -rideMinutes(from, to) - WALK_FROM_STOP_MINUTES);
   return metroJourney(from, to, departs);
+}
+
+// A journey that boards at `boards` and reaches the destination's station `rideMinutes` later,
+// optionally changing trains at Epping on the way.
+function journeyBoardingAt(
+  from: Place,
+  to: Place,
+  boards: string,
+  { rideMinutes, change = false }: { rideMinutes: number; change?: boolean },
+): TransitJourney {
+  const station = place(
+    `${from.name} station`,
+    from.coordinate.lat,
+    from.coordinate.lon + 0.001,
+    'stop',
+  );
+  const alight = place(`${to.name} station`, to.coordinate.lat, to.coordinate.lon - 0.001, 'stop');
+  const epping = place('Epping Station', -33.7727, 151.0818, 'stop');
+  const arrives = addMinutes(boards, rideMinutes);
+  const rides = change
+    ? [
+        transit(station, epping, boards, addMinutes(boards, 10), { realtime: true }),
+        transit(epping, alight, addMinutes(boards, 14), arrives, { realtime: true, name: 'T9' }),
+      ]
+    : [transit(station, alight, boards, arrives, { realtime: true })];
+  return {
+    legs: [
+      walk(from, station, addMinutes(boards, -WALK_TO_STOP_MINUTES), boards),
+      ...rides,
+      walk(alight, to, arrives, addMinutes(arrives, WALK_FROM_STOP_MINUTES), `walk-${to.name}`),
+    ],
+    fare: { status: 'unknown' },
+    alerts: [],
+  };
 }
 
 function alignToHeadway(iso: string, direction: 'up' | 'down'): string {
@@ -578,6 +613,76 @@ describe('leaving out car parks that are no better', () => {
     });
   });
 
+  describe('keeps a car park that is better on any one count', () => {
+    // Tallawong P1 is a 15 min drive and Kellyville 23 min. Each has one journey, boarding at a set
+    // time, so the traveller leaves 27 min before a Tallawong train or 35 min before a Kellyville one.
+    const at = (minutesAfterNow: number) => addMinutes(NOW, minutesAfterNow);
+    const planWith = async (
+      journeys: Record<string, { boards: string; rideMinutes: number; change?: boolean }>,
+      overrides: Partial<PlanRequest> = {},
+    ) => {
+      const transit = fakeTransit((query) => {
+        const journey = journeys[query.from.name];
+        return journey
+          ? [journeyBoardingAt(query.from, query.to, journey.boards, journey)]
+          : metroTimetable(query);
+      });
+      const occupancy = new Map([
+        [TALLAWONG.id, count(60)],
+        [KELLYVILLE.id, count(60)],
+      ]);
+      const carParks = fakeCarParks(occupancy, [TALLAWONG, KELLYVILLE]);
+      return shownCarParks(await planTrip(request(overrides), deps({ transit, carParks })));
+    };
+
+    it('arrives sooner, even next to one at the station asked for that drives less', async () => {
+      // Kellyville: leave 7.31, arrive 8.41. Tallawong: leave 7.33, arrive 8.45.
+      const shown = await planWith(
+        {
+          [TALLAWONG.name]: { boards: at(30), rideMinutes: 40 },
+          [KELLYVILLE.name]: { boards: at(36), rideMinutes: 30 },
+        },
+        { preferredStop: TALLAWONG.station! },
+      );
+
+      expect(shown).toEqual([KELLYVILLE.id, TALLAWONG.id]);
+    });
+
+    it('drives less, next to one that arrives sooner and leaves as late', async () => {
+      // Kellyville: leave 7.33, arrive 8.43. Tallawong: leave 7.33, arrive 8.45.
+      const shown = await planWith({
+        [TALLAWONG.name]: { boards: at(30), rideMinutes: 40 },
+        [KELLYVILLE.name]: { boards: at(38), rideMinutes: 30 },
+      });
+
+      expect(shown).toEqual([KELLYVILLE.id, TALLAWONG.id]);
+    });
+
+    it('has fewer changes, next to one that arrives sooner and drives less', async () => {
+      // Tallawong, changing at Epping: leave 7.31, arrive 8.40. Kellyville: leave 7.31, arrive 8.41.
+      const shown = await planWith({
+        [TALLAWONG.name]: { boards: at(28), rideMinutes: 37, change: true },
+        [KELLYVILLE.name]: { boards: at(36), rideMinutes: 30 },
+      });
+
+      expect(shown).toEqual([TALLAWONG.id, KELLYVILLE.id]);
+    });
+  });
+
+  it('never hides a car park behind a drop-off, which is another way to travel', async () => {
+    const response = await planTrip(
+      request({ access: { transit: true, drive: true, dropOff: true } }),
+      deps({ carParks: fakeCarParks(new Map([[TALLAWONG.id, count(60)]]), [TALLAWONG]) }),
+    );
+    const arrivals = (strategy: Strategy) =>
+      response.itineraries.filter((it) => it.strategy === strategy).map((it) => it.arriveAt);
+
+    expect(shownCarParks(response)).toEqual([TALLAWONG.id]);
+    // The drop-off at the same station gets there sooner, with no more time in a car.
+    expect(arrivals('drop-off')).toHaveLength(1);
+    expect(isBefore(arrivals('drop-off')[0]!, arrivals('park-and-ride')[0]!)).toBe(true);
+  });
+
   it('still shows a slower car park the traveller asked for', async () => {
     const withRoomAtTallawong = deps({ carParks: tallawongAndBellaVista(count(60)) });
 
@@ -657,6 +762,28 @@ describe('leaving out car parks that are no better', () => {
       );
 
       expect(shownCarParks(response)).toEqual([TALLAWONG_P2.id]);
+    });
+
+    it('lists the one that leaves two minutes later, but not one that leaves a minute later', async () => {
+      const occupancy = new Map([
+        [TALLAWONG.id, count(60)],
+        [TALLAWONG_P2.id, count(60)],
+      ]);
+      // The same line from both, with P2's train a set number of minutes after P1's.
+      const planWithP2Later = async (minutes: number) => {
+        const transit = fakeTransit((query) => {
+          if (query.from.kind !== 'car-park') return metroTimetable(query);
+          const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
+          const boards = query.from.name === TALLAWONG_P2.name ? addMinutes(first, minutes) : first;
+          return [metroJourney(query.from, query.to, boards)];
+        });
+        return shownCarParks(
+          await planTrip(request(), deps({ transit, carParks: tallawongTwins(occupancy) })),
+        );
+      };
+
+      expect(await planWithP2Later(2)).toEqual([TALLAWONG.id, TALLAWONG_P2.id]);
+      expect(await planWithP2Later(1)).toEqual([TALLAWONG.id]);
     });
 
     it('lists only the one without an alert, or with live times, when the rest reads the same', async () => {

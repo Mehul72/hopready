@@ -788,6 +788,26 @@ describe('only real choices', () => {
     expect(misread).toEqual([]);
   });
 
+  it('never hides a car park that no listed one, with a space to count on, matches or beats', async () => {
+    const wronglyHidden: string[] = [];
+    for await (const { when, request: planned, now, response } of planSampleCommutes()) {
+      const listed = byStrategy(response, 'park-and-ride').filter(canCountOnASpace);
+      for (const { id, name, outcome } of response.checkedCarParks) {
+        if (outcome !== 'matched-by-another') continue;
+        // Asked for by name, the car park is listed with the same option it was hidden with.
+        const askedFor = await plan({ ...planned, preferredCarParkId: id }, { now });
+        const hidden = byStrategy(askedFor, 'park-and-ride').find(
+          (itinerary) => itinerary.parking!.carPark.id === id,
+        );
+        if (!hidden || !listed.some((better) => isNoWorse(better, hidden))) {
+          wronglyHidden.push(`${when}: ${name}`);
+        }
+      }
+    }
+
+    expect(wronglyHidden).toEqual([]);
+  });
+
   it('keeps Kellyville (north) as somewhere else to park while Tallawong P2 is nearly full', async () => {
     const response = await plan(request({ at: TUESDAY_0745 }), { now: TUESDAY_0745 });
     expectSoundResponse(response);
