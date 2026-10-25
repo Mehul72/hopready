@@ -1,5 +1,5 @@
 import { act, renderRouter, screen, testRouter, userEvent } from 'expo-router/testing-library';
-import { Text } from 'react-native';
+import { Linking, Text } from 'react-native';
 
 import TabsLayout from '@/app/(tabs)/_layout';
 import RootLayout from '@/app/_layout';
@@ -8,7 +8,14 @@ import WelcomeRoute from '@/app/welcome';
 import { appStorage, LIVE_DATA_CONSENT_VERSION } from '@/storage';
 
 // This build has an API address, so live planning is possible and must be agreed to first.
-jest.mock('@/api', () => ({ ...jest.requireActual('@/api'), isLivePlanningConfigured: true }));
+jest.mock('@/api', () => ({
+  ...jest.requireActual('@/api'),
+  isLivePlanningConfigured: true,
+  readSupportLinks: () => ({
+    privacyPolicyUrl: 'https://hopready.test/privacy/',
+    supportUrl: null,
+  }),
+}));
 
 function placeholder(name: string) {
   return function PlaceholderScreen() {
@@ -75,6 +82,16 @@ describe('live data consent', () => {
 
     expect(await screen.findByText('Plan screen')).toBeOnTheScreen();
     expect(appStorage.settings.get()).toMatchObject({ demoMode: true, liveDataConsent: null });
+  });
+
+  it('opens the privacy policy in Safari, not inside the app', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const user = userEvent.setup();
+    await renderRouter(ROUTES, { initialUrl: '/' });
+
+    await user.press(screen.getByRole('button', { name: 'Read the privacy policy' }));
+
+    expect(openURL).toHaveBeenCalledWith('https://hopready.test/privacy/');
   });
 
   it('does not ask again on the next launch', async () => {

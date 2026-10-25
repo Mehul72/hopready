@@ -1,5 +1,4 @@
-import { openBrowserAsync } from 'expo-web-browser';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Linking, StyleSheet, View } from 'react-native';
 
 import { readSupportLinks } from '@/api';
 import { AppText, Button, Card, Screen } from '@/components';
@@ -33,9 +32,10 @@ const agreedDateFormatter = new Intl.DateTimeFormat('en-AU', {
   year: 'numeric',
 });
 
+// Safari rather than an in-app browser: the App Store age rating declares no web browsing in the app.
 async function openPrivacyPolicy(url: string): Promise<void> {
   try {
-    await openBrowserAsync(url);
+    await Linking.openURL(url);
   } catch (error) {
     console.warn(
       `HopReady: could not open the privacy policy (${error instanceof Error ? error.name : 'unknown error'}).`,
