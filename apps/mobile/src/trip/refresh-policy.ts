@@ -1,5 +1,6 @@
 import {
   floorToMinute,
+  type Itinerary,
   isBefore,
   laterOf,
   type PlanRequest,
@@ -113,4 +114,16 @@ export function replanRequest(
 ): PlanRequest | null {
   const current = withCurrentCar(request, parkedCar);
   return current ? refreshableRequest(current, now) : null;
+}
+
+// Checking a followed trip again asks for its car park or station, which the planner never hides
+// behind another. Otherwise a fallback chosen while a better car park was nearly full would read as
+// no longer offered once that car park has room.
+export function withFollowedCarParkOrStation(
+  request: PlanRequest,
+  followed: Itinerary,
+): PlanRequest {
+  if (followed.parking) return { ...request, preferredCarParkId: followed.parking.carPark.id };
+  const dropOff = followed.legs.find((leg) => leg.kind === 'drop-off');
+  return dropOff ? { ...request, preferredStop: dropOff.to } : request;
 }

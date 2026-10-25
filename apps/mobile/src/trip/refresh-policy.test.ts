@@ -18,10 +18,47 @@ import {
   refreshableRequest,
   restOfTripRequest,
   shouldRefreshActiveTripOnResume,
+  withFollowedCarParkOrStation,
 } from './refresh-policy';
 
 const NOW = new Date('2026-10-26T20:55:00.000Z');
 const secondsAgo = (seconds: number) => new Date(NOW.getTime() - seconds * 1000).toISOString();
+
+// A lift to Tallawong Station, then the metro to Chatswood.
+function dropOffItinerary(departAt: string): Itinerary {
+  const droppedAt = addMinutes(departAt, 6);
+  const readyAt = addMinutes(droppedAt, 2);
+  // transitItinerary walks 10 min to the station first, so its metro boards as the drop-off ends.
+  const [, ...metroOnwards] = transitItinerary({ departAt: addMinutes(readyAt, -10) }).legs;
+  return buildItinerary({
+    strategy: 'drop-off',
+    legs: [
+      {
+        id: 'ride-to-station',
+        kind: 'ride',
+        from: PLACES.rouseHillHome,
+        to: PLACES.tallawongStation,
+        start: departAt,
+        end: droppedAt,
+        source: 'apple-maps',
+        timing: 'estimated',
+        distanceMetres: 2_600,
+        trafficAware: true,
+      },
+      {
+        id: 'drop-off-tallawong',
+        kind: 'drop-off',
+        from: PLACES.tallawongStation,
+        to: PLACES.tallawongStation,
+        start: droppedAt,
+        end: readyAt,
+        source: 'hopready',
+        timing: 'buffer',
+      },
+      ...metroOnwards,
+    ],
+  });
+}
 
 function activeTrip(overrides: Partial<ActiveTrip> = {}): ActiveTrip {
   return {
@@ -191,6 +228,31 @@ describe('refreshableRequest', () => {
     const arriveBy = planRequest({ time: { type: 'arrive', at: addMinutes(NOW, -10) } });
     expect(refreshableRequest(later, NOW)).toBe(later);
     expect(refreshableRequest(arriveBy, NOW)).toBe(arriveBy);
+  });
+});
+
+describe('withFollowedCarParkOrStation', () => {
+  const departAt = addMinutes(NOW, 20);
+
+  it('asks for the car park of a followed drive and park trip, in place of any other', () => {
+    const request = planRequest({ preferredCarParkId: '29' });
+    expect(withFollowedCarParkOrStation(request, parkAndRideItinerary({ departAt }))).toEqual({
+      ...request,
+      preferredCarParkId: '26',
+    });
+  });
+
+  it('asks for the station of a followed drop-off', () => {
+    const request = planRequest({ access: { transit: true, drive: true, dropOff: true } });
+    expect(withFollowedCarParkOrStation(request, dropOffItinerary(departAt))).toEqual({
+      ...request,
+      preferredStop: PLACES.tallawongStation,
+    });
+  });
+
+  it('leaves the request alone for a trip with no car park or station of its own', () => {
+    const request = planRequest();
+    expect(withFollowedCarParkOrStation(request, transitItinerary({ departAt }))).toBe(request);
   });
 });
 

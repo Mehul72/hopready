@@ -285,19 +285,35 @@ describe('refreshActiveTrip', () => {
     expect(storage.activeTrip.get()?.itinerary).toEqual(nextRun);
   });
 
+  it('asks the planner for the followed car park, and keeps the request the traveller made', async () => {
+    const { session, storage, trips } = withActiveTrip(120);
+    const refreshed = session.refreshActiveTrip();
+    const check = lastPending(trips.pending);
+    check.resolve(planResponse([transit, parkAndRide]));
+    await refreshed;
+
+    expect(check.request.preferredCarParkId).toBe(parkAndRide.parking?.carPark.id);
+    expect(storage.activeTrip.get()?.request).not.toHaveProperty('preferredCarParkId');
+    expect(session.getState().activeTripRefresh.status).toBe('updated');
+  });
+
   it('says when the chosen option is no longer offered and keeps the alternatives', async () => {
     const { session, storage, trips } = withActiveTrip(120);
     const refreshed = session.refreshActiveTrip();
     const searched = lastPending(trips.pending);
     searched.resolve(planResponse([transit]));
     await refreshed;
+    // The check asked for the followed car park; the alternatives keep the traveller's own request.
+    const { preferredCarParkId: followedCarPark, ...travellersRequest } = searched.request;
 
+    expect(followedCarPark).toBe(parkAndRide.parking?.carPark.id);
     expect(session.getState().activeTripRefresh).toMatchObject({
       status: 'no-longer-offered',
       alternatives: [transit],
-      request: searched.request,
+      request: travellersRequest,
       restOfTrip: null,
     });
+    expect(session.getState().activeTripRefresh.request).not.toHaveProperty('preferredCarParkId');
     expect(storage.activeTrip.get()?.itinerary).toEqual(parkAndRide);
   });
 

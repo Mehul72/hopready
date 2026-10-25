@@ -287,6 +287,35 @@ describe('the followed trip after a refresh', () => {
     ).toBeOnTheScreen();
   });
 
+  it('still finds a car park chosen as a fallback once the nearly full one has room', async () => {
+    // A Tuesday afternoon in the demo: at 3.25 pm Tallawong P2 is nearly full, so the slower
+    // Kellyville car parks are listed as somewhere else to park. By 3.30 pm P2 has room again.
+    const plannedAt = new Date('2026-10-27T04:25:00.000Z');
+    jest.setSystemTime(plannedAt);
+    const outcome = await planSession.plan(
+      demoCommuteRequest({
+        origin: DEMO_PLACES.boxHillHome,
+        time: { type: 'depart', at: '2026-10-27T05:30:00.000Z' },
+      }),
+    );
+    if (outcome.status !== 'ready')
+      throw new Error(`The demo plan did not finish: ${outcome.status}`);
+    const fallback = outcome.response.itineraries.find(
+      (itinerary) => itinerary.parking?.carPark.name === 'Kellyville (north)',
+    );
+    if (!fallback) throw new Error('The demo plan offered no Kellyville (north) option');
+    planSession.select(fallback.id);
+    await renderApp(`/itinerary/${fallback.id}`);
+    jest.setSystemTime(new Date(addMinutes(plannedAt, 5)));
+
+    await act(() => planSession.refreshActiveTrip());
+
+    expect(
+      screen.getByLabelText('Information. This trip is still on, with the latest times.'),
+    ).toBeOnTheScreen();
+    expect(appStorage.activeTrip.get()?.itinerary.id).toBe(fallback.id);
+  });
+
   it('follows a later run of the same option and says what changed', async () => {
     const { response, itinerary } = await followParkAndRide();
     const laterRun: Itinerary = {

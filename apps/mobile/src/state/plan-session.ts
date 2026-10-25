@@ -25,6 +25,7 @@ import {
   replanRequest,
   restOfTripRequest,
   shouldRefreshActiveTripOnResume,
+  withFollowedCarParkOrStation,
 } from '@/trip/refresh-policy';
 import { withCurrentCar } from '@/trip/return-trip';
 import { type TripService, tripService } from '@/trip/trip-service';
@@ -269,7 +270,13 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
           ? refreshableRequest(tripWithCar, now)
           : restOfTripRequest(tripWithCar, part.leg, now);
       setState({ activeTripRefresh: { ...IDLE_ACTIVE_TRIP_REFRESH, status: 'refreshing' } });
-      const response = await trips.planTrip(request, { signal: run.signal });
+      // A check of the whole trip asks for the followed car park or station, which the planner
+      // never hides. The request kept with the trip stays as the traveller made it.
+      const asked =
+        part.kind === 'whole-trip'
+          ? withFollowedCarParkOrStation(request, trip.itinerary)
+          : request;
+      const response = await trips.planTrip(asked, { signal: run.signal });
       // Ignore the answer if the session was reset or the person chose another trip meanwhile.
       if (run.signal.aborted || storage.activeTrip.get() !== trip) return { status: 'checked' };
       const checkedAt = toIso(clock.now());
