@@ -7,11 +7,12 @@ import {
   type TransitMode,
 } from '@hopready/core';
 
-import { place, PLACES } from '@/test-support/trips';
+import { place, PLACES, transitItinerary } from '@/test-support/trips';
 
 import {
   describeDelay,
   describePlatform,
+  describeRealtimeCoverage,
   describeRules,
   describeStepNotes,
   distance,
@@ -20,6 +21,7 @@ import {
   PLATFORM_NOT_PROVIDED,
   platformToAdd,
   serviceTitle,
+  staleCheckOf,
   statedPlatform,
   stopCount,
   UNKNOWN_RULES_TEXT,
@@ -393,6 +395,39 @@ describe('station entrances and exits', () => {
       [expect.objectContaining({ text: expect.stringMatching(/^Change at Chatswood Station:/) })],
       [],
     ]);
+  });
+});
+
+describe('how live the times are', () => {
+  const checkedAt = '2026-10-26T20:30:00.000Z';
+  const minutesLater = (minutes: number) => Date.parse(addMinutes(checkedAt, minutes));
+  const live = transitItinerary({ departAt: '2026-10-26T20:40:00.000Z', realtime: true });
+
+  it('calls times live for as long as car park counts count as current', () => {
+    expect(staleCheckOf(checkedAt, minutesLater(15))).toBeNull();
+    expect(staleCheckOf(checkedAt, minutesLater(16))).toBe(checkedAt);
+    expect(staleCheckOf(null, minutesLater(60))).toBeNull();
+  });
+
+  it('says when live times were checked once they may have changed', () => {
+    expect(describeRealtimeCoverage(live)).toEqual({
+      text: 'Live times',
+      spoken: 'Public transport times are live.',
+    });
+    expect(describeRealtimeCoverage(live, checkedAt)).toEqual({
+      text: 'Checked 7:30 am',
+      spoken: 'Public transport times were checked at 7:30 am and may have changed.',
+    });
+  });
+
+  it('keeps sample and timetable times labelled as they are', () => {
+    const sample = {
+      ...live,
+      legs: live.legs.map((leg) => ({ ...leg, source: 'demo-fixture' as const })),
+    };
+    const timetable = transitItinerary({ departAt: '2026-10-26T20:40:00.000Z' });
+    expect(describeRealtimeCoverage(sample, checkedAt)?.text).toBe('Sample live times');
+    expect(describeRealtimeCoverage(timetable, checkedAt)?.text).toBe('Timetable times');
   });
 });
 

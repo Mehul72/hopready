@@ -1,5 +1,6 @@
 import {
   formatDurationMinutes,
+  formatSydneyTime,
   type Itinerary,
   type Leg,
   type ParkingRules,
@@ -12,6 +13,7 @@ import {
 
 import type { BannerTone } from '@/components';
 
+import { OCCUPANCY_FRESH_MINUTES } from '../shared/occupancy-wording';
 import { isSampleItinerary, isSampleLeg } from '../shared/sample-data';
 
 // Plain words for itinerary data. Everything a screen shows about a trip is worded here, so the
@@ -268,11 +270,31 @@ export const ALERT_TONES: Readonly<Record<ServiceAlert['severity'], BannerTone>>
   severe: 'error',
 };
 
-export function describeRealtimeCoverage(itinerary: Itinerary): Wording | null {
+// Live times are only called live while they are fresh, by the limit the app already applies to
+// car park counts. Returns when they were checked once that is longer ago, or null while fresh.
+export function staleCheckOf(checkedAt: string | null, nowMs: number): string | null {
+  if (checkedAt === null) return null;
+  const minutes = Math.floor(secondsBetween(checkedAt, new Date(nowMs)) / 60);
+  return minutes > OCCUPANCY_FRESH_MINUTES ? checkedAt : null;
+}
+
+// `staleCheckAt`, from staleCheckOf, words live times by when they were checked instead.
+export function describeRealtimeCoverage(
+  itinerary: Itinerary,
+  staleCheckAt: string | null = null,
+): Wording | null {
   const hasTransit = itinerary.legs.some((leg) => leg.kind === 'transit');
   if (!hasTransit) return null;
+  // Sample times stay labelled as samples, however old they are.
   if (isSampleItinerary(itinerary) && itinerary.realtime !== 'none') {
     return { text: 'Sample live times', spoken: 'Sample times for demo mode, not live.' };
+  }
+  if (staleCheckAt && itinerary.realtime !== 'none') {
+    const time = formatSydneyTime(staleCheckAt);
+    return {
+      text: `Checked ${time}`,
+      spoken: `Public transport times were checked at ${time} and may have changed.`,
+    };
   }
   switch (itinerary.realtime) {
     case 'full':

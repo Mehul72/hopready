@@ -12,7 +12,7 @@ import { ActiveTripStatus } from './active-trip-status';
 import { DataAttribution } from './data-attribution';
 import { AlertBanner, ArrivalRow, LegRow } from './leg-row';
 import { TripSummaryCard } from './trip-summary-card';
-import { describeStepNotes } from './trip-text';
+import { describeStepNotes, staleCheckOf } from './trip-text';
 import { useCurrentMinute } from './use-current-minute';
 import { type DisplayedTrip, useDisplayedTrip } from './use-displayed-trip';
 import { useStartDriving } from './use-start-driving';
@@ -193,11 +193,12 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
   const mapHeight = Math.round(
     Math.min(MAP_MAX_HEIGHT, Math.max(MAP_MIN_HEIGHT, height * MAP_SHARE_OF_WINDOW)),
   );
+  const staleCheckAt = staleCheckOf(trip.plannedAt, nowMs);
 
   return (
     <Screen footer={<TripFooter trip={trip} />} testID="itinerary-screen">
       <ActiveTripStatus trip={trip} nowMs={nowMs} />
-      <TripSummaryCard itinerary={itinerary} />
+      <TripSummaryCard itinerary={itinerary} staleCheckAt={staleCheckAt} />
       {itinerary.notes.map((note, index) => (
         <Banner key={`${index}:${note}`} tone="info" message={note} />
       ))}
@@ -217,6 +218,7 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
           leg={leg}
           notes={stepNotes[index]}
           nowMs={nowMs}
+          staleCheckAt={staleCheckAt}
           onStartDriving={(destination) => {
             void startDriving(destination);
           }}

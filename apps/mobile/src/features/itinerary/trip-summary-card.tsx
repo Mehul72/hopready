@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText, Card } from '@/components';
 import { type ColourTokens, COMPACT_MAX_FONT_SCALE, RADII, SPACING, useTheme } from '@/theme';
 
+import { isSampleItinerary } from '../shared/sample-data';
 import { shownDurationSeconds } from '../shared/shown-duration';
 import { optionLabel } from '../shared/option-labels';
 import { describeRealtimeCoverage, duration, type Wording } from './trip-text';
@@ -46,10 +47,13 @@ function tripFacts(itinerary: Itinerary): Wording[] {
   return facts;
 }
 
-export function describeTripSummary(itinerary: Itinerary): string {
+export function describeTripSummary(
+  itinerary: Itinerary,
+  staleCheckAt: string | null = null,
+): string {
   const total = duration(shownDurationSeconds(itinerary));
   const facts = tripFacts(itinerary).map((fact) => fact.spoken);
-  const coverage = describeRealtimeCoverage(itinerary);
+  const coverage = describeRealtimeCoverage(itinerary, staleCheckAt);
   return [
     `${optionLabel(itinerary)}.`,
     `Leave ${formatSydneyTime(itinerary.departAt)}, arrive ${formatSydneyTime(itinerary.arriveAt)}.`,
@@ -61,17 +65,29 @@ export function describeTripSummary(itinerary: Itinerary): string {
 }
 
 // The top of the trip: big leave and arrive times, then the totals and how live the times are.
-// VoiceOver reads it as one sentence.
-export function TripSummaryCard({ itinerary }: { itinerary: Itinerary }) {
+// VoiceOver reads it as one sentence. `staleCheckAt` is set once live times are too old to call
+// live (staleCheckOf).
+export function TripSummaryCard({
+  itinerary,
+  staleCheckAt = null,
+}: {
+  itinerary: Itinerary;
+  staleCheckAt?: string | null;
+}) {
   const { colours } = useTheme();
   const total = duration(shownDurationSeconds(itinerary));
   const facts = tripFacts(itinerary);
-  const coverage = describeRealtimeCoverage(itinerary);
-  const coverageStyle = COVERAGE_STYLES[itinerary.realtime];
+  const coverage = describeRealtimeCoverage(itinerary, staleCheckAt);
+  // Old live times lose the live colour with the word. Sample times keep theirs.
+  const coverageStyle =
+    COVERAGE_STYLES[staleCheckAt && !isSampleItinerary(itinerary) ? 'none' : itinerary.realtime];
 
   return (
     <Card testID="trip-summary">
-      <View accessible accessibilityLabel={describeTripSummary(itinerary)} style={styles.body}>
+      <View
+        accessible
+        accessibilityLabel={describeTripSummary(itinerary, staleCheckAt)}
+        style={styles.body}>
         <AppText variant="subheadline" tone="secondary" weight="semibold">
           {optionLabel(itinerary)}
         </AppText>

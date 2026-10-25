@@ -127,7 +127,9 @@ function service(name: string, mode: TransitLeg['mode'], overrides: Partial<Tran
 }
 
 async function renderLeg(leg: Leg, onStartDriving = jest.fn()) {
-  await render(<LegRow leg={leg} nowMs={NOW.getTime()} onStartDriving={onStartDriving} />);
+  await render(
+    <LegRow leg={leg} nowMs={NOW.getTime()} staleCheckAt={null} onStartDriving={onStartDriving} />,
+  );
   return onStartDriving;
 }
 
@@ -140,6 +142,7 @@ async function renderStepOf(legs: Leg[], index: number, transferBufferMinutes = 
       leg={leg}
       notes={describeStepNotes(legs, transferBufferMinutes)[index]}
       nowMs={NOW.getTime()}
+      staleCheckAt={null}
       onStartDriving={jest.fn()}
     />,
   );
@@ -201,6 +204,23 @@ describe('LegRow', () => {
     expect(screen.getByText('3 min late (sample)')).toBeOnTheScreen();
     expect(screen.queryByText('Live')).not.toBeOnTheScreen();
     expect(screen.queryByLabelText(/Live time from the operator/)).not.toBeOnTheScreen();
+  });
+
+  it('says when a live time was checked, instead of live, once that is too long ago', async () => {
+    const checkedAt = '2026-10-26T20:10:00.000Z';
+    const checked = formatSydneyTime(checkedAt);
+    await render(
+      <LegRow
+        leg={transitLeg({ source: 'tfnsw-trip-planner', timing: 'realtime' })}
+        nowMs={NOW.getTime()}
+        staleCheckAt={checkedAt}
+        onStartDriving={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText(`Checked ${checked}`)).toBeOnTheScreen();
+    expect(screen.queryByText('Live')).not.toBeOnTheScreen();
+    expect(screen.getByLabelText(/Time checked at 7:10\sam, on time\./)).toBeOnTheScreen();
   });
 
   it('says when no platform is provided, and labels timetable times', async () => {

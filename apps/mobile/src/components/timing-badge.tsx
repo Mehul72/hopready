@@ -1,4 +1,4 @@
-import type { Timing } from '@hopready/core';
+import { formatSydneyTime, type Timing } from '@hopready/core';
 import { type SFSymbol, SymbolView } from 'expo-symbols';
 import { StyleSheet, View } from 'react-native';
 
@@ -10,6 +10,8 @@ export interface TimingBadgeProps {
   timing: Timing;
   // A demo-mode time: a "realtime" one is shown as sample data, never as "Live".
   sample?: boolean;
+  // When a "realtime" time was checked, once that is too long ago to call it "Live".
+  staleCheckAt?: string | null;
   testID?: string;
 }
 
@@ -63,13 +65,37 @@ export const SAMPLE_REALTIME_STYLE: TimingStyle = {
   tone: 'onDemo',
 };
 
-export function timingStyleFor(timing: Timing, sample = false): TimingStyle {
-  return sample && timing === 'realtime' ? SAMPLE_REALTIME_STYLE : TIMING_STYLES[timing];
+// An operator's live time from a check long ago may have changed since, so it says when it was
+// checked instead of claiming to be live.
+function checkedRealtimeStyle(checkedAt: string): TimingStyle {
+  const time = formatSydneyTime(checkedAt);
+  return {
+    label: `Checked ${time}`,
+    spoken: `Time checked at ${time}`,
+    symbol: 'clock',
+    background: 'surfaceMuted',
+    tone: 'secondary',
+  };
 }
 
-export function TimingBadge({ timing, sample = false, testID }: TimingBadgeProps) {
+export function timingStyleFor(
+  timing: Timing,
+  sample = false,
+  staleCheckAt: string | null = null,
+): TimingStyle {
+  if (timing !== 'realtime') return TIMING_STYLES[timing];
+  if (sample) return SAMPLE_REALTIME_STYLE;
+  return staleCheckAt ? checkedRealtimeStyle(staleCheckAt) : TIMING_STYLES.realtime;
+}
+
+export function TimingBadge({
+  timing,
+  sample = false,
+  staleCheckAt = null,
+  testID,
+}: TimingBadgeProps) {
   const { colours } = useTheme();
-  const style = timingStyleFor(timing, sample);
+  const style = timingStyleFor(timing, sample, staleCheckAt);
   const foreground = colourForTone(colours, style.tone);
 
   return (

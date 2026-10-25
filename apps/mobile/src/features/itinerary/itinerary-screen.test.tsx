@@ -444,6 +444,32 @@ describe('checking a followed trip for changes', () => {
   });
 });
 
+describe('how live the times are', () => {
+  it('stops calling the times live once they were checked more than 15 minutes ago', async () => {
+    appStorage.settings.setDemoMode(false);
+    const live = parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z', realtime: true });
+    // A check on resume, if one starts, never answers, so the times stay as first planned.
+    jest
+      .spyOn(tripService, 'planTrip')
+      .mockResolvedValueOnce(planResponse([live]))
+      .mockReturnValue(new Promise<PlanResponse>(() => undefined));
+    await planSession.plan(planRequest());
+    planSession.select(live.id);
+    jest.setSystemTime(new Date(addMinutes(WEEKDAY_MORNING, 16)));
+
+    await renderApp(`/itinerary/${live.id}`);
+
+    const summary = within(screen.getByTestId('trip-summary'));
+    expect(summary.getByText('Checked 7:30 am')).toBeOnTheScreen();
+    expect(summary.queryByText('Live times')).not.toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(describeTripSummary(live, WEEKDAY_MORNING.toISOString())),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText('Live')).not.toBeOnTheScreen();
+    expect(screen.getByLabelText('Times checked at 7:30 am')).toBeOnTheScreen();
+  });
+});
+
 describe('a followed trip home', () => {
   const car: ParkedCar = {
     location: PLACES.tallawongCarPark,

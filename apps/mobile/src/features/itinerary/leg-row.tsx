@@ -38,6 +38,9 @@ export interface LegRowProps {
   leg: Leg;
   // The current minute, for the age of car park counts.
   nowMs: number;
+  // When the trip's times were checked, once that is too long ago to call them live
+  // (staleCheckOf).
+  staleCheckAt: string | null;
   onStartDriving: (destination: DriveDestination) => void;
   // From describeStepNotes. Only walks, waits and services ever get any, so only their rows
   // show them.
@@ -46,7 +49,7 @@ export interface LegRowProps {
 
 // One step of the trip. Each card is one VoiceOver element that reads the step as a sentence;
 // buttons and links inside it stay separate so they can still be reached and activated.
-export function LegRow({ leg, nowMs, onStartDriving, notes = [] }: LegRowProps) {
+export function LegRow({ leg, nowMs, staleCheckAt, onStartDriving, notes = [] }: LegRowProps) {
   switch (leg.kind) {
     case 'drive':
       return <DriveRow leg={leg} onStartDriving={onStartDriving} />;
@@ -55,7 +58,7 @@ export function LegRow({ leg, nowMs, onStartDriving, notes = [] }: LegRowProps) 
     case 'walk':
       return <WalkRow leg={leg} notes={notes} />;
     case 'transit':
-      return <TransitRow leg={leg} notes={notes} />;
+      return <TransitRow leg={leg} notes={notes} staleCheckAt={staleCheckAt} />;
     case 'park':
       return <ParkRow leg={leg} nowMs={nowMs} />;
     case 'drop-off':
@@ -301,7 +304,15 @@ function ParkingRulesSourceLink({ source }: { source: { url: string; label: stri
   );
 }
 
-function TransitRow({ leg, notes }: { leg: TransitLeg; notes: StepNotes }) {
+function TransitRow({
+  leg,
+  notes,
+  staleCheckAt,
+}: {
+  leg: TransitLeg;
+  notes: StepNotes;
+  staleCheckAt: string | null;
+}) {
   const modeName = LEG_VISUALS[leg.mode].label;
   const title = serviceTitle(leg);
   const platform = platformToAdd(leg.from.name, describePlatform(leg.departurePlatform));
@@ -313,7 +324,7 @@ function TransitRow({ leg, notes }: { leg: TransitLeg; notes: StepNotes }) {
   const delay = describeDelay(leg);
   const arrive = formatSydneyTime(leg.end);
   const sample = isSampleLeg(leg);
-  const timing = timingStyleFor(leg.timing, sample).spoken;
+  const timing = timingStyleFor(leg.timing, sample, staleCheckAt).spoken;
   const spokenParts = [
     `${modeName} ${title}`,
     `From ${leg.from.name}${platform ? `, ${platform}` : ''}`,
@@ -336,7 +347,7 @@ function TransitRow({ leg, notes }: { leg: TransitLeg; notes: StepNotes }) {
           <Detail>{`From ${leg.from.name}${platform ? ` · ${platform}` : ''}`}</Detail>
           <Detail>{[`To ${arrival}, arrive ${arrive}`, stops].filter(Boolean).join(' · ')}</Detail>
           <View style={styles.badges}>
-            <TimingBadge timing={leg.timing} sample={sample} />
+            <TimingBadge timing={leg.timing} sample={sample} staleCheckAt={staleCheckAt} />
             {delay ? (
               <AppText variant="footnote" weight="semibold">
                 {delay.text}
