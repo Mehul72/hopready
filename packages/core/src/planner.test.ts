@@ -530,6 +530,20 @@ describe('leaving out car parks that are no better', () => {
     );
     const tallawongTwins = (occupancy: Map<string, Occupancy>) =>
       fakeCarParks(occupancy, [TALLAWONG, TALLAWONG_P2]);
+    // From P2 a quicker train two minutes later arrives with the all-stops one from P1.
+    const quickerTrainFromP2 = () =>
+      fakeTransit((query) => {
+        if (query.from.kind !== 'car-park') return metroTimetable(query);
+        const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
+        return query.from.name === TALLAWONG_P2.name
+          ? [metroJourney(query.from, query.to, addMinutes(first, 2))]
+          : [
+              metroJourney(query.from, query.to, first, {
+                name: 'M1 all stops',
+                extraRideMinutes: 2,
+              }),
+            ];
+      });
 
     it('lists only the one with room when their cards would read the same', async () => {
       // Twenty seconds more driving into P2 still reads as the same whole minutes.
@@ -562,29 +576,36 @@ describe('leaving out car parks that are no better', () => {
     });
 
     it('lists only the one that lets the traveller leave later for the same arrival', async () => {
-      // From P2 a quicker train two minutes later arrives with the all-stops one from P1.
-      const transit = fakeTransit((query) => {
-        if (query.from.kind !== 'car-park') return metroTimetable(query);
-        const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
-        return query.from.name === TALLAWONG_P2.name
-          ? [metroJourney(query.from, query.to, addMinutes(first, 2))]
-          : [
-              metroJourney(query.from, query.to, first, {
-                name: 'M1 all stops',
-                extraRideMinutes: 2,
-              }),
-            ];
-      });
       const occupancy = new Map([
         [TALLAWONG.id, count(60)],
         [TALLAWONG_P2.id, count(60)],
       ]);
       const response = await planTrip(
         request(),
-        deps({ transit, carParks: tallawongTwins(occupancy) }),
+        deps({ transit: quickerTrainFromP2(), carParks: tallawongTwins(occupancy) }),
       );
 
       expect(shownCarParks(response)).toEqual([TALLAWONG_P2.id]);
+    });
+
+    it('still lists the car park asked for when a better one is at the station asked for', async () => {
+      const occupancy = new Map([
+        [TALLAWONG.id, count(60)],
+        [TALLAWONG_P2.id, count(60)],
+      ]);
+      const planAskingFor = async (asked: Partial<PlanRequest>) =>
+        shownCarParks(
+          await planTrip(
+            request(asked),
+            deps({ transit: quickerTrainFromP2(), carParks: tallawongTwins(occupancy) }),
+          ),
+        );
+      const station = TALLAWONG.station!;
+
+      expect(await planAskingFor({ preferredStop: station })).toEqual([TALLAWONG_P2.id]);
+      expect(
+        await planAskingFor({ preferredStop: station, preferredCarParkId: TALLAWONG.id }),
+      ).toEqual([TALLAWONG_P2.id, TALLAWONG.id]);
     });
   });
 });

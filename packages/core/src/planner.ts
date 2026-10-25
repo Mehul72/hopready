@@ -1129,14 +1129,16 @@ function selectItineraries(context: PlanContext, candidates: Itinerary[]): Itine
 
 // Another car park or station that is no better on anything the results can be sorted by is padding,
 // not a choice. Such an option is hidden only behind one the traveller can count on for a space, so
-// a car park that may be full keeps its fallback. Nothing else hides the car park or station the
-// traveller asked for.
+// a car park that may be full keeps its fallback. The car park the traveller asked for is never
+// hidden, and a station they asked for can lose a car park only to a better one at that station.
 function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): Itinerary[] {
   const isPreferred = (option: Itinerary) => context.preferredOptions.has(option.id);
-  // Strongest first, so an option is only ever hidden behind one that is shown. The traveller's own
-  // choice leads, so only another option through it can hide one. After that, an option sorts ahead
-  // of any it strictly dominates, and of two that dominate each other, the one with a space to count
-  // on, then the one that leaves later, goes first.
+  const isCarParkAskedFor = (option: Itinerary) =>
+    option.parking !== null && option.parking.carPark.id === context.request.preferredCarParkId;
+  // Strongest first, so an option is only ever hidden behind one that is shown. Options through the
+  // car park or station the traveller asked for lead, so nothing else hides them. After that, an
+  // option sorts ahead of any it strictly dominates, and of two that dominate each other, the one
+  // with a space to count on, then the one that leaves later, goes first.
   const strongestFirst = options
     .filter((option) => option.strategy === 'park-and-ride' || option.strategy === 'drop-off')
     .sort(
@@ -1151,10 +1153,12 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
   const shown: Itinerary[] = [];
   const hidden = new Set<Itinerary>();
   for (const option of strongestFirst) {
-    const dominated = shown.some(
-      (other) =>
-        other.strategy === option.strategy && canCountOnASpace(other) && dominates(other, option),
-    );
+    const dominated =
+      !isCarParkAskedFor(option) &&
+      shown.some(
+        (other) =>
+          other.strategy === option.strategy && canCountOnASpace(other) && dominates(other, option),
+      );
     if (dominated) hidden.add(option);
     else shown.push(option);
   }
