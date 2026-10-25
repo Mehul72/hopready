@@ -25,7 +25,7 @@ Expo SDK 58 (React Native 0.88, React 19.3, Expo Router) with code under `src/`.
    EXPO_PUBLIC_API_BASE_URL=http://localhost:8787 npx expo run:ios
    ```
 
-   Without an address, live mode reports "not set up" and offers demo mode. It never switches by itself.
+   With an address, the first launch explains what live planning sends and asks for agreement before anything is sent (docs/decisions/0006). Without an address, live mode reports "not set up" and offers demo mode. It never switches by itself.
 
 ## Check it
 
@@ -40,27 +40,31 @@ npx jest
 
 `app.config.ts` reads these from the environment (an EAS environment or your shell). None of them is secret: the app holds no provider keys.
 
-| Variable                      | Sets                                | When unset                                    |
-| ----------------------------- | ----------------------------------- | --------------------------------------------- |
-| `EXPO_PUBLIC_API_BASE_URL`    | `extra.apiBaseUrl`, the API address | Live mode is "not configured"                 |
-| `HOPREADY_IOS_BUNDLE_ID`      | `ios.bundleIdentifier`              | `au.hopready.HopReady`                        |
-| `HOPREADY_PRIVACY_POLICY_URL` | `extra.privacyPolicyUrl`            | `https://mehul72.github.io/hopready/privacy/` |
-| `HOPREADY_SUPPORT_URL`        | `extra.supportUrl`                  | `https://mehul72.github.io/hopready/support/` |
-| `EAS_PROJECT_ID`              | `extra.eas.projectId`               | Left out                                      |
+| Variable                      | Sets                                                                                                             | When unset                                    |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `EXPO_PUBLIC_API_BASE_URL`    | `extra.apiBaseUrl`, the API address                                                                              | Live mode is "not configured"                 |
+| `HOPREADY_IOS_BUNDLE_ID`      | `ios.bundleIdentifier`                                                                                           | `au.hopready.HopReady`                        |
+| `HOPREADY_PRIVACY_POLICY_URL` | `extra.privacyPolicyUrl`                                                                                         | `https://mehul72.github.io/hopready/privacy/` |
+| `HOPREADY_SUPPORT_URL`        | `extra.supportUrl`                                                                                               | `https://mehul72.github.io/hopready/support/` |
+| `EAS_PROJECT_ID`              | `extra.eas.projectId`                                                                                            | Left out                                      |
+| `HOPREADY_APPLE_TEAM_ID`      | `ios.appleTeamId`                                                                                                | `MACDPWQG37`                                  |
+| `HOPREADY_DEMO_SCENARIOS`     | `extra.demoScenarios` (`1` shows the staged-failure picker in demo mode; set for development and preview builds) | Off, as in store builds                       |
+| `HOPREADY_IOS_UI_TESTS`       | Adds the XCUITest target at prebuild (docs/testing.md)                                                           | No test target                                |
 
 ## Where things are
 
-| Folder             | What it holds                                                                                                                                                                             |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app`          | Routes only. Every file here becomes a route and ships in the bundle, so tests live elsewhere.                                                                                            |
-| `src/theme`        | Colour tokens for light and dark (WCAG AA, checked by `contrast.test.ts`), transport mode colours, labels and SF Symbols, typography and spacing. `useTheme()` returns the current theme. |
-| `src/components`   | Building blocks for screens (list below).                                                                                                                                                 |
-| `src/storage`      | Everything saved on the device, in `expo-sqlite/kv-store`: stores, hooks and `deleteAllData()`.                                                                                           |
-| `src/api`          | The HTTP client for the HopReady API, `ApiError`, and the TanStack Query client.                                                                                                          |
-| `src/trip`         | `tripService` (plans, place search and car parks, in live or demo mode), query hooks, the refresh policy and the resume hook.                                                             |
-| `src/state`        | `planSession`, the shared store for the latest search, its results and the active trip refresh.                                                                                           |
-| `src/location`     | `requestCurrentPlace()` and the location permission hook.                                                                                                                                 |
-| `src/test-support` | Jest mocks for native modules, and builders for places, requests and itineraries.                                                                                                         |
+| Folder             | What it holds                                                                                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app`          | Routes only. Every file here becomes a route and ships in the bundle, so tests live elsewhere.                                                                                                                              |
+| `src/features`     | The screens, one folder per area: `plan`, `results`, `itinerary`, `parked-car`, `saved`, `settings` and `consent`, with their flow tests. `shared` holds wording used by several, such as car park counts and option names. |
+| `src/theme`        | Colour tokens for light and dark (WCAG AA, checked by `contrast.test.ts`), transport mode colours, labels and SF Symbols, typography and spacing. `useTheme()` returns the current theme.                                   |
+| `src/components`   | Building blocks for screens (list below).                                                                                                                                                                                   |
+| `src/storage`      | Everything saved on the device, in `expo-sqlite/kv-store`: stores, hooks and `deleteAllData()`.                                                                                                                             |
+| `src/api`          | The HTTP client for the HopReady API, `ApiError`, and the TanStack Query client.                                                                                                                                            |
+| `src/trip`         | `tripService` (plans, place search and car parks, in live or demo mode), query hooks, the refresh policy and the resume hook.                                                                                               |
+| `src/state`        | `planSession`, the shared store for the latest search, its results and the active trip refresh.                                                                                                                             |
+| `src/location`     | `requestCurrentPlace()` and the location permission hook.                                                                                                                                                                   |
+| `src/test-support` | Jest mocks for native modules, and builders for places, requests and itineraries.                                                                                                                                           |
 
 ### Components
 
@@ -69,10 +73,10 @@ npx jest
 ## Rules for screens
 
 - **Wrap every screen in `Screen`.** It handles safe areas, scrolling, the keyboard and a readable width. Inside a modal sheet it also shows the demo banner, which the window-wide strip cannot reach. Its `footer` is for stack and modal screens; on a tab screen the tab bar covers it.
-- **Get data through `planSession` (`@/state`) and `@/trip`.** `planSession.plan(request)`, `refresh()` (at most every 30 seconds) and `select(id)` drive the results and itinerary screens. `usePlaceSearch(text, near)` debounces and needs 2 characters; `useCarParks()` lists Park&Ride car parks. Never call `fetch` from a screen.
+- **Get data through `planSession` (`@/state`) and `@/trip`.** `planSession.plan(request)`, `refresh()` (at most every 30 seconds) and `select(id)` drive the results and itinerary screens. `usePlaceSearch(text, near)` debounces and needs 2 characters (the place search sheet waits for 3); `useCarParks()` lists Park&Ride car parks. Never call `fetch` from a screen.
 - **Errors are `ApiError`.** Show `error.message` and choose the action from `error.kind`. When `error.suggestsDemoMode` is true, offer a button that turns demo mode on (`appStorage.settings.setDemoMode(true)`); never turn it on without the person asking.
 - **Show a `TripMap` on any screen that shows drive times or Apple search results.** Apple's terms only allow that data next to an Apple map. Pass `bottomInset` when a sheet covers the map so Apple's legal link stays visible.
-- **Ask for location only from a tap,** through `requestCurrentPlace()`. On `denied`, offer manual entry, plus `openLocationSettings()` when `canAskAgain` is false. A recent trip from "Current location" holds the old coordinates, so ask for the location again when it is reused.
+- **Ask for location only from a tap,** through `requestCurrentPlace()`. Pass `lookUpStreetName: true` only in live mode: naming the street sends the position to Apple through iOS, and demo mode sends nothing. On `denied`, offer manual entry, plus `openLocationSettings()` when `canAskAgain` is false. A recent trip from "Current location" holds the old coordinates, so ask for the location again when it is reused.
 - **Text goes through `AppText` and colour through `useTheme()`.** Never mark meaning by colour alone: modes have icons and names, timings have labels, selection has a tick or a raised segment.
 - **SF Symbols are limited to version 4.2** by the type checker (`src/theme/sf-symbols.d.ts`), because the app supports iOS 16.4.
 
@@ -84,4 +88,4 @@ npx jest
 | `POST /v1/places/search` | `{ "query": "2 to 80 characters", "near": { "lat", "lon" } \| null }` | `{ "results": [{ "place", "detail" }], "unavailable": ["provider name"] }` |
 | `GET /v1/carparks`       | Nothing                                                               | `{ "carParks": [CarParkFacility with "occupancy"], "notices": [] }`        |
 
-Every request carries `X-HopReady-Install`, a random version 4 UUID that is replaced when the person deletes all data. Errors are read from `{ "error": { "code" } }` (codes from `apps/api/src/errors.ts`) and the HTTP status; the server's own message is never shown. Requests time out after 15 seconds, so the API's plan deadline must be shorter.
+Nothing is sent until the person has agreed to live data use; until then requests fail with `consent-required`. POST bodies go as `application/json` (the API answers anything else with 415). Every request carries `X-HopReady-Install`, a random version 4 UUID that is replaced when the person deletes all data. Errors are read from `{ "error": { "code" } }` (codes from `apps/api/src/errors.ts`) and the HTTP status; the server's own message is never shown. Requests time out after 15 seconds, so the API's plan deadline must be shorter.
