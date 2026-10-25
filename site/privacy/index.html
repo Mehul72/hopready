@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HopReady privacy policy</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>HopReady privacy policy</h1>
+      <p class="lede">Draft. Last updated 25 October 2026.</p>
+      <p class="note">
+        Before publishing: the publisher must confirm a contact email and review this policy against
+        the released build.
+      </p>
+
+      <h2>The short version</h2>
+      <ul>
+        <li>No account, no advertising, no tracking, no analytics or crash-reporting SDKs.</li>
+        <li>Your saved places, recent searches, preferences and parked car stay on your iPhone.</li>
+        <li>
+          To plan a trip, the places involved are sent to HopReady's server, which asks Transport
+          for NSW and Apple Maps for routes. HopReady's server does not keep them after answering.
+        </li>
+      </ul>
+
+      <h2>What stays on your iPhone</h2>
+      <p>
+        Home and work, favourite places and routes, recent searches, trip preferences, the location
+        of your parked car, parking spots you saved, the trip you are on, and a random install
+        identifier. This is stored in the app's own storage and is never uploaded as a set. Settings
+        &gt; Delete all HopReady data erases it, as does deleting the app.
+      </p>
+
+      <h2>What is sent, and why</h2>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">What is sent</th>
+            <th scope="col">Who receives it</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>You plan a trip</td>
+            <td>
+              Start, destination and (for a trip home) parked-car locations, the time, and your trip
+              preferences
+            </td>
+            <td>
+              HopReady's server, which sends locations and times to Transport for NSW (public
+              transport) and Apple Maps (drive times)
+            </td>
+          </tr>
+          <tr>
+            <td>You search for a place</td>
+            <td>What you type, and your approximate location if you allowed location access</td>
+            <td>HopReady's server, which asks Transport for NSW (stops) and Apple Maps (places)</td>
+          </tr>
+          <tr>
+            <td>You check car parks</td>
+            <td>Nothing personal</td>
+            <td>HopReady's server and Transport for NSW</td>
+          </tr>
+          <tr>
+            <td>Every request</td>
+            <td>The random install identifier, and your IP address as part of the connection</td>
+            <td>HopReady's server, to limit abuse. Not passed to Transport for NSW or Apple</td>
+          </tr>
+          <tr>
+            <td>You tap Start driving</td>
+            <td>The destination of the drive</td>
+            <td>The navigation app you choose (Apple Maps, Google Maps or Waze)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        HopReady asks for your agreement before the first live search sends any of this. Demo mode
+        sends nothing.
+      </p>
+
+      <h2>Location</h2>
+      <p>
+        HopReady only uses your location while the app is open, and only after you tap
+        <em>Use current location</em> and allow it. It never tracks you in the background. You can
+        always type a start point instead.
+      </p>
+
+      <h2>What HopReady's server keeps</h2>
+      <p>
+        HopReady's server runs on Cloudflare Workers. It answers each request and does not store
+        locations, addresses or search text. Its logs record technical details only, such as which
+        feature was used, how long it took and whether a provider failed. They never include
+        locations, addresses, search text or keys. Cloudflare keeps these logs for a few days. Rate
+        limits briefly count requests per install identifier and per IP address.
+      </p>
+
+      <h2>Transport for NSW and Apple</h2>
+      <p>
+        Transport for NSW and Apple receive locations and search text from HopReady's server, not
+        from your phone, and without your identity or install identifier. They handle requests under
+        their own terms and privacy policies:
+        <a href="https://www.transport.nsw.gov.au/about-us/transport-privacy/privacy-statement"
+          >Transport for NSW privacy</a
+        >
+        and <a href="https://www.apple.com/legal/privacy/">Apple privacy</a>. Maps shown in the app
+        come from Apple Maps under Apple's privacy policy.
+      </p>
+
+      <h2>Children</h2>
+      <p>HopReady is not directed at children under 13.</p>
+
+      <h2>Changes</h2>
+      <p>
+        If this policy changes, the new version will be posted here with a new date before the app
+        update that needs it.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Mehul Fursule (individual developer). Email:
+        <strong>to be confirmed by the publisher before release</strong>.
+      </p>
+
+      <footer><a href="../support/">Support</a></footer>
+    </main>
+  </body>
+</html>
