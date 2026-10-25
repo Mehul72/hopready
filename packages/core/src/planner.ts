@@ -406,8 +406,10 @@ async function planThroughPoint(
     time.type === 'depart'
       ? { type: 'depart' as const, at: addSeconds(time.at, rankedDriveSeconds + bufferSeconds) }
       : time;
+  // Parking or being dropped off only makes sense with a public transport leg after it, and
+  // Park&Ride is only free with one. A walk-only answer means the destination is simply nearby.
   const journeys = (await queryTransit(context, point.place, destination, transitTime)).filter(
-    (journey) => keepJourney(context, journey),
+    (journey) => transitLegsOf(journey.legs).length > 0 && keepJourney(context, journey),
   );
   const journey = time.type === 'depart' ? earliestJourney(journeys) : latestJourney(journeys);
   if (!journey) return null;

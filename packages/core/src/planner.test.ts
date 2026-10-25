@@ -369,6 +369,25 @@ describe('arrive by', () => {
   });
 });
 
+describe('transfer strategies need public transport', () => {
+  it('does not offer parking when the only answer from the car park is a walk', async () => {
+    const walkOnly = fakeTransit((query) => [
+      {
+        legs: [walk(query.from, query.to, addMinutes(NOW, 30), addMinutes(NOW, 42))],
+        fare: { status: 'unknown' },
+        alerts: [],
+      },
+    ]);
+    const response = await planTrip(request(), deps({ transit: walkOnly }));
+
+    expect(response.itineraries.some((it) => it.strategy === 'park-and-ride')).toBe(false);
+    expect(response.checkedCarParks.some((carPark) => carPark.outcome === 'used')).toBe(false);
+    expect(
+      response.checkedCarParks.some((carPark) => carPark.outcome === 'no-workable-connection'),
+    ).toBe(true);
+  });
+});
+
 describe('drop-off', () => {
   it('rides to a station without a parking leg', async () => {
     const response = await planTrip(
