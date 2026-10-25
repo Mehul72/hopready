@@ -7,7 +7,7 @@
     "dev": "tsx watch src/node-server.ts",
     "start": "tsx src/node-server.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint src --max-warnings 0",
+    "lint": "eslint src scripts --max-warnings 0",
     "test": "vitest run"
   },
   "dependencies": {

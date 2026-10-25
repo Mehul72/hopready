@@ -6,5 +6,5 @@ pnpm-lock.yaml
 apps/mobile/ios/
 apps/mobile/android/
 apps/mobile/assets/
-packages/core/src/providers/tfnsw/__recordings__/
-packages/core/src/providers/*/__recordings__/
+# Recorded provider responses stay byte-for-byte as received.
+apps/api/src/providers/*/__recordings__/
