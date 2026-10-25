@@ -55,8 +55,10 @@ function joinedLegs(trip: Itinerary, fromLegIndex: number, rest: readonly Leg[])
 // For a trip that has started, checked by planning the rest of it from the next stop
 // (restOfTripRequest). The trip still runs when an option rides every service still to come, on
 // the same runs; joined to the part already travelled, that option is the trip with the latest
-// times, and keeps its id because it is the same trip. Null after a cancellation or a missed
-// connection.
+// times, and keeps its id because it is the same trip. Null when a service still to come is not
+// offered on its run, such as after a cancellation. A service that has already left cannot be
+// planned again, so the part travelled keeps its times, and a delay on it that breaks a connection
+// is not found here.
 export function matchRestOfTrip(
   trip: Itinerary,
   fromLegIndex: number,

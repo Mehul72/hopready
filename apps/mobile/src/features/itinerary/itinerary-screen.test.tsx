@@ -19,6 +19,7 @@ import { ApiError } from '@/api';
 import { planSession } from '@/state';
 import { appStorage } from '@/storage';
 import {
+  metroThenBusItinerary,
   parkAndRideItinerary,
   place,
   PLACES,
@@ -442,6 +443,41 @@ describe('checking a followed trip for changes', () => {
     expect(
       appStorage.activeTrip.get()?.itinerary.legs.find((leg) => leg.kind === 'transit')?.start,
     ).toBe(metro.start);
+  });
+
+  it('says a service that has already left could not be checked', async () => {
+    // On the metro since five minutes ago, with the bus from Chatswood still to come.
+    const onTheMetro = metroThenBusItinerary({ departAt: addMinutes(WEEKDAY_MORNING, -15) });
+    const busIndex = onTheMetro.legs.findIndex(
+      (leg) => leg.kind === 'transit' && leg.mode === 'bus',
+    );
+    // Checked 45 seconds ago: too recent for the check on launch, old enough to ask for one.
+    appStorage.activeTrip.start({
+      request: demoCommuteRequest(),
+      itinerary: onTheMetro,
+      plannedAt: new Date(WEEKDAY_MORNING.getTime() - 45_000).toISOString(),
+      mode: 'demo',
+    });
+    jest
+      .spyOn(tripService, 'planTrip')
+      .mockResolvedValue(
+        planResponse(
+          [buildItinerary({ strategy: 'transit-only', legs: onTheMetro.legs.slice(busIndex) })],
+          { mode: 'demo' },
+        ),
+      );
+    await renderApp(`/itinerary/${onTheMetro.id}`);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Check for changes' }));
+
+    expect(
+      await screen.findByLabelText(
+        "Information. Your next services are still running, with the latest times. A service that has already left can't be checked, so a delay on it could still make you miss a connection.",
+      ),
+    ).toBeOnTheScreen();
+    expect(
+      screen.queryByText('This trip is still on, with the latest times.'),
+    ).not.toBeOnTheScreen();
   });
 
   it('checks the rest of the trip after leaving, and offers what still runs', async () => {

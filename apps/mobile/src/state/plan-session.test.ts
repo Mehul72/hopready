@@ -14,6 +14,7 @@ import { StorageError } from '@/storage/stored-value';
 import { createSequentialUuids } from '@/test-support/ids';
 import { createMemoryBackend } from '@/test-support/memory-kv-store';
 import {
+  metroThenBusItinerary,
   parkAndRideItinerary,
   place,
   PLACES,
@@ -389,7 +390,10 @@ describe('a followed trip that has started', () => {
     lastPending(trips.pending).resolve(planResponse([restFromStation(started, 3)]));
     await checked;
 
-    expect(session.getState().activeTripRefresh).toMatchObject({ status: 'updated' });
+    expect(session.getState().activeTripRefresh).toMatchObject({
+      status: 'updated',
+      restOfTrip: { fromLegIndex: started.legs.indexOf(metro), serviceAlreadyLeft: false },
+    });
     expect(storage.activeTrip.get()).toMatchObject({
       request,
       itinerary: {
@@ -398,6 +402,36 @@ describe('a followed trip that has started', () => {
         arriveAt: addMinutes(started.arriveAt, 3),
       },
       plannedAt: START.toISOString(),
+    });
+  });
+
+  it('says when a service it could not check had already left', async () => {
+    const { session, storage, trips } = setUp();
+    // On the metro since five minutes ago, with the bus from Chatswood still to come.
+    const onTheMetro = metroThenBusItinerary({ departAt: addMinutes(START, -15) });
+    const busIndex = onTheMetro.legs.findIndex(
+      (leg) => leg.kind === 'transit' && leg.mode === 'bus',
+    );
+    storage.activeTrip.start({
+      request,
+      itinerary: onTheMetro,
+      plannedAt: new Date(START.getTime() - 120_000).toISOString(),
+      mode: 'live',
+    });
+
+    const checked = session.refreshActiveTrip();
+    const searched = lastPending(trips.pending);
+    expect(searched.request.origin).toEqual(PLACES.chatswoodStation);
+    searched.resolve(
+      planResponse([
+        buildItinerary({ strategy: 'transit-only', legs: onTheMetro.legs.slice(busIndex) }),
+      ]),
+    );
+    await checked;
+
+    expect(session.getState().activeTripRefresh).toMatchObject({
+      status: 'updated',
+      restOfTrip: { fromLegIndex: busIndex, serviceAlreadyLeft: true },
     });
   });
 

@@ -52,6 +52,9 @@ export interface RestOfTripCheck {
   // That service's leg on the trip as it was checked. Alternatives start at its stop, so following
   // one keeps the legs before it.
   fromLegIndex: number;
+  // A service before it had already left, perhaps with the person on board. Planning cannot start
+  // from a service that has left, so a delay on it, and a connection it then misses, is not known.
+  serviceAlreadyLeft: boolean;
 }
 
 export interface ActiveTripRefresh {
@@ -274,7 +277,15 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
         part.kind === 'whole-trip'
           ? matchItinerary(trip.itinerary, response.itineraries)
           : matchRestOfTrip(trip.itinerary, part.legIndex, response.itineraries);
-      const restOfTrip = part.kind === 'whole-trip' ? null : { fromLegIndex: part.legIndex };
+      const restOfTrip =
+        part.kind === 'whole-trip'
+          ? null
+          : {
+              fromLegIndex: part.legIndex,
+              serviceAlreadyLeft: trip.itinerary.legs
+                .slice(0, part.legIndex)
+                .some((leg) => leg.kind === 'transit'),
+            };
       if (!match) {
         setState({
           activeTripRefresh: {

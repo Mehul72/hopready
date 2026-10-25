@@ -263,3 +263,25 @@ export function planResponse(
     notices: [],
   };
 }
+
+// Walk 10 min, metro 40 min to Chatswood, wait 5 min, then bus 10 min to the office.
+export function metroThenBusItinerary({ departAt }: Pick<ItineraryOptions, 'departAt'>): Itinerary {
+  const boardAt = addMinutes(departAt, 10);
+  const busAt = addMinutes(boardAt, 45);
+  return buildItinerary({
+    strategy: 'transit-only',
+    legs: [
+      walkLeg('walk-to-station', PLACES.rouseHillHome, PLACES.tallawongStation, departAt, 10),
+      transitLeg(PLACES.tallawongStation, PLACES.chatswoodStation, boardAt, 40, {
+        name: 'M1',
+        mode: 'metro',
+        realtime: false,
+      }),
+      transitLeg(PLACES.chatswoodStation, PLACES.chatswoodOffice, busAt, 10, {
+        name: '545',
+        mode: 'bus',
+        realtime: false,
+      }),
+    ],
+  });
+}

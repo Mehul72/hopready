@@ -181,8 +181,18 @@ function CheckResult({ trip, canCheck }: { trip: DisplayedTrip; canCheck: boolea
     case 'refreshing':
       return <Banner tone="info" message="Checking this trip for changes." />;
     case 'updated':
-      // When it was checked is on the line above.
-      return <Banner tone="info" message="This trip is still on, with the latest times." />;
+      // When it was checked is on the line above. Only the services still to come were planned
+      // again, so a service that had already left is not vouched for.
+      return (
+        <Banner
+          tone="info"
+          message={
+            refresh.restOfTrip?.serviceAlreadyLeft
+              ? "Your next services are still running, with the latest times. A service that has already left can't be checked, so a delay on it could still make you miss a connection."
+              : 'This trip is still on, with the latest times.'
+          }
+        />
+      );
     case 'replaced':
       return (
         <Banner
