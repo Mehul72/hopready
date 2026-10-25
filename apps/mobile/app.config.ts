@@ -12,10 +12,17 @@ const SPLASH_BACKGROUND_DARK = '#0B3B3A';
 
 const DEFAULT_PRIVACY_POLICY_URL = 'https://mehul72.github.io/hopready/privacy/';
 const DEFAULT_SUPPORT_URL = 'https://mehul72.github.io/hopready/support/';
+// The owner's Apple Developer team (individual membership), read from their provisioning profiles.
+const DEFAULT_APPLE_TEAM_ID = 'MACDPWQG37';
 
 function easExtra(): { eas: { projectId: string } } | Record<string, never> {
   const projectId = process.env.EAS_PROJECT_ID;
   return projectId ? { eas: { projectId } } : {};
+}
+
+// The XCUITest target is only for local end-to-end runs; store builds never carry it.
+function uiTestPlugins(): string[] {
+  return process.env.HOPREADY_IOS_UI_TESTS === '1' ? ['./plugins/with-ios-ui-tests'] : [];
 }
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
@@ -26,27 +33,50 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   version: '0.1.0',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
-  icon: './assets/images/icon.png',
+  icon: './assets/brand/icon-1024.png',
   ios: {
     bundleIdentifier: process.env.HOPREADY_IOS_BUNDLE_ID ?? 'au.hopready.HopReady',
+    appleTeamId: process.env.HOPREADY_APPLE_TEAM_ID ?? DEFAULT_APPLE_TEAM_ID,
     supportsTablet: false,
-    icon: './assets/expo.icon',
+    // iOS 26 and later use the layered Icon Composer icon; earlier versions use the PNG above.
+    icon: './assets/brand/hopready.icon',
     infoPlist: {
       NSLocationWhenInUseUsageDescription: LOCATION_PURPOSE,
       // HopReady only uses the encryption built into iOS (HTTPS), which is exempt.
       ITSAppUsesNonExemptEncryption: false,
       // The navigation apps the drive leg can be handed to, checked with canOpenURL.
       LSApplicationQueriesSchemes: ['comgooglemaps', 'waze'],
+      // HTTPS only. Local networking stays open so a development build can reach a laptop's API.
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: false,
+        NSAllowsLocalNetworking: true,
+      },
     },
-  },
-  android: {
-    adaptiveIcon: {
-      backgroundColor: '#E6F4FE',
-      foregroundImage: './assets/images/android-icon-foreground.png',
-      backgroundImage: './assets/images/android-icon-background.png',
-      monochromeImage: './assets/images/android-icon-monochrome.png',
+    // Apple rejects uploads without reasons for these APIs, which React Native and Expo modules use.
+    // Static CocoaPods dependencies do not always contribute their own manifests (Expo's guide).
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyCollectedDataTypes: [],
+      NSPrivacyAccessedAPITypes: [
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',
+          NSPrivacyAccessedAPITypeReasons: ['CA92.1'],
+        },
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryFileTimestamp',
+          NSPrivacyAccessedAPITypeReasons: ['C617.1'],
+        },
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategorySystemBootTime',
+          NSPrivacyAccessedAPITypeReasons: ['35F9.1'],
+        },
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryDiskSpace',
+          NSPrivacyAccessedAPITypeReasons: ['E174.1'],
+        },
+      ],
     },
-    predictiveBackGestureEnabled: false,
   },
   plugins: [
     'expo-router',
@@ -54,8 +84,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-splash-screen',
       {
         backgroundColor: SPLASH_BACKGROUND,
-        image: './assets/images/splash-icon.png',
-        imageWidth: 76,
+        image: './assets/brand/splash-mark.png',
+        imageWidth: 160,
         dark: { backgroundColor: SPLASH_BACKGROUND_DARK },
       },
     ],
@@ -73,6 +103,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         isIosBackgroundLocationEnabled: false,
       },
     ],
+    ...uiTestPlugins(),
   ],
   experiments: {
     typedRoutes: true,

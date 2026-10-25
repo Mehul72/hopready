@@ -7,7 +7,8 @@
     "start": "expo start",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint --max-warnings 0"
+    "lint": "expo lint --max-warnings 0",
+    "test": "jest"
   },
   "dependencies": {
     "@expo/ui": "~58.0.23",
