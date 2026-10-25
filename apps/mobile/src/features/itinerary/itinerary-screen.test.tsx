@@ -4,6 +4,7 @@ import {
   type DriveLeg,
   type Itinerary,
   legSeconds,
+  type ParkedCar,
   type PlanRequest,
   type PlanResponse,
 } from '@hopready/core';
@@ -15,7 +16,13 @@ import { ActionSheetIOS, Linking } from 'react-native';
 import { ApiError } from '@/api';
 import { planSession } from '@/state';
 import { appStorage } from '@/storage';
-import { parkAndRideItinerary, planRequest, planResponse } from '@/test-support/trips';
+import {
+  parkAndRideItinerary,
+  PLACES,
+  planRequest,
+  planResponse,
+  transitItinerary,
+} from '@/test-support/trips';
 import { tripService } from '@/trip';
 
 import { APPLE_ATTRIBUTION, DEMO_ATTRIBUTION, TFNSW_ATTRIBUTION } from './data-attribution';
@@ -345,5 +352,41 @@ describe('the followed trip after a refresh', () => {
       ),
     ).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+  });
+});
+
+describe('a followed trip home', () => {
+  const car: ParkedCar = {
+    location: PLACES.tallawongCarPark,
+    carParkId: '26',
+    confirmedAt: WEEKDAY_MORNING.toISOString(),
+  };
+
+  it('asks for Take me home again once the parked car is removed', async () => {
+    appStorage.parkedCar.markParked(car, 'Tallawong P1');
+    const home = transitItinerary({ departAt: addMinutes(WEEKDAY_MORNING, 10) });
+    jest.spyOn(tripService, 'planTrip').mockResolvedValue(planResponse([home], { mode: 'demo' }));
+    await planSession.plan(
+      planRequest({
+        origin: PLACES.chatswoodOffice,
+        destination: PLACES.rouseHillHome,
+        trip: { kind: 'return-via-car', parkedCar: car },
+      }),
+    );
+    planSession.select(home.id);
+    await renderApp(`/itinerary/${home.id}`);
+    expect(screen.queryByTestId('trip-home-out-of-date')).not.toBeOnTheScreen();
+
+    await act(async () => {
+      appStorage.parkedCar.clear();
+    });
+
+    expect(
+      screen.getByLabelText(
+        'Warning. This trip home is out of date. Your car details changed after it was planned. Tap Take me home on the Car tab to plan it again.',
+      ),
+    ).toBeOnTheScreen();
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Open the Car tab' }));
+    expect(screen).toHavePathname('/car');
   });
 });

@@ -1,33 +1,41 @@
-import { formatSydneyTime, isBefore, type Itinerary, toIso } from '@hopready/core';
+import {
+  formatSydneyTime,
+  isBefore,
+  type Itinerary,
+  type PlanRequest,
+  toIso,
+} from '@hopready/core';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText, Banner, Card } from '@/components';
-import { planSession } from '@/state';
+import { type ActiveTripRefresh, planSession } from '@/state';
 import { appStorage } from '@/storage';
 import { SPACING } from '@/theme';
-import { refreshableRequest } from '@/trip';
+import { refreshableRequest, replanRequest, useTripHomeOutOfDate } from '@/trip';
 
 import { showResultsFor } from '../saved/plan-requests';
 import { writeOrAlert } from '../saved/storage-writes';
 import { shownDurationSeconds } from '../shared/shown-duration';
+import { TripHomeOutOfDate } from '../shared/trip-home-out-of-date';
 import { describeTripSummary } from './trip-summary-card';
 import { optionLabel } from '../shared/option-labels';
 import { duration } from './trip-text';
 import type { DisplayedTrip } from './use-displayed-trip';
 
 // Follows another option after the chosen one stopped being offered. The alternatives come from
-// the same refresh, so they are planned for the same request and mode.
-function followAlternative(alternative: Itinerary, checkedAt: string | null) {
+// the same refresh, so the trip keeps the search they answer and the same mode.
+function followAlternative(alternative: Itinerary, refresh: ActiveTripRefresh) {
   const activeTrip = appStorage.activeTrip.get();
-  if (!activeTrip) return;
+  const { request } = refresh;
+  if (!activeTrip || !request) return;
   const now = new Date();
   const started = writeOrAlert(
     () =>
       appStorage.activeTrip.start({
-        request: refreshableRequest(activeTrip.request, now),
+        request: refreshableRequest(request, now),
         itinerary: alternative,
-        plannedAt: checkedAt ?? toIso(now),
+        plannedAt: refresh.checkedAt ?? toIso(now),
         mode: activeTrip.mode,
       }),
     "Couldn't switch to this option",
@@ -35,17 +43,23 @@ function followAlternative(alternative: Itinerary, checkedAt: string | null) {
   if (started.ok) router.replace({ pathname: '/itinerary/[id]', params: { id: alternative.id } });
 }
 
+// Through replanRequest, so a trip home never goes back to a car that has moved or gone.
+function planAgain(request: PlanRequest) {
+  const next = replanRequest(request, appStorage.parkedCar.get(), new Date());
+  if (next) showResultsFor(next);
+}
+
 function AlternativeCard({
   alternative,
-  checkedAt,
+  refresh,
 }: {
   alternative: Itinerary;
-  checkedAt: string | null;
+  refresh: ActiveTripRefresh;
 }) {
   const total = duration(shownDurationSeconds(alternative));
   return (
     <Card
-      onPress={() => followAlternative(alternative, checkedAt)}
+      onPress={() => followAlternative(alternative, refresh)}
       accessibilityLabel={describeTripSummary(alternative)}
       accessibilityHint="Follows this option instead">
       <View style={styles.alternative}>
@@ -66,7 +80,10 @@ function AlternativeCard({
 // What the latest check of the followed trip found. Shown only on the followed trip.
 export function ActiveTripStatus({ trip, nowMs }: { trip: DisplayedTrip; nowMs: number }) {
   const { activeTripRefresh: refresh, itinerary, request } = trip;
+  const tripHomeOutOfDate = useTripHomeOutOfDate(request);
   if (!trip.isActive) return null;
+  // What a check found is about the car as it was, so it gives way to asking for Take me home.
+  if (tripHomeOutOfDate) return <TripHomeOutOfDate />;
   // Once the trip has started, checking it again cannot find it (refresh-policy.ts).
   const canCheckAgain = isBefore(new Date(nowMs), itinerary.departAt);
 
@@ -95,18 +112,14 @@ export function ActiveTripStatus({ trip, nowMs }: { trip: DisplayedTrip; nowMs: 
       // This itinerary is one of the options offered now, so the warning is about another one.
       if (refresh.alternatives.some((alternative) => alternative.id === itinerary.id)) return null;
       if (refresh.alternatives.length === 0) {
+        const searched = refresh.request ?? request;
         return (
           <Banner
             tone="error"
             title="This trip is no longer offered"
             message="A service may be cancelled or a connection no longer works, and nothing else is offered right now."
             action={
-              request
-                ? {
-                    label: 'Plan again',
-                    onPress: () => showResultsFor(refreshableRequest(request, new Date())),
-                  }
-                : undefined
+              searched ? { label: 'Plan again', onPress: () => planAgain(searched) } : undefined
             }
             announce
           />
@@ -121,11 +134,7 @@ export function ActiveTripStatus({ trip, nowMs }: { trip: DisplayedTrip; nowMs: 
             announce
           />
           {refresh.alternatives.map((alternative) => (
-            <AlternativeCard
-              key={alternative.id}
-              alternative={alternative}
-              checkedAt={refresh.checkedAt}
-            />
+            <AlternativeCard key={alternative.id} alternative={alternative} refresh={refresh} />
           ))}
         </View>
       );

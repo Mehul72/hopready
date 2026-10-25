@@ -13,7 +13,7 @@ import { type AppStorage, appStorage, useActiveTrip, useSettings } from '@/stora
 import { matchItinerary } from '@/trip/itinerary-match';
 import {
   manualRefreshAvailability,
-  refreshableRequest,
+  replanRequest,
   shouldRefreshActiveTripOnResume,
 } from '@/trip/refresh-policy';
 import { type TripService, tripService } from '@/trip/trip-service';
@@ -39,6 +39,9 @@ export interface ActiveTripRefresh {
   status: ActiveTripRefreshStatus;
   error: ApiError | null;
   alternatives: Itinerary[];
+  // For 'no-longer-offered': the search the alternatives answer, so following one or planning
+  // again uses the same places and car.
+  request: PlanRequest | null;
   // For 'replaced': the run the person chose, so the screen can say what changed.
   previous: Itinerary | null;
   checkedAt: string | null;
@@ -67,14 +70,17 @@ export type RefreshOutcome =
   | PlanOutcome
   | { status: 'nothing-to-refresh' }
   | { status: 'busy' }
-  | { status: 'too-soon'; retryInSeconds: number };
+  | { status: 'too-soon'; retryInSeconds: number }
+  // A trip home that no longer fits the car (withCurrentCar). It is not planned again.
+  | { status: 'car-changed' };
 
 export interface PlanSession {
   getState: () => PlanSessionState;
   subscribe: (listener: () => void) => () => void;
   // Starts a new search. Any search still running is cancelled and its answer ignored.
   plan: (request: PlanRequest) => Promise<PlanOutcome>;
-  // Re-plans the latest request, at most once every 30 seconds.
+  // Re-plans the latest request, at most once every 30 seconds. A trip home goes through the car
+  // as it is now. Never rejects.
   refresh: () => Promise<RefreshOutcome>;
   // Makes an option from the latest results the active trip. Returns null if it is not there.
   select: (itineraryId: string) => Itinerary | null;
@@ -86,7 +92,10 @@ export interface PlanSession {
 
 export interface PlanSessionDependencies {
   trips: Pick<TripService, 'planTrip' | 'currentMode'>;
-  storage: Pick<AppStorage, 'activeTrip' | 'recentRequests' | 'settings' | 'onDataDeleted'>;
+  storage: Pick<
+    AppStorage,
+    'activeTrip' | 'parkedCar' | 'recentRequests' | 'settings' | 'onDataDeleted'
+  >;
   clock: Clock;
 }
 
@@ -94,6 +103,7 @@ const IDLE_ACTIVE_TRIP_REFRESH: ActiveTripRefresh = {
   status: 'idle',
   error: null,
   alternatives: [],
+  request: null,
   previous: null,
   checkedAt: null,
 };
@@ -146,6 +156,14 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
     }
   }
 
+  // Results already on screen stay there, next to the error.
+  function fail(error: unknown): PlanOutcome {
+    const apiError = toApiError(error);
+    if (apiError.kind === 'unexpected') reportUnexpected(apiError);
+    setState({ status: 'failed', error: apiError });
+    return { status: 'failed', error: apiError };
+  }
+
   async function runPlan(request: PlanRequest, run: AbortController): Promise<PlanOutcome> {
     try {
       const response = await trips.planTrip(request, { signal: run.signal });
@@ -157,10 +175,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
     } catch (error) {
       if (currentRun !== run) return { status: 'superseded' };
       currentRun = null;
-      const apiError = toApiError(error);
-      if (apiError.kind === 'unexpected') reportUnexpected(apiError);
-      setState({ status: 'failed', error: apiError });
-      return { status: 'failed', error: apiError };
+      return fail(error);
     }
   }
 
@@ -182,8 +197,10 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
       if (!trip || !shouldRefreshActiveTripOnResume(trip, clock.now(), trips.currentMode())) {
         return;
       }
+      const request = replanRequest(trip.request, storage.parkedCar.get(), clock.now());
+      // The trip screen asks for Take me home again instead.
+      if (!request) return;
       setState({ activeTripRefresh: { ...IDLE_ACTIVE_TRIP_REFRESH, status: 'refreshing' } });
-      const request = refreshableRequest(trip.request, clock.now());
       const response = await trips.planTrip(request, { signal: run.signal });
       // Ignore the answer if the session was reset or the person chose another trip meanwhile.
       if (run.signal.aborted || storage.activeTrip.get() !== trip) return;
@@ -195,6 +212,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
             status: 'no-longer-offered',
             error: null,
             alternatives: response.itineraries,
+            request,
             previous: null,
             checkedAt,
           },
@@ -212,6 +230,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
           status: match.exact ? 'updated' : 'replaced',
           error: null,
           alternatives: [],
+          request: null,
           previous: match.exact ? null : trip.itinerary,
           checkedAt,
         },
@@ -225,6 +244,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
           status: 'failed',
           error: apiError,
           alternatives: [],
+          request: null,
           previous: null,
           checkedAt: toIso(clock.now()),
         },
@@ -269,13 +289,21 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
       if (!request) return { status: 'nothing-to-refresh' };
       if (status === 'planning' || status === 'refreshing') return { status: 'busy' };
       const now = clock.now();
+      let next: PlanRequest | null;
+      try {
+        next = replanRequest(request, storage.parkedCar.get(), now);
+      } catch (error) {
+        // An unreadable parked car fails the refresh like any other error, so it never rejects.
+        return fail(error);
+      }
+      if (!next) return { status: 'car-changed' };
       const availability = manualRefreshAvailability(plannedAt, now);
       if (!availability.allowed) {
         return { status: 'too-soon', retryInSeconds: availability.retryInSeconds };
       }
       const run = beginRun();
       setState({ status: response ? 'refreshing' : 'planning', error: null });
-      return runPlan(refreshableRequest(request, now), run);
+      return runPlan(next, run);
     },
     select: (itineraryId) => {
       const { request, response, plannedAt } = state;

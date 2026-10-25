@@ -1,11 +1,14 @@
-import { addMinutes, type PlanRequest, type PlanResponse } from '@hopready/core';
+import { addMinutes, type ParkedCar, type PlanRequest, type PlanResponse } from '@hopready/core';
 
 import { ApiError } from '@/api/errors';
-import { createAppStorage } from '@/storage/app-storage';
+import { type AppStorage, createAppStorage } from '@/storage/app-storage';
+import { StorageError } from '@/storage/stored-value';
 import { createSequentialUuids } from '@/test-support/ids';
 import { createMemoryBackend } from '@/test-support/memory-kv-store';
 import {
   parkAndRideItinerary,
+  place,
+  PLACES,
   planRequest,
   planResponse,
   transitItinerary,
@@ -191,6 +194,25 @@ describe('refresh', () => {
     const { session } = setUp();
     await expect(session.refresh()).resolves.toEqual({ status: 'nothing-to-refresh' });
   });
+
+  it('fails, rather than rejecting, when the parked car cannot be read', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { session, storage, trips, advanceSeconds } = await plannedSession();
+    advanceSeconds(31);
+    jest.spyOn(storage.parkedCar, 'get').mockImplementation(() => {
+      throw new StorageError('Could not read parked-car', { cause: new Error('disk') });
+    });
+
+    await expect(session.refresh()).resolves.toMatchObject({
+      status: 'failed',
+      error: { kind: 'unexpected' },
+    });
+    expect(trips.service.planTrip).toHaveBeenCalledTimes(1);
+    expect(session.getState()).toMatchObject({
+      status: 'failed',
+      response: planResponse([transit]),
+    });
+  });
 });
 
 describe('select', () => {
@@ -257,12 +279,14 @@ describe('refreshActiveTrip', () => {
   it('says when the chosen option is no longer offered and keeps the alternatives', async () => {
     const { session, storage, trips } = withActiveTrip(120);
     const refreshed = session.refreshActiveTrip();
-    lastPending(trips.pending).resolve(planResponse([transit]));
+    const searched = lastPending(trips.pending);
+    searched.resolve(planResponse([transit]));
     await refreshed;
 
     expect(session.getState().activeTripRefresh).toMatchObject({
       status: 'no-longer-offered',
       alternatives: [transit],
+      request: searched.request,
     });
     expect(storage.activeTrip.get()?.itinerary).toEqual(parkAndRide);
   });
@@ -284,6 +308,103 @@ describe('refreshActiveTrip', () => {
       error: { kind: 'offline' },
     });
   });
+});
+
+describe('a trip home after the parked car changed', () => {
+  const PARKED: ParkedCar = {
+    location: PLACES.tallawongCarPark,
+    carParkId: '26',
+    confirmedAt: '2026-10-26T08:00:00.000Z',
+  };
+  // A correction moves the car and keeps when it was parked.
+  const CORRECTED: ParkedCar = {
+    ...PARKED,
+    location: place('Pinned location', -33.6951, 150.9071),
+    carParkId: null,
+  };
+  const tripHome = planRequest({
+    origin: PLACES.chatswoodOffice,
+    destination: PLACES.rouseHillHome,
+    time: { type: 'depart', at: START.toISOString() },
+    access: { transit: true, drive: true, dropOff: false },
+    trip: { kind: 'return-via-car', parkedCar: PARKED },
+  });
+  const CHANGES: [string, (storage: AppStorage) => void][] = [
+    ['the car is removed', (storage) => storage.parkedCar.clear()],
+    [
+      'the person says they were dropped off',
+      (storage) => storage.parkedCar.markDroppedOff(START.toISOString()),
+    ],
+  ];
+
+  async function plannedTripHome() {
+    const context = setUp();
+    context.storage.parkedCar.markParked(PARKED, 'Tallawong P1');
+    const outcome = context.session.plan(tripHome);
+    lastPending(context.trips.pending).resolve(planResponse([transit]));
+    await outcome;
+    context.advanceSeconds(31);
+    return context;
+  }
+
+  function followedTripHome() {
+    const context = setUp();
+    context.storage.parkedCar.markParked(PARKED, 'Tallawong P1');
+    context.storage.activeTrip.start({
+      request: tripHome,
+      itinerary: transit,
+      plannedAt: new Date(START.getTime() - 120_000).toISOString(),
+      mode: 'live',
+    });
+    return context;
+  }
+
+  it('refreshes the results through the corrected spot', async () => {
+    const { session, storage, trips } = await plannedTripHome();
+    storage.parkedCar.markParked(CORRECTED, null);
+
+    void session.refresh();
+
+    expect(lastPending(trips.pending).request).toMatchObject({
+      origin: tripHome.origin,
+      trip: { kind: 'return-via-car', parkedCar: CORRECTED },
+    });
+  });
+
+  it('checks the followed trip through the corrected spot', async () => {
+    const { session, storage, trips } = followedTripHome();
+    storage.parkedCar.markParked(CORRECTED, null);
+
+    void session.refreshActiveTrip();
+
+    expect(lastPending(trips.pending).request.trip).toEqual({
+      kind: 'return-via-car',
+      parkedCar: CORRECTED,
+    });
+  });
+
+  it.each(CHANGES)('never refreshes the results back to the old car when %s', async (_, change) => {
+    const { session, storage, trips } = await plannedTripHome();
+    change(storage);
+
+    await expect(session.refresh()).resolves.toEqual({ status: 'car-changed' });
+
+    expect(trips.service.planTrip).toHaveBeenCalledTimes(1);
+    expect(session.getState()).toMatchObject({ status: 'ready', request: tripHome });
+  });
+
+  it.each(CHANGES)(
+    'never checks the followed trip against the old car when %s',
+    async (_, change) => {
+      const { session, storage, trips } = followedTripHome();
+      change(storage);
+
+      await session.refreshActiveTrip();
+
+      expect(trips.service.planTrip).not.toHaveBeenCalled();
+      expect(session.getState().activeTripRefresh.status).toBe('idle');
+    },
+  );
 });
 
 describe('reset', () => {

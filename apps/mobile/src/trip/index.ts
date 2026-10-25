@@ -11,10 +11,11 @@ export {
   manualRefreshAvailability,
   type RefreshAvailability,
   refreshableRequest,
+  replanRequest,
   RESUME_REFRESH_MIN_AGE_SECONDS,
   shouldRefreshActiveTripOnResume,
 } from './refresh-policy';
-export { returnTripFor } from './return-trip';
+export { returnTripFor, useTripHomeOutOfDate, withCurrentCar } from './return-trip';
 export {
   createTripService,
   type DataMode,

@@ -31,10 +31,11 @@ import { turnOnDemoMode } from '@/features/plan/demo-mode';
 import { usePlanChoices } from '@/features/plan/plan-choices';
 import { describeRequestTime } from '@/features/plan/time-choice';
 import { planSession, usePlanSession } from '@/state';
-import { usePreferences } from '@/storage';
+import { appStorage, usePreferences } from '@/storage';
 import { MAX_CONTENT_WIDTH, SPACING, useTheme } from '@/theme';
-import { MANUAL_REFRESH_MIN_INTERVAL_SECONDS, refreshableRequest } from '@/trip';
+import { MANUAL_REFRESH_MIN_INTERVAL_SECONDS, replanRequest, useTripHomeOutOfDate } from '@/trip';
 
+import { TripHomeOutOfDate } from '../shared/trip-home-out-of-date';
 import { CarParksChecked } from './car-parks-checked';
 import { optionsChangedSince, withCurrentOptions } from './current-options';
 import { defaultOrderFor, orderItineraries, ordersFor, type ResultOrder } from './itinerary-order';
@@ -110,6 +111,7 @@ export function ResultsScreen() {
   const endpoints = useMemo(() => (request ? endpointsOf(request) : []), [request]);
   const preferences = usePreferences();
   const choices = usePlanChoices();
+  const tripHomeOutOfDate = useTripHomeOutOfDate(request);
 
   // VoiceOver users hear nothing when the loading rows are replaced, so the outcome is spoken.
   useEffect(() => {
@@ -151,16 +153,23 @@ export function ResultsScreen() {
 
   const currentRequest = withCurrentOptions(request, preferences, choices);
   const optionsChanged = response !== null && optionsChangedSince(request, currentRequest);
+  // Refreshing could only plan back to the car as it was, so the banner asks for Take me home.
+  const canRefresh = response !== null && !tripHomeOutOfDate;
+
+  // A "leave at" time that passed meanwhile moves up to now, and a trip home follows the car as it
+  // is now. Out of date, it is not planned at all.
+  function planAgain(base: PlanRequest) {
+    const next = replanRequest(base, appStorage.parkedCar.get(), new Date());
+    if (next) void planSession.plan(next);
+  }
 
   function planWithCurrentOptions() {
-    void planSession.plan(refreshableRequest(currentRequest, new Date()));
+    planAgain(currentRequest);
   }
 
   function retry() {
-    if (!request) return;
-    // A failed first search has nothing to keep on screen, so it plans afresh, and a "leave at"
-    // time that passed meanwhile moves up to now.
-    void planSession.plan(refreshableRequest(request, new Date()));
+    // A failed first search has nothing to keep on screen, so it plans afresh.
+    if (request) planAgain(request);
   }
 
   async function refresh() {
@@ -178,7 +187,7 @@ export function ResultsScreen() {
     const current = planSession.getState().request;
     // Switching modes clears the session, so the same trip is planned again with sample data.
     if (!turnOnDemoMode() || !current) return;
-    void planSession.plan(refreshableRequest(current, new Date()));
+    planAgain(current);
   }
 
   // Opening an option only shows it. Following it, which refreshes it when the app comes back, is
@@ -189,7 +198,8 @@ export function ResultsScreen() {
 
   let body: ReactNode;
   if (!response && status === 'failed' && error) {
-    body = (
+    // Trying again would plan back to the car as it was; the banner above says what to do.
+    body = tripHomeOutOfDate ? null : (
       <ResultsError
         error={error}
         onRetry={retry}
@@ -213,7 +223,7 @@ export function ResultsScreen() {
             testID="refresh-failed"
           />
         ) : null}
-        {optionsChanged ? (
+        {optionsChanged && !tripHomeOutOfDate ? (
           <Banner
             tone="info"
             title="Trip options changed"
@@ -288,7 +298,7 @@ export function ResultsScreen() {
         contentContainerStyle={styles.scrollContent}
         contentInsetAdjustmentBehavior="automatic"
         refreshControl={
-          response ? (
+          canRefresh ? (
             <RefreshControl
               refreshing={status === 'refreshing'}
               onRefresh={() => void refresh()}
@@ -312,7 +322,7 @@ export function ResultsScreen() {
               </AppText>
             </View>
             {/* Pull to refresh is hard to find with VoiceOver or Switch Control; this does the same. */}
-            {response ? (
+            {canRefresh ? (
               <Button
                 variant="plain"
                 label="Refresh"
@@ -323,6 +333,7 @@ export function ResultsScreen() {
               />
             ) : null}
           </View>
+          {tripHomeOutOfDate ? <TripHomeOutOfDate /> : null}
           {body}
         </View>
       </ScrollView>

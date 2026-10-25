@@ -1,7 +1,8 @@
 import { isBefore, type PlanRequest, secondsBetween, toIso } from '@hopready/core';
 
-import type { ActiveTrip } from '@/storage';
+import type { ActiveTrip, ParkedCarState } from '@/storage';
 
+import { withCurrentCar } from './return-trip';
 import type { DataMode } from './trip-service';
 
 // Each refresh costs provider quota shared by every HopReady user, and times rarely change
@@ -45,4 +46,15 @@ export function shouldRefreshActiveTripOnResume(
 export function refreshableRequest(request: PlanRequest, now: Date): PlanRequest {
   if (request.time.type !== 'depart' || !isBefore(request.time.at, now)) return request;
   return { ...request, time: { type: 'depart', at: toIso(now) } };
+}
+
+// A search planned again: refreshable, and a trip home through the car as it is now. Null when the
+// trip home no longer fits the car (see withCurrentCar).
+export function replanRequest(
+  request: PlanRequest,
+  parkedCar: ParkedCarState,
+  now: Date,
+): PlanRequest | null {
+  const current = withCurrentCar(request, parkedCar);
+  return current ? refreshableRequest(current, now) : null;
 }

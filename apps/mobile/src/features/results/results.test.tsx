@@ -1,4 +1,4 @@
-import { type Itinerary, legSeconds } from '@hopready/core';
+import { type Itinerary, legSeconds, type ParkedCar } from '@hopready/core';
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
@@ -10,7 +10,7 @@ import { freezeClockAt, renderApp, TUESDAY_0730 } from '@/features/plan/test-har
 import { planSession } from '@/state';
 import { appStorage } from '@/storage';
 import { fitToCoordinates } from '@/test-support/mocks/react-native-maps';
-import { PLACES } from '@/test-support/trips';
+import { PLACES, planRequest, planResponse, transitItinerary } from '@/test-support/trips';
 import { tripService } from '@/trip';
 
 beforeEach(() => {
@@ -301,6 +301,40 @@ describe('refreshing', () => {
     await waitFor(() => expect(planSession.getState().status).toBe('ready'));
     expect(plan).toHaveBeenCalledTimes(1);
     expect(planSession.getState().plannedAt).not.toBe(firstPlannedAt);
+  });
+});
+
+describe('a trip home', () => {
+  it('asks for Take me home again, instead of refreshing, once the car is removed', async () => {
+    const car: ParkedCar = {
+      location: PLACES.tallawongCarPark,
+      carParkId: '26',
+      confirmedAt: TUESDAY_0730.toISOString(),
+    };
+    appStorage.parkedCar.markParked(car, 'Tallawong P1');
+    jest.spyOn(tripService, 'planTrip').mockResolvedValue(
+      planResponse([transitItinerary({ departAt: TUESDAY_0730.toISOString() })], {
+        mode: 'demo',
+      }),
+    );
+    await planSession.plan(
+      planRequest({
+        origin: PLACES.chatswoodOffice,
+        destination: PLACES.rouseHillHome,
+        trip: { kind: 'return-via-car', parkedCar: car },
+      }),
+    );
+    await renderApp('/results');
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeOnTheScreen();
+
+    await act(async () => {
+      appStorage.parkedCar.clear();
+    });
+
+    expect(screen.getByTestId('trip-home-out-of-date')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeOnTheScreen();
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Open the Car tab' }));
+    expect(await screen.findByText('Car screen')).toBeOnTheScreen();
   });
 });
 
