@@ -217,6 +217,7 @@ describe('searchPlaces', () => {
     const results = await clientWith(fetch).searchPlaces('  Chatswood ', near);
 
     expect(results).toEqual({
+      mode: 'live',
       results: [{ place: PLACES.chatswoodStation, detail: 'Train and metro station' }],
       unavailable: ['apple-maps'],
     });
@@ -229,10 +230,46 @@ describe('searchPlaces', () => {
   it('returns no results without a request for text shorter than the server accepts', async () => {
     const fetch = scriptedFetch();
     expect(await clientWith(fetch).searchPlaces(' C ', null)).toEqual({
+      mode: 'live',
       results: [],
       unavailable: [],
     });
     expect(fetch.requests).toHaveLength(0);
+  });
+});
+
+describe('the mode an answer was made in', () => {
+  it('keeps "demo" from an API serving sample data, so the app can label it', async () => {
+    const fetch = scriptedFetch(
+      async () =>
+        jsonResponse(200, {
+          mode: 'demo',
+          results: [{ place: PLACES.chatswoodStation, detail: null }],
+          unavailable: [],
+        }),
+      async () =>
+        jsonResponse(200, {
+          mode: 'demo',
+          fetchedAt: NOW.toISOString(),
+          carParks: [],
+          notices: [],
+        }),
+    );
+    const client = clientWith(fetch);
+
+    expect((await client.searchPlaces('Chatswood')).mode).toBe('demo');
+    expect((await client.carParks()).mode).toBe('demo');
+  });
+
+  it('treats a search or car park answer without a mode as an invalid response', async () => {
+    const fetch = scriptedFetch(
+      async () => jsonResponse(200, { results: [], unavailable: [] }),
+      async () => jsonResponse(200, { carParks: [], notices: [] }),
+    );
+    const client = clientWith(fetch);
+
+    expect((await failureOf(client.searchPlaces('Chatswood'))).kind).toBe('invalid-response');
+    expect((await failureOf(client.carParks())).kind).toBe('invalid-response');
   });
 });
 
@@ -265,7 +302,7 @@ describe('carParks', () => {
 
     const listing = await clientWith(fetch).carParks();
 
-    expect(listing).toEqual({ carParks: [carPark], notices: [] });
+    expect(listing).toEqual({ mode: 'live', carParks: [carPark], notices: [] });
     expect(fetch.requests[0]?.init.method).toBe('GET');
     expect(fetch.requests[0]?.init.body).toBeUndefined();
   });
@@ -273,6 +310,7 @@ describe('carParks', () => {
   it('rejects occupancy reported as zero spaces of zero, which the model treats as unknown', async () => {
     const fetch = scriptedFetch(async () =>
       jsonResponse(200, {
+        mode: 'live',
         carParks: [
           {
             id: '26',

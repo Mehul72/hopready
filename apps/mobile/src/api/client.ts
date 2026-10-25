@@ -49,7 +49,10 @@ export function createApiClient(transport: HttpTransport): ApiClient {
       }),
     searchPlaces: async (query, near, signal) => {
       const trimmed = query.trim();
-      if (trimmed.length < PLACE_QUERY_MIN_LENGTH) return { results: [], unavailable: [] };
+      // Nothing is sent, so nothing in this answer can be the server's sample data.
+      if (trimmed.length < PLACE_QUERY_MIN_LENGTH) {
+        return { mode: 'live', results: [], unavailable: [] };
+      }
       return requestJson(transport, {
         method: 'POST',
         path: API_ROUTES.placeSearch,

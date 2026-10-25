@@ -19,12 +19,14 @@ import {
   apiClient,
   ApiError,
   type ApiErrorKind,
+  type ApiMode,
   type CarParkListing,
   describeWait,
   PLACE_QUERY_MIN_LENGTH,
   type PlaceSearchResults,
   readDemoScenariosAllowed,
 } from '@/api';
+import { apiAnswerMode } from '@/state/api-answer-mode';
 import { appStorage, type AppSettings } from '@/storage';
 
 export type DataMode = 'live' | 'demo';
@@ -51,6 +53,9 @@ export interface TripServiceDependencies {
   api: ApiClient;
   settings: () => Pick<AppSettings, 'demoMode' | 'demoScenario'>;
   clock: Clock;
+  // Told the mode of every answer from the API. It is 'demo' when the API serves sample data,
+  // which must be labelled even though the app is in live mode.
+  onApiAnswer: (mode: ApiMode) => void;
 }
 
 const KIND_FOR_DEMO_FAILURE: Readonly<Record<ProviderFailure, ApiErrorKind>> = {
@@ -99,6 +104,7 @@ async function demoCarParkListing(
 ): Promise<CarParkListing> {
   const facilities = await carParks.listFacilities(signal ?? new AbortController().signal);
   return {
+    mode: 'demo',
     carParks: facilities.map((facility) => ({ ...facility, occupancy: OCCUPANCY_NOT_CHECKED })),
     notices: [],
   };
@@ -115,7 +121,7 @@ function validated(request: PlanRequest): PlanRequest {
 }
 
 export function createTripService(dependencies: TripServiceDependencies): TripService {
-  const { api, clock } = dependencies;
+  const { api, clock, onApiAnswer } = dependencies;
 
   function demoProviders() {
     const scenario = dependencies.settings().demoScenario ?? undefined;
@@ -136,13 +142,19 @@ export function createTripService(dependencies: TripServiceDependencies): TripSe
 
   const currentMode = (): DataMode => (dependencies.settings().demoMode ? 'demo' : 'live');
 
+  // Only answers that came from the API are passed on: the demo planner never asks it anything.
+  function fromApi<T extends { mode: ApiMode }>(answer: T): T {
+    onApiAnswer(answer.mode);
+    return answer;
+  }
+
   return {
     currentMode,
     planTrip: async (request, { signal } = {}) => {
       // Checked here as well as on the server, so both modes reject the same requests and an
       // out-of-area trip fails before any network call.
       const checked = validated(request);
-      if (currentMode() === 'live') return api.plan(checked, signal);
+      if (currentMode() === 'live') return fromApi(await api.plan(checked, signal));
       const providers = demoProviders();
       return inDemo(signal, () =>
         planWithProviders(
@@ -160,16 +172,18 @@ export function createTripService(dependencies: TripServiceDependencies): TripSe
     },
     searchPlaces: async (query, near, { signal } = {}) => {
       const trimmed = query.trim();
-      if (trimmed.length < PLACE_QUERY_MIN_LENGTH) return { results: [], unavailable: [] };
-      if (currentMode() === 'live') return api.searchPlaces(trimmed, near, signal);
+      if (trimmed.length < PLACE_QUERY_MIN_LENGTH) {
+        return { mode: currentMode(), results: [], unavailable: [] };
+      }
+      if (currentMode() === 'live') return fromApi(await api.searchPlaces(trimmed, near, signal));
       const providers = demoProviders();
       const results = await inDemo(signal, () =>
         providers.places.search(trimmed, near ?? null, signal ?? new AbortController().signal),
       );
-      return { results, unavailable: [] };
+      return { mode: 'demo', results, unavailable: [] };
     },
     listCarParks: async ({ signal } = {}) => {
-      if (currentMode() === 'live') return api.carParks(signal);
+      if (currentMode() === 'live') return fromApi(await api.carParks(signal));
       const providers = demoProviders();
       return inDemo(signal, () => demoCarParkListing(providers.carParks, signal));
     },
@@ -191,4 +205,5 @@ export const tripService = createTripService({
   api: apiClient,
   settings: () => withAllowedDemoScenario(appStorage.settings.get(), demoScenariosAllowed),
   clock: systemClock,
+  onApiAnswer: apiAnswerMode.record,
 });

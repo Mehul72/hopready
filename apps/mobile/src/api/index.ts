@@ -38,6 +38,7 @@ export {
   useQueryFocusFollowsAppState,
 } from './query-client';
 export {
+  type ApiMode,
   type CarParkListing,
   type CarParkStatus,
   carParkStatusSchema,

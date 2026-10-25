@@ -337,8 +337,10 @@ export function PlaceSearchScreen() {
           onChoose={choose}
           leadingSymbol="mappin.and.ellipse"
         />
+        {/* Credits what answered, not the setting: an API serving sample data says 'demo' even
+            while the app is in live mode. */}
         <AppText variant="footnote" tone="secondary" testID="search-attribution">
-          {attributionFor(mode)}
+          {attributionFor(search.data.mode)}
         </AppText>
       </>
     );

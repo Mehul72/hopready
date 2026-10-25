@@ -10,6 +10,7 @@ import {
   type ApiClient,
   ApiError,
   type ApiErrorKind,
+  type ApiMode,
   type CarParkListing,
   type PlaceSearchResults,
 } from '@/api';
@@ -29,25 +30,33 @@ const createDemoProvidersSpy = jest.mocked(createDemoProviders);
 const NOW = new Date('2026-10-26T20:30:00.000Z');
 const clock: Clock = { now: () => NOW };
 
-function fakeApi(failure?: ApiError): jest.Mocked<ApiClient> {
+// An API that fails with `failure`, or answers in `mode` (an API started with HOPREADY_MODE=demo
+// answers in demo mode).
+function fakeApi(failure?: ApiError, mode: ApiMode = 'live'): jest.Mocked<ApiClient> {
   const answer = <T>(value: T) => (failure ? Promise.reject(failure) : Promise.resolve(value));
   return {
-    plan: jest.fn((request: PlanRequest, signal?: AbortSignal) => answer(planResponse([]))),
+    plan: jest.fn((request: PlanRequest, signal?: AbortSignal) =>
+      answer(planResponse([], { mode })),
+    ),
     searchPlaces: jest.fn(
       (
         query: string,
         near?: Coordinate | null,
         signal?: AbortSignal,
-      ): Promise<PlaceSearchResults> => answer({ results: [], unavailable: [] }),
+      ): Promise<PlaceSearchResults> => answer({ mode, results: [], unavailable: [] }),
     ),
     carParks: jest.fn((signal?: AbortSignal): Promise<CarParkListing> =>
-      answer({ carParks: [], notices: [] }),
+      answer({ mode, carParks: [], notices: [] }),
     ),
   };
 }
 
-function serviceWith(api: ApiClient, settings: Pick<AppSettings, 'demoMode' | 'demoScenario'>) {
-  return createTripService({ api, settings: () => settings, clock });
+function serviceWith(
+  api: ApiClient,
+  settings: Pick<AppSettings, 'demoMode' | 'demoScenario'>,
+  onApiAnswer: (mode: ApiMode) => void = () => {},
+) {
+  return createTripService({ api, settings: () => settings, clock, onApiAnswer });
 }
 
 const LIVE = { demoMode: false, demoScenario: null } as const;
@@ -135,7 +144,11 @@ describe('demo mode', () => {
 
   it('searches the demo places, never the API', async () => {
     const api = fakeApi();
-    const { results, unavailable } = await serviceWith(api, DEMO).searchPlaces('Chatswood', null);
+    const { mode, results, unavailable } = await serviceWith(api, DEMO).searchPlaces(
+      'Chatswood',
+      null,
+    );
+    expect(mode).toBe('demo');
     expect(results.length).toBeGreaterThan(0);
     expect(unavailable).toEqual([]);
     expect(api.searchPlaces).not.toHaveBeenCalled();
@@ -144,6 +157,7 @@ describe('demo mode', () => {
   it('lists demo car parks the way the live API does, with counts left to planning', async () => {
     const api = fakeApi();
     const listing = await serviceWith(api, DEMO).listCarParks();
+    expect(listing.mode).toBe('demo');
     expect(listing.carParks.length).toBeGreaterThan(0);
     expect(listing.carParks.every((carPark) => carPark.occupancy === OCCUPANCY_NOT_CHECKED)).toBe(
       true,
@@ -203,15 +217,47 @@ describe('request checks, the same in both modes', () => {
   it('returns no place results for text too short to search, in either mode', async () => {
     const api = fakeApi();
     expect(await serviceWith(api, DEMO).searchPlaces(' C ', null)).toEqual({
+      mode: 'demo',
       results: [],
       unavailable: [],
     });
     expect(await serviceWith(api, LIVE).searchPlaces('C', null)).toEqual({
+      mode: 'live',
       results: [],
       unavailable: [],
     });
     expect(api.searchPlaces).not.toHaveBeenCalled();
     expect(createDemoProvidersSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('the mode the API answers in', () => {
+  it('passes on the mode of every answer the API gives', async () => {
+    const onApiAnswer = jest.fn();
+    const service = serviceWith(fakeApi(undefined, 'demo'), LIVE, onApiAnswer);
+
+    await service.planTrip(planRequest());
+    await service.searchPlaces('Chatswood', null);
+    await service.listCarParks();
+    // The same server, restarted without HOPREADY_MODE=demo.
+    await serviceWith(fakeApi(), LIVE, onApiAnswer).searchPlaces('Chatswood', null);
+
+    expect(onApiAnswer.mock.calls).toEqual([['demo'], ['demo'], ['demo'], ['live']]);
+  });
+
+  it('passes on nothing the API did not answer', async () => {
+    const onApiAnswer = jest.fn();
+    const api = fakeApi(undefined, 'demo');
+
+    await serviceWith(api, DEMO, onApiAnswer).planTrip(demoRequest());
+    await serviceWith(api, DEMO, onApiAnswer).searchPlaces('Chatswood', null);
+    await serviceWith(api, DEMO, onApiAnswer).listCarParks();
+    await serviceWith(api, LIVE, onApiAnswer).searchPlaces('C', null);
+    await expect(
+      serviceWith(fakeApi(new ApiError('offline')), LIVE, onApiAnswer).listCarParks(),
+    ).rejects.toMatchObject({ kind: 'offline' });
+
+    expect(onApiAnswer).not.toHaveBeenCalled();
   });
 });
 

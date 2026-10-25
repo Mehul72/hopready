@@ -18,6 +18,8 @@ import {
 } from '@/trip/refresh-policy';
 import { type TripService, tripService } from '@/trip/trip-service';
 
+import { useApiAnswerMode } from './api-answer-mode';
+
 // 'refreshing' keeps the previous results on screen while new ones load.
 export type PlanStatus = 'idle' | 'planning' | 'refreshing' | 'ready' | 'failed';
 
@@ -299,10 +301,12 @@ export function usePlanSession(): PlanSessionState {
 }
 
 // True while anything on screen may be sample data: demo mode is on, or the API itself answered
-// in demo mode (HOPREADY_MODE=demo, for local end-to-end runs).
+// in demo mode (HOPREADY_MODE=demo, for local end-to-end runs). Its latest answer covers searches
+// and car park lists; the plan results and followed trip keep the mode they were planned in.
 export function useShowsDemoData(): boolean {
   const { demoMode } = useSettings();
   const { response } = usePlanSession();
   const activeTrip = useActiveTrip();
-  return demoMode || response?.mode === 'demo' || activeTrip?.mode === 'demo';
+  const apiMode = useApiAnswerMode();
+  return demoMode || apiMode === 'demo' || response?.mode === 'demo' || activeTrip?.mode === 'demo';
 }

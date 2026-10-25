@@ -4,7 +4,7 @@ import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
 import { AccessibilityInfo } from 'react-native';
 
-import { ApiError } from '@/api';
+import { ApiError, type PlaceSearchResults } from '@/api';
 import { appStorage } from '@/storage';
 import { place } from '@/test-support/trips';
 import { tripService } from '@/trip';
@@ -23,7 +23,8 @@ import {
 const GRANTED = locationPermission('granted');
 const UNDETERMINED = locationPermission('undetermined');
 
-const LIVE_RESULTS = {
+const LIVE_RESULTS: PlaceSearchResults = {
+  mode: 'live',
   results: [
     {
       place: place('Chatswood Station', -33.7969, 151.1803, 'stop', { stopId: '206710' }),

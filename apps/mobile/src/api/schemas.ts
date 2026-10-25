@@ -11,6 +11,11 @@ import { z } from 'zod';
 // Response shapes for the HopReady API. They mirror the core types, so the server can build them
 // straight from its providers and the app checks every field before using it.
 
+// 'demo' when the API serves its labelled sample data (HOPREADY_MODE=demo, for local end-to-end
+// runs). The app labels those answers as demo even while it is in live mode.
+export const apiModeSchema = z.enum(['live', 'demo']);
+export type ApiMode = z.infer<typeof apiModeSchema>;
+
 export const placeSuggestionSchema = z.object({
   place: placeSchema,
   // A second line such as the suburb or "Train station", when the provider gives one.
@@ -19,6 +24,7 @@ export const placeSuggestionSchema = z.object({
 
 // POST /v1/places/search with { query, near: { lat, lon } | null }
 export const placeSearchResponseSchema = z.object({
+  mode: apiModeSchema,
   results: z.array(placeSuggestionSchema),
   // Search sources that did not answer (provider names such as 'apple-maps'), so the screen can
   // say that some results may be missing.
@@ -38,11 +44,13 @@ export type CarParkStatus = CarParkFacility & { occupancy: Occupancy };
 
 // GET /v1/carparks
 export const carParksResponseSchema = z.object({
+  mode: apiModeSchema,
   carParks: z.array(carParkStatusSchema),
   // Plain-language notes, for example that occupancy figures are unavailable right now.
   notices: z.array(z.string()).default([]),
 });
 export interface CarParkListing {
+  mode: ApiMode;
   carParks: CarParkStatus[];
   notices: string[];
 }
