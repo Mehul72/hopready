@@ -13,12 +13,14 @@ import {
   type FetchRequest,
   type FetchResponse,
 } from '@/api';
+import SavedTab from '@/app/(tabs)/saved';
 import ConfirmParkingRoute from '@/app/parked-car/confirm';
 import { DEMO_BANNER_MESSAGE, DEMO_BANNER_TITLE } from '@/components/demo-mode-banner';
 import { appStorage } from '@/storage';
 import { jsonResponse } from '@/test-support/fetch';
 import { OCCUPANCY_NOT_CHECKED } from '@/trip/trip-service';
 
+import { DEMO_SEARCH_ATTRIBUTION } from '../saved/place-picker-sheet';
 import { DEMO_ATTRIBUTION, LIVE_ATTRIBUTION } from './place-search-screen';
 import { APP_ROUTES } from './test-harness';
 
@@ -26,9 +28,11 @@ import { APP_ROUTES } from './test-harness';
 const DEMO_LINE = `${DEMO_BANNER_TITLE}. ${DEMO_BANNER_MESSAGE}`;
 const DEMO_BANNER = `Demo. ${DEMO_BANNER_TITLE}. ${DEMO_BANNER_MESSAGE}`;
 
-// The plan screens, with the real parking sheet: it lists car parks too.
+// The plan screens, with the real Saved tab and parking sheet: they also search places and list
+// car parks.
 const ROUTES = {
   ...APP_ROUTES,
+  '(tabs)/saved': SavedTab,
   'parked-car/confirm': ConfirmParkingRoute,
 };
 
@@ -97,6 +101,20 @@ describe('live mode against an API serving demo data', () => {
     expect(within(sheet).getByLabelText(DEMO_LINE)).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: /^1 Example Street, Chatswood/ })).toBeOnTheScreen();
     expect(appStorage.settings.get().demoMode).toBe(false);
+  });
+
+  it('labels the place picker on the Saved tab and its credit line as demo', async () => {
+    answerFrom(localApi('demo'));
+    const user = userEvent.setup();
+    await openApp('/saved');
+    await user.press(screen.getByRole('button', { name: 'Home, Not set' }));
+    const picker = screen.getByTestId('place-picker');
+    expect(within(picker).queryByLabelText(DEMO_BANNER)).not.toBeOnTheScreen();
+
+    await user.type(within(picker).getByLabelText('Search for a place'), 'Rouse Hill');
+
+    expect(await within(picker).findByText(DEMO_SEARCH_ATTRIBUTION)).toBeOnTheScreen();
+    expect(within(picker).getByLabelText(DEMO_BANNER)).toBeOnTheScreen();
   });
 
   it('labels the car park list in trip options as demo', async () => {

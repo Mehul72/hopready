@@ -17,7 +17,7 @@ import {
 } from '@/components';
 import { appStorage } from '@/storage';
 import { MIN_TOUCH_TARGET, RADII, SPACING, useTheme } from '@/theme';
-import { useDataMode, usePlaceSearch } from '@/trip';
+import { usePlaceSearch } from '@/trip';
 
 import { useAnnounceSearchOutcome } from '../shared/announce-search-outcome';
 import { findCurrentPlace, openLocationSettingsOrExplain } from './current-location';
@@ -43,7 +43,6 @@ export interface PlacePickerSheetProps {
 
 function SearchResults({ query, onPick }: { query: string; onPick: (place: Place) => void }) {
   const search = usePlaceSearch(query, null);
-  const mode = useDataMode();
   const trimmed = query.trim();
   useAnnounceSearchOutcome(
     trimmed.length >= PLACE_QUERY_MIN_LENGTH ? search.data : undefined,
@@ -86,7 +85,7 @@ function SearchResults({ query, onPick }: { query: string; onPick: (place: Place
     return <LoadingState rows={3} accessibilityLabel="Searching for places" />;
   }
 
-  const { results, unavailable } = search.data;
+  const { mode, results, unavailable } = search.data;
   return (
     <View style={styles.results}>
       {unavailable.length > 0 ? (
@@ -126,6 +125,8 @@ function SearchResults({ query, onPick }: { query: string; onPick: (place: Place
           ))}
         </>
       )}
+      {/* Credits what answered, not the setting: an API serving sample data says 'demo' even
+          while the app is in live mode. */}
       <AppText variant="footnote" tone="secondary">
         {mode === 'demo' ? DEMO_SEARCH_ATTRIBUTION : LIVE_SEARCH_ATTRIBUTION}
       </AppText>
