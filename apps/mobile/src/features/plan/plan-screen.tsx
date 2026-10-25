@@ -1,7 +1,7 @@
 import type { Place } from '@hopready/core';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { AccessibilityInfo, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Alert, StyleSheet, View } from 'react-native';
 
 import { AppText, Banner, Button, Card, ListRow, Screen } from '@/components';
 import { FollowedTripCard } from '@/features/itinerary';
@@ -154,12 +154,24 @@ export function PlanScreen() {
     startPlanning({ ...inputs, origin, destination, access });
   }
 
+  // The same store holds Saved > Recent searches and trips home, more than this list shows, so the
+  // person is asked first, as Saved does.
   function clearRecents() {
-    try {
-      appStorage.recentRequests.clear();
-    } catch (error) {
-      console.warn(`HopReady: could not clear recent trips (${errorName(error)}).`);
-    }
+    Alert.alert('Clear all recent trips?', 'This also clears Recent searches in Saved.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: () => {
+          try {
+            appStorage.recentRequests.clear();
+          } catch (error) {
+            console.warn(`HopReady: could not clear recent trips (${errorName(error)}).`);
+            Alert.alert("Couldn't clear recent trips", 'Nothing was changed. Try again.');
+          }
+        },
+      },
+    ]);
   }
 
   return (

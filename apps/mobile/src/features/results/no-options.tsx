@@ -49,7 +49,8 @@ export function NoOptions({
         <View style={styles.reasons}>
           {explanations.map((explanation) => (
             <View key={explanation.reason} style={styles.reason}>
-              <AppText tone="secondary" importantForAccessibility="no">
+              {/* iOS ignores importantForAccessibility, so the bullet is hidden explicitly. */}
+              <AppText tone="secondary" accessibilityElementsHidden importantForAccessibility="no">
                 {'•'}
               </AppText>
               <AppText style={styles.reasonText}>{explanation.text}</AppText>

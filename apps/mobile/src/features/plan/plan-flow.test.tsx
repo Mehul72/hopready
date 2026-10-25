@@ -2,7 +2,7 @@ import { DEMO_PLACES } from '@hopready/core/fixtures';
 import * as Location from 'expo-location';
 import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
-import { Linking } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 import { planSession } from '@/state';
 import { appStorage } from '@/storage';
@@ -294,7 +294,19 @@ describe('one-tap routes', () => {
     });
     const user = userEvent.setup();
     await renderApp('/');
+    const confirm = jest.spyOn(Alert, 'alert');
 
+    confirm.mockImplementationOnce((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Cancel')?.onPress?.();
+    });
+    await user.press(
+      within(screen.getByTestId('recent-trips')).getByRole('button', { name: 'Clear' }),
+    );
+    expect(appStorage.recentRequests.get()).not.toEqual([]);
+
+    confirm.mockImplementationOnce((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Clear')?.onPress?.();
+    });
     await user.press(
       within(screen.getByTestId('recent-trips')).getByRole('button', { name: 'Clear' }),
     );

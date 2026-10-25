@@ -48,7 +48,7 @@ export function ActionChip({
       ) : (
         <SymbolView name={symbol} tintColor={colours.brand} size={16} />
       )}
-      <AppText variant="subheadline" numberOfLines={1} style={styles.label}>
+      <AppText variant="subheadline" style={styles.label}>
         {label}
       </AppText>
     </Pressable>
@@ -65,6 +65,8 @@ const styles = StyleSheet.create({
     borderRadius: RADII.pill,
     borderWidth: 1,
     paddingHorizontal: SPACING.md,
+    // Long names wrap at large text sizes, so the chip needs room above and below them.
+    paddingVertical: SPACING.xs,
   },
   label: {
     flexShrink: 1,
