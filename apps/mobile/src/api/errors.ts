@@ -9,6 +9,8 @@ export const API_ERROR_KINDS = [
   'rate-limited',
   // Live planning has no server address in this build, or the server has no provider keys.
   'not-configured',
+  // The person has not agreed to what live planning sends, so nothing was sent.
+  'consent-required',
   'outside-coverage',
   // Any other 4xx: the server could not use this request.
   'rejected',
@@ -48,6 +50,8 @@ export function messageForApiError(kind: ApiErrorKind, retryAfterSeconds: number
         : `HopReady is busy right now. Try again in ${describeWait(retryAfterSeconds)}.`;
     case 'not-configured':
       return "Live trip planning isn't set up yet. To try HopReady with sample trips, turn on demo mode in Settings.";
+    case 'consent-required':
+      return 'Live trips send your places to HopReady. Agree to that in Settings > Live data use, or turn on demo mode.';
     case 'outside-coverage':
       return 'HopReady plans trips within Greater Sydney only. Choose places inside Greater Sydney.';
     case 'rejected':

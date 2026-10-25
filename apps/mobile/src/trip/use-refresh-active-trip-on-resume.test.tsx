@@ -54,6 +54,22 @@ describe('useRefreshActiveTripOnResume', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  it('refreshes nothing while paused, then refreshes once the pause ends', async () => {
+    const appState = captureAppStateListener();
+    const refresh = jest.spyOn(planSession, 'refreshActiveTrip').mockResolvedValue(undefined);
+    const { rerender } = await renderHook(
+      ({ paused }: { paused: boolean }) => useRefreshActiveTripOnResume({ paused }),
+      { initialProps: { paused: true } },
+    );
+
+    appState.emit('background');
+    appState.emit('active');
+    expect(refresh).not.toHaveBeenCalled();
+
+    await rerender({ paused: false });
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('stops listening when unmounted', async () => {
     const appState = captureAppStateListener();
     const { unmount } = await renderHook(() => useRefreshActiveTripOnResume());

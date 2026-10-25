@@ -6,9 +6,11 @@ import { planSession } from '@/state/plan-session';
 // Mount once, in the root layout. When the app launches, and whenever it comes back from the
 // background, the active trip is re-planned if the refresh-on-resume rule allows it (see
 // refresh-policy.ts). Brief interruptions such as Control Centre leave the app 'inactive', not in
-// the background, and do not count.
-export function useRefreshActiveTripOnResume(): void {
+// the background, and do not count. While `paused` (live data not agreed to yet), nothing is
+// refreshed; the refresh runs as soon as the pause ends.
+export function useRefreshActiveTripOnResume({ paused = false }: { paused?: boolean } = {}): void {
   useEffect(() => {
+    if (paused) return;
     // refreshActiveTrip never rejects: its outcome, including errors, lands in the session.
     void planSession.refreshActiveTrip();
     let wentToBackground = false;
@@ -22,5 +24,5 @@ export function useRefreshActiveTripOnResume(): void {
       void planSession.refreshActiveTrip();
     });
     return () => subscription.remove();
-  }, []);
+  }, [paused]);
 }

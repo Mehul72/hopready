@@ -1,6 +1,6 @@
 import { getNetworkStateAsync } from 'expo-network';
 
-import { appStorage } from '@/storage';
+import { appStorage, hasLiveDataConsent } from '@/storage';
 
 import { createApiClient } from './client';
 import { readApiBaseUrl } from './config';
@@ -21,4 +21,5 @@ export const apiClient = createApiClient({
   fetch: (url, init) => fetch(url, init),
   installId: () => appStorage.settings.get().installId,
   isOffline: isDeviceOffline,
+  hasLiveDataConsent: () => hasLiveDataConsent(appStorage.settings.get()),
 });

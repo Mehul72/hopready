@@ -30,7 +30,7 @@ export default function RootLayout() {
   const showsDemoData = useShowsDemoData();
   const needsLiveDataConsent = useNeedsLiveDataConsent();
   useQueryFocusFollowsAppState();
-  useRefreshActiveTripOnResume();
+  useRefreshActiveTripOnResume({ paused: needsLiveDataConsent });
 
   // Cached searches and car parks are data too: "delete all data" removes them with the rest.
   useEffect(() => appStorage.onDataDeleted(() => queryClient.clear()), [queryClient]);

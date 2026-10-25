@@ -296,3 +296,37 @@ describe('carParks', () => {
     expect((await failureOf(clientWith(fetch).carParks())).kind).toBe('invalid-response');
   });
 });
+
+describe('live data agreement', () => {
+  it('sends nothing at all until the person agrees', async () => {
+    const fetch = scriptedFetch(async () => jsonResponse(200, planResponse([])));
+    const client = clientWith(fetch, { hasLiveDataConsent: () => false });
+
+    const failures = [
+      await failureOf(client.plan(planRequest())),
+      await failureOf(client.searchPlaces('Chatswood')),
+      await failureOf(client.carParks()),
+    ];
+
+    for (const error of failures) {
+      expect(error.kind).toBe('consent-required');
+      expect(error.suggestsDemoMode).toBe(true);
+    }
+    expect(fetch.requests).toHaveLength(0);
+  });
+
+  it('sends once the person has agreed', async () => {
+    const fetch = scriptedFetch(async () => jsonResponse(200, planResponse([])));
+
+    await clientWith(fetch, { hasLiveDataConsent: () => true }).plan(planRequest());
+
+    expect(fetch.requests).toHaveLength(1);
+  });
+
+  it('says live planning is not set up, rather than asking, when there is no server', async () => {
+    const fetch = scriptedFetch(async () => jsonResponse(200, planResponse([])));
+    const client = clientWith(fetch, { baseUrl: null, hasLiveDataConsent: () => false });
+
+    expect((await failureOf(client.plan(planRequest()))).kind).toBe('not-configured');
+  });
+});

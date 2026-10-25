@@ -27,6 +27,8 @@ export interface HttpTransport {
   installId: () => string;
   // Asked only after a request fails to connect, to tell "offline" from "server unreachable".
   isOffline: () => Promise<boolean>;
+  // Checked before every request. Leaving it out (tests, tools) sends without asking.
+  hasLiveDataConsent?: () => boolean;
   timeoutMs?: number;
   now?: () => Date;
 }
@@ -126,6 +128,11 @@ export async function requestJson<T>(
   request: JsonRequest<T>,
 ): Promise<T> {
   if (!transport.baseUrl) throw new ApiError('not-configured', { suggestsDemoMode: true });
+  // The last line of defence for the agreement screen: a request started outside the screens,
+  // such as refreshing the followed trip at launch, still sends nothing without agreement.
+  if (transport.hasLiveDataConsent && !transport.hasLiveDataConsent()) {
+    throw new ApiError('consent-required', { suggestsDemoMode: true });
+  }
   if (request.signal?.aborted) throw new ApiError('cancelled');
 
   const now = transport.now ?? (() => new Date());

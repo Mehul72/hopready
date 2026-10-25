@@ -29,6 +29,11 @@ const PRESENTATIONS: Readonly<Record<ApiErrorKind, ErrorPresentation>> = {
     symbol: 'gearshape',
     nextStep: 'demo-mode',
   },
+  'consent-required': {
+    title: 'Live trips need your agreement',
+    symbol: 'hand.raised',
+    nextStep: 'demo-mode',
+  },
   'outside-coverage': { title: 'Outside Greater Sydney', symbol: 'map', nextStep: 'change-trip' },
   rejected: {
     title: "Couldn't plan this trip",
