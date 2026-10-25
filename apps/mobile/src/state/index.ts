@@ -3,6 +3,7 @@ export {
   type ActiveTripRefreshStatus,
   type CheckOutcome,
   createPlanSession,
+  lastAnsweredAt,
   type PlanOutcome,
   type PlanSession,
   type PlanSessionDependencies,

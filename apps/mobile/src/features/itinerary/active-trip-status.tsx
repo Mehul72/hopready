@@ -5,7 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { describeWait } from '@/api';
 import { AppText, Banner, Button, Card } from '@/components';
-import { type ActiveTripRefresh, planSession } from '@/state';
+import { type ActiveTripRefresh, lastAnsweredAt, planSession } from '@/state';
 import { appStorage } from '@/storage';
 import { SPACING } from '@/theme';
 import {
@@ -94,17 +94,17 @@ function AlternativeCard({
 
 interface CheckNote {
   text: string;
-  // The note is about these times; a check that brings newer ones makes it out of date.
-  plannedAt: string | null;
+  // The note is about the check at this time; a newer answer makes it out of date.
+  checkedAt: string | null;
 }
 
-// When the followed trip's times arrived, and a way to check them again, as the results have.
+// When the followed trip was last checked, and a way to check it again, as the results have.
 function CheckForChanges({
-  plannedAt,
+  checkedAt,
   canCheck,
   checking,
 }: {
-  plannedAt: string | null;
+  checkedAt: string | null;
   canCheck: boolean;
   checking: boolean;
 }) {
@@ -116,24 +116,24 @@ function CheckForChanges({
     if (outcome.status === 'too-soon') {
       setNote({
         text: `This trip was checked less than ${MANUAL_REFRESH_MIN_INTERVAL_SECONDS} seconds ago. You can check again in ${describeWait(outcome.retryInSeconds)}.`,
-        plannedAt,
+        checkedAt,
       });
     }
   }
 
-  if (!plannedAt && !canCheck) return null;
+  if (!checkedAt && !canCheck) return null;
   return (
     <>
       <View style={styles.checkRow}>
-        {plannedAt ? (
+        {checkedAt ? (
           <AppText
             variant="subheadline"
             tone="secondary"
             tabularNumbers
-            accessibilityLabel={`Times checked at ${formatSydneyTime(plannedAt)}`}
+            accessibilityLabel={`Times checked at ${formatSydneyTime(checkedAt)}`}
             style={styles.checkedAt}
             testID="times-checked-at">
-            {`Checked ${formatSydneyTime(plannedAt)}`}
+            {`Checked ${formatSydneyTime(checkedAt)}`}
           </AppText>
         ) : null}
         {canCheck ? (
@@ -147,7 +147,7 @@ function CheckForChanges({
           />
         ) : null}
       </View>
-      {note && note.plannedAt === plannedAt ? (
+      {note && note.checkedAt === checkedAt ? (
         <Banner tone="info" message={note.text} announce testID="check-too-soon" />
       ) : null}
     </>
@@ -161,10 +161,13 @@ export function ActiveTripStatus({ trip, nowMs }: { trip: DisplayedTrip; nowMs: 
   if (!trip.isActive) return null;
   // Once every service has left, there is nothing left to check (refresh-policy.ts).
   const canCheck = partToCheck(trip, new Date(nowMs), mode) !== null;
+  // A check that found the trip no longer offered leaves its times as they were, but it still
+  // counts towards when the trip can be checked again, so the line says when it ran.
+  const checkedAt = trip.plannedAt ? lastAnsweredAt(trip.plannedAt, trip.activeTripRefresh) : null;
   return (
     <>
       <CheckForChanges
-        plannedAt={trip.plannedAt}
+        checkedAt={checkedAt}
         canCheck={canCheck}
         checking={trip.activeTripRefresh.status === 'refreshing'}
       />

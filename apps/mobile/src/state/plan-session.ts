@@ -157,6 +157,16 @@ const INITIAL_STATE: PlanSessionState = {
   activeTripRefresh: IDLE_ACTIVE_TRIP_REFRESH,
 };
 
+// When the followed trip, planned at `plannedAt`, last got an answer. A check that found it no
+// longer offered leaves the trip and its plannedAt as they were, so that check counts too. A failed
+// one never does, so "Try again" is never held back. The trip screen shows this time, so it agrees
+// with the rate limits that count from it.
+export function lastAnsweredAt(plannedAt: string, refresh: ActiveTripRefresh): string {
+  return refresh.status === 'no-longer-offered' && refresh.checkedAt
+    ? laterOf(plannedAt, refresh.checkedAt)
+    : plannedAt;
+}
+
 // A bug, not a network or provider problem. Only the error's type is logged: messages can quote
 // the request, which holds places.
 function reportUnexpected(error: ApiError) {
@@ -227,16 +237,6 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
     for (const listener of [...listeners]) listener();
   }
 
-  // When the active trip last got an answer. A check that found it no longer offered leaves the
-  // trip and its plannedAt as they were, so that check counts too. A failed one never does, so
-  // "Try again" is never held back.
-  function lastAnsweredAt(trip: ActiveTrip): string {
-    const { status, checkedAt } = state.activeTripRefresh;
-    return status === 'no-longer-offered' && checkedAt
-      ? laterOf(trip.plannedAt, checkedAt)
-      : trip.plannedAt;
-  }
-
   // Plans the active trip again, or the rest of it once it has started, and records what changed
   // in `activeTripRefresh`. On resume it waits a minute after the last answer; when the person
   // asks, 30 seconds. Never rejects.
@@ -250,7 +250,7 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
       const mode = trips.currentMode();
       const part = trip ? partToCheck(trip, now, mode) : null;
       if (!trip || !part) return { status: 'nothing-to-check' };
-      const answeredAt = lastAnsweredAt(trip);
+      const answeredAt = lastAnsweredAt(trip.plannedAt, state.activeTripRefresh);
       if (trigger === 'resume') {
         if (!shouldRefreshActiveTripOnResume(trip, now, mode, answeredAt)) {
           return { status: 'nothing-to-check' };

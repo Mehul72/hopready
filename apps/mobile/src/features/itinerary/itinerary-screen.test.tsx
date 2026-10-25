@@ -381,6 +381,29 @@ describe('checking a followed trip for changes', () => {
     );
   });
 
+  it('says when a check found the trip gone, as that check counts for the 30 seconds', async () => {
+    const { response } = await followParkAndRide();
+    const alternative = firstWithStrategy(response, 'transit-only');
+    jest
+      .spyOn(tripService, 'planTrip')
+      .mockResolvedValue({ ...response, itineraries: [alternative] });
+    const firstCheck = new Date(addMinutes(WEEKDAY_MORNING, 2));
+    jest.setSystemTime(firstCheck);
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Check for changes' }));
+    expect(
+      await screen.findByLabelText(/^Error\. This trip is no longer offered\./),
+    ).toBeOnTheScreen();
+
+    jest.setSystemTime(new Date(firstCheck.getTime() + 10_000));
+    await user.press(screen.getByRole('button', { name: 'Check for changes' }));
+
+    expect(screen.getByLabelText('Times checked at 7:32 am')).toBeOnTheScreen();
+    expect(screen.getByTestId('check-too-soon')).toHaveTextContent(
+      /This trip was checked less than 30 seconds ago\. You can check again in \d+ seconds\./,
+    );
+  });
+
   it('notices at the car park that the metro was cancelled during the drive', async () => {
     const { itinerary } = await followParkAndRide();
     const metro = itinerary.legs.find((leg) => leg.kind === 'transit');
