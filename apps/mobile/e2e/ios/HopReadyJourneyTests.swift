@@ -1,3 +1,4 @@
+import CoreLocation
 import XCTest
 
 // The main journeys, end to end, on a Release build in demo mode (no API address, so nothing is
@@ -21,6 +22,10 @@ final class HopReadyJourneyTests: HopReadyTestCase {
     XCTAssertTrue(element("leg-drive").exists, "The timeline has no drive leg")
     XCTAssertTrue(element("leg-park").exists, "The timeline has no parking step")
     XCTAssertTrue(app.buttons["I parked here"].exists)
+    // The trip map is a native Apple map, with a spoken summary of the route laid over it.
+    XCTAssertTrue(app.maps.firstMatch.waitForExistence(timeout: 10), "The trip map is missing")
+    let summary = app.images.matching(NSPredicate(format: "label BEGINSWITH %@", "Map of the trip"))
+    XCTAssertTrue(summary.firstMatch.exists, "The trip map has no spoken summary")
 
     // Start driving hands the drive to a navigation app. The simulator has only Apple Maps, so
     // HopReady opens it straight away.
@@ -32,6 +37,25 @@ final class HopReadyJourneyTests: HopReadyTestCase {
     let maps = XCUIApplication(bundleIdentifier: "com.apple.Maps")
     XCTAssertTrue(maps.wait(for: .runningForeground, timeout: 15), "Apple Maps did not open")
     app.activate()
+  }
+
+  // With location access allowed, the Plan tab's Current location fills in the start and the trip
+  // plans from it. The simulated position is the demo world's Box Hill home.
+  func testCurrentLocationStartsATripOnceAllowed() throws {
+    XCUIDevice.shared.location = XCUILocation(
+      location: CLLocation(latitude: -33.6431, longitude: 150.8975))
+    openTab("Plan")
+    tapWhenReady(element("quick-pick-current-location"))
+    allowOrDenyLocation(allow: true)
+    let origin = element("place-field-origin")
+    expectation(for: NSPredicate(format: "label CONTAINS %@", "Current location"), evaluatedWith: origin)
+    waitForExpectations(timeout: 15)
+
+    tapWhenReady(element("place-field-destination"))
+    chooseInPlaceSheet(search: "Chatswood")
+    departAtMidMorning()
+    tapWhenReady(element("plan-button"))
+    XCTAssertTrue(parkAndRideOption().waitForExistence(timeout: 30), "No option from the current location")
   }
 
   func testParkedCarSurvivesARelaunchAndTakeMeHomeGoesThroughIt() throws {

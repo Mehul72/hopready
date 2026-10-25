@@ -8,6 +8,8 @@ class HopReadyTestCase: XCTestCase {
   override func setUpWithError() throws {
     continueAfterFailure = false
     app = XCUIApplication()
+    // Every test starts with location access never asked, whatever an earlier test chose.
+    app.resetAuthorizationStatus(for: .location)
   }
 
   // MARK: - Steps
