@@ -3,6 +3,9 @@ import type { Itinerary, PlanRequest } from '@hopready/core';
 import { type ActiveTripRefresh, type PlanSessionState, usePlanSession } from '@/state';
 import { type ActiveTrip, useActiveTrip } from '@/storage';
 
+import { isFollowedTripOver } from './followed-trip-window';
+import { useCurrentMinute } from './use-current-minute';
+
 export interface DisplayedTrip {
   itinerary: Itinerary;
   // The search it came from, for saving the route. Null only if the session lost it.
@@ -29,9 +32,12 @@ function followedTrip(activeTrip: ActiveTrip, session: PlanSessionState): Displa
 export function findDisplayedTrip(
   itineraryId: string,
   session: PlanSessionState,
-  activeTrip: ActiveTrip | null,
+  storedTrip: ActiveTrip | null,
+  nowMs: number,
 ): DisplayedTrip | null {
   const { response, request, activeTripRefresh } = session;
+  // Ids describe an option, not a day: yesterday's followed drive has the same id as today's.
+  const activeTrip = storedTrip && !isFollowedTripOver(storedTrip, nowMs) ? storedTrip : null;
   // A refresh moved the followed trip to another run of the same option. A screen still open on
   // the old run follows the new one, even if the old run is in the results, and the status
   // banner says what changed.
@@ -44,10 +50,16 @@ export function findDisplayedTrip(
   }
 
   const fromResults = response?.itineraries.find((itinerary) => itinerary.id === itineraryId);
-  // A check on resume stores fresher live times under the same id. The search results still hold
-  // the copy from when it was planned, so the followed trip wins whenever it is this one.
+  // The newer copy wins. A check on resume stores fresher live times under the same id, while a
+  // pull to refresh on the results makes the search the newer one.
   if (activeTrip?.itinerary.id === itineraryId) {
-    return { ...followedTrip(activeTrip, session), inResults: Boolean(fromResults) };
+    const resultsAreNewer =
+      fromResults !== undefined &&
+      session.plannedAt !== null &&
+      Date.parse(session.plannedAt) > Date.parse(activeTrip.plannedAt);
+    if (!resultsAreNewer) {
+      return { ...followedTrip(activeTrip, session), inResults: Boolean(fromResults) };
+    }
   }
   if (response && fromResults) {
     return {
@@ -66,5 +78,6 @@ export function findDisplayedTrip(
 export function useDisplayedTrip(itineraryId: string): DisplayedTrip | null {
   const session = usePlanSession();
   const activeTrip = useActiveTrip();
-  return findDisplayedTrip(itineraryId, session, activeTrip);
+  const nowMs = useCurrentMinute();
+  return findDisplayedTrip(itineraryId, session, activeTrip, nowMs);
 }

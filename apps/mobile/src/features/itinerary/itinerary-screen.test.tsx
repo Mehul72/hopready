@@ -266,6 +266,32 @@ describe('the followed trip after a refresh', () => {
     expect(screen.queryByLabelText(describeTripSummary(itinerary))).not.toBeOnTheScreen();
   });
 
+  it('shows the newer results after a pull to refresh, not the older followed copy', async () => {
+    const { response, itinerary } = await followParkAndRide();
+    const refreshed: Itinerary = { ...itinerary, arriveAt: addMinutes(itinerary.arriveAt, 2) };
+    jest
+      .spyOn(tripService, 'planTrip')
+      .mockResolvedValue({ ...response, itineraries: [refreshed] });
+
+    await act(async () => {
+      await planSession.refresh();
+    });
+
+    expect(screen.getByLabelText(describeTripSummary(refreshed))).toBeOnTheScreen();
+    expect(screen.getByText("You're following this trip")).toBeOnTheScreen();
+  });
+
+  it('stops treating a trip as followed an hour after it arrived', async () => {
+    const response = await planDemoCommute();
+    const itinerary = firstWithStrategy(response, 'park-and-ride');
+    planSession.select(itinerary.id);
+    jest.setSystemTime(new Date(addMinutes(itinerary.arriveAt, 61)));
+
+    await renderApp(`/itinerary/${itinerary.id}`);
+
+    expect(screen.queryByText("You're following this trip")).not.toBeOnTheScreen();
+  });
+
   it('reports a failed check with a way to try again', async () => {
     await followParkAndRide();
     jest.spyOn(tripService, 'planTrip').mockRejectedValue(new ApiError('offline'));

@@ -1,4 +1,4 @@
-import { addMinutes, formatSydneyTime, isBefore } from '@hopready/core';
+import { formatSydneyTime } from '@hopready/core';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -7,11 +7,8 @@ import { type ActiveTripRefreshStatus, usePlanSession } from '@/state';
 import { useActiveTrip } from '@/storage';
 import { SPACING } from '@/theme';
 
+import { isFollowedTripOver } from './followed-trip-window';
 import { STRATEGY_LABELS } from './trip-text';
-
-// Long enough to come back for the trip details after arriving, short enough that yesterday's
-// trip does not sit above today's planning.
-export const FOLLOWED_TRIP_SHOWN_AFTER_ARRIVAL_MINUTES = 60;
 
 const STATUS_NOTES: Readonly<Partial<Record<ActiveTripRefreshStatus, string>>> = {
   refreshing: 'Checking for changes.',
@@ -27,9 +24,8 @@ export function FollowedTripCard({ now }: { now: Date }) {
   const activeTrip = useActiveTrip();
   const { activeTripRefresh } = usePlanSession();
   if (!activeTrip) return null;
+  if (isFollowedTripOver(activeTrip, now.getTime())) return null;
   const { itinerary } = activeTrip;
-  const hideAfter = addMinutes(itinerary.arriveAt, FOLLOWED_TRIP_SHOWN_AFTER_ARRIVAL_MINUTES);
-  if (isBefore(hideAfter, now)) return null;
 
   const strategy = STRATEGY_LABELS[itinerary.strategy];
   const times = `Leave ${formatSydneyTime(itinerary.departAt)} · Arrive ${formatSydneyTime(itinerary.arriveAt)}`;

@@ -1,4 +1,5 @@
-export { FOLLOWED_TRIP_SHOWN_AFTER_ARRIVAL_MINUTES, FollowedTripCard } from './followed-trip-card';
+export { FollowedTripCard } from './followed-trip-card';
+export { FOLLOWED_TRIP_SHOWN_AFTER_ARRIVAL_MINUTES } from './followed-trip-window';
 export { ItineraryScreen } from './itinerary-screen';
 export {
   drivingDirectionsUrl,
