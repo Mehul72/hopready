@@ -75,3 +75,7 @@ Constraints:
 - Daily volume approaches the Apple quota and a quota increase is refused.
 - Measured Sydney peak drive times are consistently worse than HERE's.
 - An Android or web client is planned (Apple Map Data would constrain it).
+
+## Correction (2026-10-26)
+
+"Only the access token is cached" holds for the API. The app stores Apple-sourced place names and coordinates in saved places, recent trips and the followed trip until the person deletes them. That conflicts with a strict reading of §2.5 and is an open owner decision (docs/OWNER-ACTIONS.md, item 22). The decision recorded above is unchanged.

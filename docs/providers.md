@@ -26,7 +26,7 @@ Facts below were read from official sources on 2026-10-25. Prices, quotas and te
   - Feeds have frozen for days during outages, so the app shows each figure's age and flags it as stale after 15 minutes.
 - **Apple Maps:**
   - Apple data may only be shown together with an Apple map, and Apple's logo and legal link must stay visible (DPLA Attachment 6 §2.1 and §2.4).
-  - Results may only be cached temporarily (§2.5). HopReady caches only the access token. Place IDs are exempt and may be stored.
+  - Results may only be cached temporarily (§2.5). Place IDs are exempt and may be stored. HopReady's server caches only the access token. The app, however, keeps Apple-sourced names and coordinates in saved places (Home, Work, favourites, parking spots), recent trips and the followed trip, until the person deletes them. Whether to store Place IDs instead is an open owner decision (docs/OWNER-ACTIONS.md, item 22).
   - Real-time routing apps must show the notice "YOUR USE OF THIS REAL TIME ROUTE GUIDANCE APPLICATION IS AT YOUR SOLE RISK. LOCATION DATA MAY NOT BE ACCURATE." (DPLA §3.3.3(F)(iii)). It appears in Settings.
 - **Opal fares:** removed from the Trip Planner API on 16 October 2023. HopReady shows fares as unknown.
 
