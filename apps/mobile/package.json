@@ -11,15 +11,24 @@
   },
   "dependencies": {
     "@expo/ui": "~58.0.23",
+    "@hopready/core": "workspace:*",
+    "@react-native-community/datetimepicker": "9.2.1",
+    "@tanstack/react-query": "^5.100.0",
     "expo": "~58.0.19",
     "expo-constants": "~58.0.13",
+    "expo-crypto": "~58.0.7",
+    "expo-dev-client": "~58.0.15",
     "expo-device": "~58.0.5",
     "expo-font": "~58.0.10",
     "expo-glass-effect": "~58.0.5",
+    "expo-haptics": "~58.0.7",
     "expo-image": "~58.0.17",
     "expo-linking": "~58.0.14",
+    "expo-location": "~58.0.19",
+    "expo-network": "~58.0.4",
     "expo-router": "~58.0.26",
     "expo-splash-screen": "~58.0.11",
+    "expo-sqlite": "~58.0.14",
     "expo-status-bar": "~58.0.4",
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.6",
@@ -28,17 +37,24 @@
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
     "react-native-gesture-handler": "~3.3.0",
+    "react-native-maps": "1.29.11",
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.30.0",
     "react-native-web": "~0.21.4",
     "react-native-worklets": "0.13.0",
-    "@hopready/core": "workspace:*"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@react-native/jest-preset": "0.88.0",
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
-    "typescript": "~6.0.3",
     "eslint": "^9.39.5",
-    "eslint-config-expo": "~58.0.4"
+    "eslint-config-expo": "~58.0.4",
+    "jest": "^30.0.0",
+    "jest-expo": "~58.0.12",
+    "test-renderer": "^1.0.0",
+    "typescript": "~6.0.3"
   }
 }
