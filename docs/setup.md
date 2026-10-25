@@ -51,6 +51,8 @@ In the app, open Settings and turn on **Demo mode**. Demo trips come from built-
    EXPO_PUBLIC_API_BASE_URL=http://localhost:8787 npx expo run:ios
    ```
 
+On first launch the app explains what live planning sends and asks for agreement (docs/decisions/0006). Tap **Agree and continue**; Settings > Live data use shows it again.
+
 Without keys, run the API in demo mode instead (`HOPREADY_MODE=demo pnpm --filter @hopready/api dev`). The app then shows the demo banner for API responses too.
 
 ## 4. Live provider checks
