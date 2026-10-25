@@ -1,5 +1,5 @@
 import type { Place } from '@hopready/core';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Modal, StyleSheet, TextInput, View } from 'react-native';
 
 import { PLACE_QUERY_MAX_LENGTH, PLACE_QUERY_MIN_LENGTH } from '@/api';
@@ -143,10 +143,29 @@ function PlacePickerContent({
     canOpenSettings: boolean;
   } | null>(null);
 
+  // A position fix can take several seconds. A place picked meanwhile, or the sheet closing, makes
+  // a late answer stale: it must never replace what the person chose.
+  const locateRun = useRef(0);
+
+  useEffect(() => {
+    const runs = locateRun;
+    return () => {
+      runs.current += 1;
+    };
+  }, []);
+
+  const pick = (place: Place) => {
+    locateRun.current += 1;
+    onPick(place);
+  };
+
   const pickCurrentLocation = async () => {
+    locateRun.current += 1;
+    const run = locateRun.current;
     setLocating(true);
     setLocationProblem(null);
     const outcome = await findCurrentPlace();
+    if (run !== locateRun.current) return;
     setLocating(false);
     if (outcome.status === 'found') {
       onPick(outcome.place);
@@ -209,7 +228,7 @@ function PlacePickerContent({
           }
         />
       ) : null}
-      <SearchResults query={query} onPick={onPick} />
+      <SearchResults query={query} onPick={pick} />
     </Screen>
   );
 }

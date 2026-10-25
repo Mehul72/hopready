@@ -134,6 +134,38 @@ export function grantLocationAt(
   ]);
 }
 
+// Like grantLocationAt, but the position only arrives when `release` is called, to test what
+// happens when a person does something else while the phone is still finding them.
+export function holdLocationAt(coordinate: Coordinate): { release: () => Promise<void> } {
+  grantLocationAt(coordinate);
+  let deliver: (() => void) | null = null;
+  const arrived = new Promise<void>((resolve) => {
+    deliver = resolve;
+  });
+  const position = {
+    coords: {
+      latitude: coordinate.lat,
+      longitude: coordinate.lon,
+      altitude: null,
+      accuracy: 20,
+      altitudeAccuracy: null,
+      heading: null,
+      speed: null,
+    },
+    timestamp: WEEKDAY_MORNING.getTime(),
+  };
+  jest.spyOn(Location, 'getCurrentPositionAsync').mockImplementation(async () => {
+    await arrived;
+    return position;
+  });
+  return {
+    release: async () => {
+      deliver?.();
+      await arrived;
+    },
+  };
+}
+
 export function denyLocation(canAskAgain: boolean): void {
   jest
     .spyOn(Location, 'requestForegroundPermissionsAsync')

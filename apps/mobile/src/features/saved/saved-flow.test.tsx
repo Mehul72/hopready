@@ -1,7 +1,7 @@
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { userEvent } from '@testing-library/react-native';
 import * as Location from 'expo-location';
-import { screen, within } from 'expo-router/testing-library';
+import { act, screen, within } from 'expo-router/testing-library';
 import { Alert, type AlertButton } from 'react-native';
 
 import { planSession } from '@/state';
@@ -12,6 +12,7 @@ import {
   denyLocation,
   freezeClockAt,
   grantLocationAt,
+  holdLocationAt,
   renderApp,
   WEEKDAY_MORNING,
 } from '../itinerary/testing';
@@ -95,6 +96,22 @@ describe('Home and Work', () => {
       kind: 'address',
     });
     expect(Location.reverseGeocodeAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps the place picked from search when the location arrives late', async () => {
+    const location = holdLocationAt(DEMO_PLACES.chatswoodOffice.coordinate);
+    await renderApp('/saved');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Work, Not set' }));
+    await user.press(screen.getByRole('button', { name: 'Use my current location' }));
+    await user.type(screen.getByLabelText('Search for a place'), 'Macquarie University');
+    await user.press(
+      await screen.findByRole('button', { name: 'Macquarie University, Macquarie Park' }),
+    );
+    await act(() => location.release());
+
+    expect(appStorage.places.get().work?.name).toBe('Macquarie University');
   });
 
   it('removes Home only after confirming', async () => {

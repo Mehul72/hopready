@@ -1,6 +1,6 @@
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { fireEvent, userEvent } from '@testing-library/react-native';
-import { screen, waitFor } from 'expo-router/testing-library';
+import { act, screen, waitFor } from 'expo-router/testing-library';
 import { Alert, type AlertButton } from 'react-native';
 
 import { planSession } from '@/state';
@@ -11,6 +11,7 @@ import {
   denyLocation,
   freezeClockAt,
   grantLocationAt,
+  holdLocationAt,
   renderApp,
   WEEKDAY_MORNING,
 } from '../itinerary/testing';
@@ -182,6 +183,25 @@ describe('confirming where the car is', () => {
       },
       carParkName: null,
     });
+  });
+
+  it('keeps the car park chosen while the location was still being found', async () => {
+    const location = holdLocationAt({ lat: -33.742, lon: 150.956 });
+    await renderApp('/parked-car/confirm');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('radio', { name: /^Where I am now/ }));
+    await user.press(screen.getByRole('button', { name: 'Choose another car park' }));
+    await user.press(
+      await screen.findByRole('radio', { name: 'Kellyville (north), Kellyville Station' }),
+    );
+    await act(() => location.release());
+
+    expect(
+      screen.getByRole('radio', { name: 'Kellyville (north), Kellyville Station' }),
+    ).toBeChecked();
+    await user.press(screen.getByRole('button', { name: 'Save where I parked' }));
+    expect(appStorage.parkedCar.get()).toMatchObject({ carParkName: 'Kellyville (north)' });
   });
 
   it('says when the location cannot be used and keeps the other choices', async () => {

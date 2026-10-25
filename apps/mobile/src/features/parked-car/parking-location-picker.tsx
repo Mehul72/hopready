@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText, Banner, Button, ErrorState, LoadingState } from '@/components';
@@ -136,11 +136,30 @@ export function ParkingLocationPicker({
   const [locationProblem, setLocationProblem] = useState<string | null>(null);
   const [showsAllCarParks, setShowsAllCarParks] = useState(false);
   const selectedKey = selected ? choiceKey(selected) : null;
+  // A position fix can take several seconds. A choice made meanwhile, or leaving the screen, makes
+  // a late answer stale: it must never replace where the person said the car is.
+  const locateRun = useRef(0);
+
+  useEffect(() => {
+    const runs = locateRun;
+    return () => {
+      runs.current += 1;
+    };
+  }, []);
+
+  const choose = (choice: ParkingChoice) => {
+    locateRun.current += 1;
+    setLocating(false);
+    onSelect(choice);
+  };
 
   const chooseCurrentLocation = async () => {
+    locateRun.current += 1;
+    const run = locateRun.current;
     setLocating(true);
     setLocationProblem(null);
     const outcome = await findCurrentPlace();
+    if (run !== locateRun.current) return;
     setLocating(false);
     if (outcome.status === 'found') {
       onSelect({ kind: 'current-location', place: outcome.place });
@@ -158,7 +177,7 @@ export function ParkingLocationPicker({
           subtitle="Choose it only if this is where you parked."
           selected={selectedKey === `car-park:${suggestion.carParkId}`}
           onPress={() =>
-            onSelect({
+            choose({
               kind: 'car-park',
               carParkId: suggestion.carParkId,
               name: suggestion.name,
@@ -195,7 +214,7 @@ export function ParkingLocationPicker({
               title={spot.name}
               subtitle="Saved by you. Rules and spaces unknown."
               selected={selectedKey === `saved-spot:${spot.id}`}
-              onPress={() => onSelect({ kind: 'saved-spot', spot })}
+              onPress={() => choose({ kind: 'saved-spot', spot })}
             />
           ))}
         </>
@@ -208,7 +227,7 @@ export function ParkingLocationPicker({
         <DocumentedCarParks
           selectedKey={selectedKey}
           excludeId={suggestion?.carParkId ?? null}
-          onSelect={onSelect}
+          onSelect={choose}
         />
       ) : (
         <Button
