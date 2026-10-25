@@ -65,7 +65,9 @@ export default function RootLayout() {
               {/* Live planning sends places to HopReady's server, so until the person agrees or
                   chooses demo mode, the explanation is the only screen. */}
               <Stack.Protected guard={!needsLiveDataConsent} redirectTo="/welcome">
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                {/* The title is only ever seen as the back button on screens opened from a tab;
+                    without it iOS shows the route group's name, "(tabs)". */}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Back' }} />
                 <Stack.Screen name="results" options={{ title: 'Options' }} />
                 <Stack.Screen name="itinerary/[id]" options={{ title: 'Trip' }} />
                 <Stack.Screen
