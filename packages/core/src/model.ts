@@ -174,7 +174,8 @@ export const transitLegSchema = z.object({
   service: transitServiceSchema,
   scheduledStart: isoInstant,
   scheduledEnd: isoInstant,
-  // Only what the provider states. Null means "not provided", and the UI says so.
+  // Only what the provider states, and null when it states none. The app says a departure platform
+  // is not provided, and leaves out an arrival platform it was not given.
   departurePlatform: z.string().nullable(),
   arrivalPlatform: z.string().nullable(),
   stopCount: z.number().int().nonnegative().nullable(),
