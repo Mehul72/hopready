@@ -4,7 +4,7 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 // never from this file. Nothing here is secret: the app holds no provider keys.
 
 const LOCATION_PURPOSE =
-  'HopReady uses your location to start trips from where you are and to show nearby places first when you search.';
+  'HopReady uses your location to start trips from where you are, to show where you are on its maps, and to list nearby places first when you search.';
 
 // Calm deep teal from the HopReady icon (src/theme/colours.ts), and its dark counterpart.
 const SPLASH_BACKGROUND = '#0E6F6E';

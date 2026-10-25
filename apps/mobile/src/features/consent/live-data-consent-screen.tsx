@@ -110,7 +110,7 @@ export function LiveDataConsentScreen({
             <Button
               variant="secondary"
               label="Use demo mode instead"
-              accessibilityHint="Sample trips on real stops. Nothing is sent."
+              accessibilityHint="Sample trips on real stops. Nothing is sent to HopReady's server."
               onPress={useDemoMode}
               fullWidth
             />
@@ -144,7 +144,7 @@ export function LiveDataConsentScreen({
       <AppText variant="footnote" tone="secondary">
         {agreedOn
           ? `You agreed on ${agreedOn}. You can withdraw at any time.`
-          : 'Demo mode never sends anything. You can change your mind later in Settings.'}
+          : "Demo mode sends nothing to HopReady's server. You can change your mind later in Settings."}
       </AppText>
     </Screen>
   );
