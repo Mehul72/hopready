@@ -25,6 +25,7 @@ import {
   describeRules,
   distance,
   duration,
+  platformToAdd,
   serviceTitle,
   statedPlatform,
   type StepNotes,
@@ -303,10 +304,10 @@ function ParkingRulesSourceLink({ source }: { source: { url: string; label: stri
 function TransitRow({ leg, notes }: { leg: TransitLeg; notes: StepNotes }) {
   const modeName = LEG_VISUALS[leg.mode].label;
   const title = serviceTitle(leg);
-  const platform = describePlatform(leg.departurePlatform);
+  const platform = platformToAdd(leg.from.name, describePlatform(leg.departurePlatform));
   // The arrival platform helps with finding the exit or the next service, but nobody needs it to
   // get off, so it is shown only when stated rather than called missing.
-  const arrivalPlatform = statedPlatform(leg.arrivalPlatform);
+  const arrivalPlatform = platformToAdd(leg.to.name, statedPlatform(leg.arrivalPlatform));
   const arrival = arrivalPlatform ? `${leg.to.name}, ${arrivalPlatform}` : leg.to.name;
   const stops = stopCount(leg.stopCount);
   const delay = describeDelay(leg);
@@ -315,7 +316,7 @@ function TransitRow({ leg, notes }: { leg: TransitLeg; notes: StepNotes }) {
   const timing = timingStyleFor(leg.timing, sample).spoken;
   const spokenParts = [
     `${modeName} ${title}`,
-    `From ${leg.from.name}, ${platform}`,
+    `From ${leg.from.name}${platform ? `, ${platform}` : ''}`,
     `To ${arrival}, arriving ${arrive}`,
     stops,
     leg.cancelled ? 'This service is cancelled' : null,
@@ -332,7 +333,7 @@ function TransitRow({ leg, notes }: { leg: TransitLeg; notes: StepNotes }) {
       spoken={`${spokenParts.join('. ')}.`}
       details={
         <>
-          <Detail>{`From ${leg.from.name} · ${platform}`}</Detail>
+          <Detail>{`From ${leg.from.name}${platform ? ` · ${platform}` : ''}`}</Detail>
           <Detail>{[`To ${arrival}, arrive ${arrive}`, stops].filter(Boolean).join(' · ')}</Detail>
           <View style={styles.badges}>
             <TimingBadge timing={leg.timing} sample={sample} />

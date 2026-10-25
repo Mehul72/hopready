@@ -232,6 +232,28 @@ describe('LegRow', () => {
     ).toBeOnTheScreen();
   });
 
+  it('says a platform once when the trip was planned from or to that platform', async () => {
+    await renderLeg(
+      transitLeg({
+        from: place('Tallawong Station, Platform 1', -33.69163, 150.906022, 'stop'),
+        to: place('Chatswood Station, Platform 3', -33.7969, 151.1803, 'stop'),
+        departurePlatform: 'Platform 1',
+        arrivalPlatform: 'Platform 3',
+      }),
+    );
+    const arrive = formatSydneyTime(addMinutes(START, 40));
+
+    expect(screen.getByText('From Tallawong Station, Platform 1')).toBeOnTheScreen();
+    expect(
+      screen.getByText(`To Chatswood Station, Platform 3, arrive ${arrive} · 13 stops`),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        `${leaveTime}. Metro M1 towards Sydenham. From Tallawong Station, Platform 1. To Chatswood Station, Platform 3, arriving ${arrive}. 13 stops. Timetable time, not live.`,
+      ),
+    ).toBeOnTheScreen();
+  });
+
   it('shows the platform, live delay and alerts of a live service', async () => {
     await renderLeg(
       transitLeg({

@@ -18,6 +18,7 @@ import {
   duration,
   formatSydneyDay,
   PLATFORM_NOT_PROVIDED,
+  platformToAdd,
   serviceTitle,
   statedPlatform,
   stopCount,
@@ -167,6 +168,15 @@ describe('public transport wording', () => {
     expect(statedPlatform('Stand C')).toBe('Stand C');
     expect(statedPlatform(null)).toBeNull();
     expect(statedPlatform('  ')).toBeNull();
+  });
+
+  it('adds a platform to a stop name only when the name does not already end with it', () => {
+    expect(platformToAdd('Chatswood Station', 'Platform 1')).toBe('Platform 1');
+    expect(platformToAdd('Chatswood Station, Platform 1', 'Platform 1')).toBeNull();
+    expect(platformToAdd('Circular Quay,Wharf 2, Side A', 'Wharf 2, Side A')).toBeNull();
+    expect(platformToAdd('Central Station, Platform 24', 'Platform 4')).toBe('Platform 4');
+    expect(platformToAdd('Chatswood Station', PLATFORM_NOT_PROVIDED)).toBe(PLATFORM_NOT_PROVIDED);
+    expect(platformToAdd('Chatswood Station', null)).toBeNull();
   });
 
   it('names the service with its headsign when there is one', () => {

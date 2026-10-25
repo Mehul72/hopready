@@ -107,6 +107,19 @@ export function describePlatform(platform: string | null): string {
   return statedPlatform(platform) ?? PLATFORM_NOT_PROVIDED;
 }
 
+// The platform to show after a stop's name, or null when the name already ends with it. The first
+// and last steps keep the name the trip was planned with, and a stop picked from search can be a
+// platform itself ("Chatswood Station, Platform 1").
+export function platformToAdd(stopName: string, platform: string | null): string | null {
+  if (platform === null) return null;
+  const normalise = (text: string) =>
+    text
+      .split(',')
+      .map((part) => part.trim().toLowerCase())
+      .join(', ');
+  return normalise(stopName).endsWith(`, ${normalise(platform)}`) ? null : platform;
+}
+
 export function serviceTitle(leg: TransitLeg): string {
   const { name, headsign } = leg.service;
   return headsign ? `${name} towards ${headsign}` : name;
