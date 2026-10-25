@@ -31,9 +31,12 @@ class HopReadyTestCase: XCTestCase {
     app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Drive and park'")).firstMatch
   }
 
-  // The demo timetable has no services between about 1.30 am and 4.30 am, so a fixed departure
-  // keeps the journey independent of when the tests run. The picker never goes before now.
+  // The demo timetable has no services between about 1.30 am and 4.30 am, so runs before 10 am
+  // depart at 10:00 am. From 10 am on the trip leaves now: the picker never goes before now.
   func departAtMidMorning() {
+    var sydneyCalendar = Calendar(identifier: .gregorian)
+    sydneyCalendar.timeZone = TimeZone(identifier: "Australia/Sydney")!
+    guard sydneyCalendar.component(.hour, from: Date()) < 10 else { return }
     tapWhenReady(labelled("Depart at"))
     // React Native puts the test ID on a wrapper; the compact picker inside has a date button and
     // a time button such as "1:35 am".
