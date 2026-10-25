@@ -2,33 +2,25 @@
 
 Read this first when picking the work up. The plan with step-level detail is docs/plans/hopready-v1.md. Owner-side blockers are in docs/OWNER-ACTIONS.md.
 
-## Where things stand (2026-10-25, evening AEDT)
+## Where things stand (2026-10-26, just after midnight AEDT)
 
-- Branch `feat/hopready-v1`, local only (nothing pushed).
-- Done and tested:
-  - workspace scaffold
-  - core model and Sydney time handling
-  - planner
-  - documented Park&Ride catalogue
-  - provider HTTP client
-  - CI and deploy workflows
-  - decision records
-  - routing and provider docs
-- In progress (parallel build, wave 1):
+- Branch `feat/hopready-v1`, local only (nothing pushed). `git log --oneline` lists every step.
+- **Done and tested.** Each item lists the commit and test command:
+  - Core model, Sydney time and planner (`pnpm --filter @hopready/core test`)
+  - Documented Park&Ride catalogue
+  - Provider HTTP client
+  - TfNSW adapters, commit 3a9a2ae: 119 tests, plus three real public Trip Planner responses mapped cleanly
+  - Apple Maps adapters, commit e4189b0: 49 tests
+  - API platform, commit d99d3d6: routes, validation, rate limits, daily budgets counting real HTTP requests, redacted logs, Workers config and Node server. 303 API tests pass, and `wrangler deploy --dry-run` builds.
+  - Car park picker no longer polls occupancy, and search keeps room for addresses (8b6b03a)
+- **In progress (parallel build, wave 1):**
   - demo fixtures
-  - TfNSW adapters
-  - Apple Maps adapters
-  - API platform
   - mobile foundation, then the screens
-- Not started:
-  - integration
-  - iOS simulator walkthrough
-  - Maestro end-to-end tests
+- **Next:**
+  - extend the Park&Ride catalogue to all 40 live facilities from the Car Park API documentation, so the car park list needs no per-facility calls (draft in the session scratchpad)
+  - integration and the iOS simulator run
+  - XCUITest end-to-end (Maestro install was refused)
   - review pass
-  - app icon
-  - support and privacy pages
-  - store metadata
-  - TestFlight
 
 ## Resume
 
