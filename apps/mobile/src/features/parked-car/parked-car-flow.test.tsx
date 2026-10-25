@@ -278,6 +278,22 @@ describe('correcting the parked car', () => {
     expect(state.parkedCar.confirmedAt).toBe('2026-10-26T20:45:00.000Z');
   });
 
+  it('keeps a pin moved while the location was still being found', async () => {
+    parkAtKellyvilleNorth();
+    const location = holdLocationAt({ lat: -33.7962, lon: 151.1848 });
+    await renderApp('/parked-car/correct');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('radio', { name: /^Where I am now/ }));
+    await user.press(screen.getByRole('button', { name: 'Move pin north' }));
+    await act(() => location.release());
+    await user.press(screen.getByRole('button', { name: 'Save new location' }));
+
+    const state = appStorage.parkedCar.get();
+    if (state.status !== 'parked') throw new Error('Expected the car to stay parked');
+    expect(state.parkedCar.location.coordinate.lon).toBeCloseTo(KELLYVILLE_NORTH.coordinate.lon, 9);
+  });
+
   it('puts the pin where the map is tapped', async () => {
     parkAtKellyvilleNorth();
     await renderApp('/parked-car/correct');

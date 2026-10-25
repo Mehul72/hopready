@@ -19,6 +19,9 @@ export interface ParkingLocationPickerProps {
   suggestion: SuggestedCarPark | null;
   selected: ParkingChoice | null;
   onSelect: (choice: ParkingChoice) => void;
+  // Goes up each time the place is chosen outside this list, such as by moving a pin, so a
+  // location lookup still running is dropped instead of overriding that choice.
+  choicesMadeElsewhere?: number;
 }
 
 function normalise(text: string): string {
@@ -130,6 +133,7 @@ export function ParkingLocationPicker({
   suggestion,
   selected,
   onSelect,
+  choicesMadeElsewhere = 0,
 }: ParkingLocationPickerProps) {
   const spots = useSavedParkingSpots();
   const [locating, setLocating] = useState(false);
@@ -139,6 +143,7 @@ export function ParkingLocationPicker({
   // A position fix can take several seconds. A choice made meanwhile, or leaving the screen, makes
   // a late answer stale: it must never replace where the person said the car is.
   const locateRun = useRef(0);
+  const latestLookup = useRef(0);
 
   useEffect(() => {
     const runs = locateRun;
@@ -146,6 +151,10 @@ export function ParkingLocationPicker({
       runs.current += 1;
     };
   }, []);
+
+  useEffect(() => {
+    locateRun.current += 1;
+  }, [choicesMadeElsewhere]);
 
   const choose = (choice: ParkingChoice) => {
     locateRun.current += 1;
@@ -156,11 +165,12 @@ export function ParkingLocationPicker({
   const chooseCurrentLocation = async () => {
     locateRun.current += 1;
     const run = locateRun.current;
+    latestLookup.current = run;
     setLocating(true);
     setLocationProblem(null);
     const outcome = await findCurrentPlace();
+    if (run === latestLookup.current) setLocating(false);
     if (run !== locateRun.current) return;
-    setLocating(false);
     if (outcome.status === 'found') {
       onSelect({ kind: 'current-location', place: outcome.place });
       return;

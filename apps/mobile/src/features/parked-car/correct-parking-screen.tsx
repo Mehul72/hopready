@@ -52,12 +52,14 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
   const tripCarPark = suggestedCarParkOf(useActiveTrip()?.itinerary);
   const suggestion = tripCarPark?.carParkId === state.parkedCar.carParkId ? null : tripCarPark;
   const [choice, setChoice] = useState<ParkingChoice | null>(null);
+  const [pinMoves, setPinMoves] = useState(0);
   const pin = choice ? choiceCoordinate(choice) : original;
   // Choosing a listed place re-centres the map on it; moving the pin by hand never does.
   const mapKey = choice && choice.kind !== 'pin' ? choiceKey(choice) : 'pin';
 
   const movePin = (coordinate: Coordinate) => {
     const nearOriginal = haversineMetres(coordinate, original) <= SAME_SPOT_METRES;
+    setPinMoves((count) => count + 1);
     setChoice({
       kind: 'pin',
       coordinate,
@@ -100,6 +102,7 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
           suggestion={suggestion}
           selected={choice?.kind === 'pin' ? null : choice}
           onSelect={setChoice}
+          choicesMadeElsewhere={pinMoves}
         />
       </View>
       <View style={styles.remove}>
