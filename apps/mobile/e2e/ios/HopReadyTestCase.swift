@@ -43,11 +43,28 @@ class HopReadyTestCase: XCTestCase {
     tapWhenReady(time)
     let wheels = app.pickerWheels
     XCTAssertTrue(wheels.firstMatch.waitForExistence(timeout: 5))
-    wheels.element(boundBy: 0).adjust(toPickerWheelValue: "10")
-    wheels.element(boundBy: 1).adjust(toPickerWheelValue: "00")
-    if wheels.count > 2 { wheels.element(boundBy: 2).adjust(toPickerWheelValue: "am") }
+    setWheel(wheels.element(boundBy: 0), to: "10")
+    setWheel(wheels.element(boundBy: 1), to: "00")
+    if wheels.count > 2 { setWheel(wheels.element(boundBy: 2), to: "am") }
     // Tapping outside the popover closes it.
     app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+    // iOS writes "10:00 am" with a narrow no-break space before "am".
+    let shownTime = time.label.replacingOccurrences(of: "\u{202F}", with: " ")
+    XCTAssertEqual(shownTime, "10:00 am", "The departure time was not set")
+  }
+
+  // A single wheel adjustment can stop a few rows short (7 to 9 instead of 10 on the iOS 27
+  // simulator), so it is repeated until the wheel shows the wanted value. Minutes read "12 minutes".
+  func setWheel(_ wheel: XCUIElement, to wanted: String, attempts: Int = 6) {
+    func reads(_ value: String) -> Bool {
+      let shown = wheel.value as? String ?? ""
+      if let number = Int(value) { return Int(shown.prefix(while: \.isNumber)) == number }
+      return shown.hasPrefix(value)
+    }
+    for _ in 0..<attempts where !reads(wanted) {
+      wheel.adjust(toPickerWheelValue: wanted)
+    }
+    XCTAssertTrue(reads(wanted), "The wheel stopped at \(wheel.value ?? "nothing"), not \(wanted)")
   }
 
   // The Plan tab's search and the Saved and Take me home pickers label their search fields
