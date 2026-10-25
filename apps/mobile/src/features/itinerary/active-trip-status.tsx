@@ -10,6 +10,7 @@ import { refreshableRequest } from '@/trip';
 
 import { showResultsFor } from '../saved/plan-requests';
 import { writeOrAlert } from '../saved/storage-writes';
+import { shownDurationSeconds } from '../shared/shown-duration';
 import { describeTripSummary } from './trip-summary-card';
 import { duration, STRATEGY_LABELS } from './trip-text';
 import type { DisplayedTrip } from './use-displayed-trip';
@@ -40,7 +41,7 @@ function AlternativeCard({
   alternative: Itinerary;
   checkedAt: string | null;
 }) {
-  const total = duration(alternative.durationSeconds);
+  const total = duration(shownDurationSeconds(alternative));
   return (
     <Card
       onPress={() => followAlternative(alternative, checkedAt)}

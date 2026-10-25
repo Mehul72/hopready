@@ -12,6 +12,7 @@ import { LEG_VISUALS, type LegVisualKind, legVisualKind } from '@/theme';
 import { selfDriveSeconds } from './itinerary-order';
 import { describeOccupancy, SPACES_CAN_FILL_NOTE, type Wording } from '../shared/occupancy-wording';
 import { isSampleItinerary } from '../shared/sample-data';
+import { shownDurationSeconds } from '../shared/shown-duration';
 import { STRATEGY_LABELS } from './plan-explanations';
 
 const SECONDS_PER_MINUTE = 60;
@@ -112,8 +113,8 @@ export function tripFacts(itinerary: Itinerary): TripFacts {
   const driveSeconds = selfDriveSeconds(itinerary);
   const liftSeconds = rideSeconds(itinerary);
   const total = {
-    text: formatDurationMinutes(itinerary.durationSeconds),
-    spoken: spokenDuration(itinerary.durationSeconds),
+    text: formatDurationMinutes(shownDurationSeconds(itinerary)),
+    spoken: spokenDuration(shownDurationSeconds(itinerary)),
   };
   let driving: Wording | null = null;
   if (driveSeconds > 0) {

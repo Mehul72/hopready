@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText, Card } from '@/components';
 import { type ColourTokens, COMPACT_MAX_FONT_SCALE, RADII, SPACING, useTheme } from '@/theme';
 
+import { shownDurationSeconds } from '../shared/shown-duration';
 import { describeRealtimeCoverage, duration, STRATEGY_LABELS, type Wording } from './trip-text';
 
 interface CoverageStyle {
@@ -45,7 +46,7 @@ function tripFacts(itinerary: Itinerary): Wording[] {
 }
 
 export function describeTripSummary(itinerary: Itinerary): string {
-  const total = duration(itinerary.durationSeconds);
+  const total = duration(shownDurationSeconds(itinerary));
   const facts = tripFacts(itinerary).map((fact) => fact.spoken);
   const coverage = describeRealtimeCoverage(itinerary);
   return [
@@ -62,7 +63,7 @@ export function describeTripSummary(itinerary: Itinerary): string {
 // VoiceOver reads it as one sentence.
 export function TripSummaryCard({ itinerary }: { itinerary: Itinerary }) {
   const { colours } = useTheme();
-  const total = duration(itinerary.durationSeconds);
+  const total = duration(shownDurationSeconds(itinerary));
   const facts = tripFacts(itinerary);
   const coverage = describeRealtimeCoverage(itinerary);
   const coverageStyle = COVERAGE_STYLES[itinerary.realtime];
