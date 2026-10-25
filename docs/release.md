@@ -159,4 +159,5 @@ Also confirm in App Store Connect:
 - **Sizes:** 6.9" (1320 × 2868, from the iPhone 17 Pro Max or 18 Pro Max simulator) and 6.3" (1206 × 2622, from the iPhone 17 Pro or 18 Pro simulator).
 - **Format:** JPEG with no alpha channel. Use `xcrun simctl io booted screenshot --type=jpeg file.jpg`.
 - **Live data:** capture them in live mode once the production API is up. Demo-mode captures show the demo banner and are for internal review only.
+- **Review set:** `docs/screenshots/` holds the main screens from the XCUITest walk-through (`testCapturesTheMainScreens`, iPhone 18 Pro simulator, demo mode, 2026-10-26), reduced to JPEG for the repository. They show the demo banner, so they are not for the store.
 - **April 2027:** Apple's iOS 27 SDK requirement also brings iPhone Duo screenshots. Those need Xcode 27.1 or later.
