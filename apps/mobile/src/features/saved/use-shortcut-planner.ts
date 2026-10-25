@@ -4,6 +4,8 @@ import { Alert, type AlertButton } from 'react-native';
 
 import { appStorage, type FavouriteRoute, isSamePlace } from '@/storage';
 
+import { planChoices } from '../plan/plan-choices';
+
 import {
   type CurrentPlaceOutcome,
   findCurrentPlace,
@@ -63,6 +65,16 @@ export function useShortcutPlanner(): ShortcutPlanner {
     }
   };
 
+  // The preferred station and car park from Trip options, as the Plan tab sends them, so a
+  // shortcut plans the same trip and the results do not claim the options changed.
+  const preferredStops = (): Pick<PlanRequest, 'preferredCarParkId' | 'preferredStop'> => {
+    const { preferredCarPark, preferredStation } = planChoices.get();
+    return {
+      ...(preferredCarPark ? { preferredCarParkId: preferredCarPark.id } : {}),
+      ...(preferredStation ? { preferredStop: preferredStation } : {}),
+    };
+  };
+
   // A saved "current location" origin means wherever the person is now.
   const resolveOrigin = async (origin: Place): Promise<Place | null> => {
     if (origin.kind !== 'current-location') return origin;
@@ -85,6 +97,7 @@ export function useShortcutPlanner(): ShortcutPlanner {
               access: accessForRoute({ origin, destination }, appStorage.recentRequests.get()),
               trip: { kind: 'outbound' },
               now: new Date(),
+              extras: preferredStops(),
             },
             savedTripSettings(),
           ),
@@ -111,6 +124,7 @@ export function useShortcutPlanner(): ShortcutPlanner {
             access: accessForRoute(route, appStorage.recentRequests.get()),
             trip: { kind: 'outbound' },
             now: new Date(),
+            extras: preferredStops(),
           },
           savedTripSettings(),
         ),

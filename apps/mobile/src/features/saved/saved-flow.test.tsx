@@ -16,8 +16,16 @@ import {
   renderApp,
   WEEKDAY_MORNING,
 } from '../itinerary/testing';
+import { planChoices } from '../plan/plan-choices';
 import { DEMO_SEARCH_ATTRIBUTION } from './place-picker-sheet';
 import { describeRecentRequest } from './saved-screen';
+
+const DEMO_STATIONS_TALLAWONG = {
+  name: 'Tallawong Station',
+  coordinate: { lat: -33.6916, lon: 150.906 },
+  kind: 'stop' as const,
+  stopId: '2155384',
+};
 
 // Presses the button with this text in the next alert, as a person would.
 function answerNextAlert(buttonText: string) {
@@ -222,6 +230,27 @@ describe('favourite routes', () => {
       destination: DEMO_PLACES.chatswoodOffice,
       time: { type: 'depart', at: expect.stringMatching(/^2026-10-26T20:30:/) },
       access: { transit: true, drive: false, dropOff: true },
+    });
+  });
+
+  it('plans a saved route with the preferred stops from Trip options, as the Plan tab does', async () => {
+    planChoices.setPreferredCarPark({ id: '28', name: 'Tallawong P3' });
+    planChoices.setPreferredStation(DEMO_STATIONS_TALLAWONG);
+    appStorage.favouriteRoutes.add({
+      label: 'Commute',
+      origin: DEMO_PLACES.rouseHillHome,
+      destination: DEMO_PLACES.chatswoodOffice,
+    });
+    await renderApp('/saved');
+
+    await userEvent
+      .setup()
+      .press(screen.getByRole('button', { name: 'Commute, Rouse Hill to Chatswood' }));
+
+    expect(await screen.findByText('Results screen')).toBeOnTheScreen();
+    expect(planSession.getState().request).toMatchObject({
+      preferredCarParkId: '28',
+      preferredStop: DEMO_STATIONS_TALLAWONG,
     });
   });
 
