@@ -72,7 +72,7 @@ export function Screen({
     </ScrollView>
   ) : (
     <View style={[styles.fill, edgePadding, contentContainerStyle]}>
-      {inModal ? <DemoModeBanner placement="inline" style={styles.fixedBanner} /> : null}
+      {inModal ? <DemoModeBanner placement="compact" style={styles.fixedBanner} /> : null}
       {children}
     </View>
   );

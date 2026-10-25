@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react-native';
 
 import { appStorage } from '@/storage';
+import { COMPACT_MAX_FONT_SCALE } from '@/theme';
 
 import { AppText } from './app-text';
 import { DEMO_BANNER_MESSAGE, DEMO_BANNER_TITLE, DemoModeBanner } from './demo-mode-banner';
@@ -44,6 +45,26 @@ describe('Screen', () => {
       screen.getByLabelText(`Demo. ${DEMO_BANNER_TITLE}. ${DEMO_BANNER_MESSAGE}`),
     ).toBeOnTheScreen();
     expect(screen.getByText('Choose a place')).toBeOnTheScreen();
+  });
+
+  it('uses the one-line label, capped in size, on a sheet with a fixed layout', async () => {
+    appStorage.settings.setDemoMode(true);
+    await render(
+      <ScreenPresentationProvider presentation="modal">
+        <Screen scroll={false}>
+          <AppText>Choose a place</AppText>
+        </Screen>
+      </ScreenPresentationProvider>,
+    );
+
+    expect(screen.getByLabelText(SPOKEN)).toBeOnTheScreen();
+    expect(screen.getByText('Sample data, not live')).toHaveProp(
+      'maxFontSizeMultiplier',
+      COMPACT_MAX_FONT_SCALE,
+    );
+    expect(
+      screen.queryByLabelText(`Demo. ${DEMO_BANNER_TITLE}. ${DEMO_BANNER_MESSAGE}`),
+    ).not.toBeOnTheScreen();
   });
 
   it('leaves the banner to the window strip on ordinary screens', async () => {
