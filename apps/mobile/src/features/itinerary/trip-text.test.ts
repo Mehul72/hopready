@@ -1,11 +1,19 @@
-import { addMinutes, STANDARD_PARK_AND_RIDE_RULES, type TransitLeg } from '@hopready/core';
+import {
+  addMinutes,
+  type Leg,
+  type Place,
+  STANDARD_PARK_AND_RIDE_RULES,
+  type TransitLeg,
+  type TransitMode,
+} from '@hopready/core';
 
-import { PLACES } from '@/test-support/trips';
+import { place, PLACES } from '@/test-support/trips';
 
 import {
   describeDelay,
   describePlatform,
   describeRules,
+  describeStepNotes,
   distance,
   duration,
   formatSydneyDay,
@@ -38,6 +46,64 @@ function transitLeg(overrides: Partial<TransitLeg> = {}): TransitLeg {
     alerts: [],
     realtimeTripId: null,
     ...overrides,
+  };
+}
+
+const STOPS = {
+  collaroy: place('Collaroy B-Line', -33.731745, 151.301068, 'stop'),
+  warringahMall: place('Warringah Mall, Pittwater Rd', -33.767526, 151.268564, 'stop'),
+  wynyard: place('Wynyard Station', -33.865945, 151.206103, 'stop'),
+  martinPlace: place('Martin Place Station', -33.867648, 151.210583, 'stop'),
+  central: place('Central Station', -33.884024, 151.206203, 'stop'),
+};
+
+// Legs are timed in minutes after the first service leaves, so each trip reads as a timeline.
+const FIRST_DEPARTURE = '2026-10-26T20:43:00.000Z';
+
+function at(minute: number): string {
+  return addMinutes(FIRST_DEPARTURE, minute);
+}
+
+function ride(name: string, mode: TransitMode, from: Place, to: Place, minutes: [number, number]) {
+  const start = at(minutes[0]);
+  const end = at(minutes[1]);
+  return transitLeg({
+    id: `${name}-${minutes[0]}`,
+    from,
+    to,
+    mode,
+    service: { name, description: null, headsign: null, operator: null },
+    start,
+    end,
+    scheduledStart: start,
+    scheduledEnd: end,
+  });
+}
+
+function walk(from: Place, to: Place, minutes: [number, number]): Leg {
+  return {
+    id: `walk-${minutes[0]}`,
+    kind: 'walk',
+    from,
+    to,
+    start: at(minutes[0]),
+    end: at(minutes[1]),
+    source: 'tfnsw-trip-planner',
+    timing: 'estimated',
+    distanceMetres: 400,
+  };
+}
+
+function wait(stop: Place, minutes: [number, number]): Leg {
+  return {
+    id: `wait-${minutes[0]}`,
+    kind: 'wait',
+    from: stop,
+    to: stop,
+    start: at(minutes[0]),
+    end: at(minutes[1]),
+    source: 'hopready',
+    timing: 'scheduled',
   };
 }
 
@@ -108,6 +174,81 @@ describe('public transport wording', () => {
     expect(
       describeDelay(transitLeg({ timing: 'scheduled', start: addMinutes(scheduledStart, 3) })),
     ).toBeNull();
+  });
+});
+
+describe('changes between services', () => {
+  const walkingChange = [
+    ride('B1', 'bus', STOPS.collaroy, STOPS.wynyard, [0, 54]),
+    walk(STOPS.wynyard, STOPS.martinPlace, [54, 59]),
+    wait(STOPS.martinPlace, [59, 62]),
+    ride('M1', 'metro', STOPS.martinPlace, PLACES.chatswoodStation, [62, 73]),
+  ];
+
+  it('sets a change against the transfer buffer once, on the walk that starts it', () => {
+    const notes = describeStepNotes(walkingChange, 3);
+
+    expect(notes[1]).toContainEqual({
+      text: 'Change at Wynyard Station: 8 min including the walk; your transfer buffer is 3 min.',
+      spoken:
+        'Change at Wynyard Station: 8 minutes including the walk; your transfer buffer is 3 minutes.',
+    });
+    expect([notes[0], notes[2], notes[3]]).toEqual([[], [], []]);
+  });
+
+  it('sets a change at one stop against the transfer buffer on the wait', () => {
+    const legs = [
+      ride('B1', 'bus', STOPS.collaroy, STOPS.warringahMall, [0, 14]),
+      wait(STOPS.warringahMall, [14, 18]),
+      ride('280', 'bus', STOPS.warringahMall, PLACES.chatswoodStation, [18, 71]),
+    ];
+
+    expect(describeStepNotes(legs, 3)).toEqual([
+      [],
+      [
+        {
+          text: 'Change at Warringah Mall, Pittwater Rd: 4 min between services; your transfer buffer is 3 min.',
+          spoken:
+            'Change at Warringah Mall, Pittwater Rd: 4 minutes between services; your transfer buffer is 3 minutes.',
+        },
+      ],
+      [],
+    ]);
+  });
+
+  it('puts a change with no walk or wait on the service being left', () => {
+    const legs = [
+      ride('T1', 'train', STOPS.wynyard, STOPS.central, [0, 6]),
+      ride('T8', 'train', STOPS.central, PLACES.chatswoodStation, [6, 40]),
+    ];
+
+    expect(describeStepNotes(legs, 0)).toEqual([
+      [
+        {
+          text: 'Change at Central Station: under 1 min between services; your transfer buffer is 0 min.',
+          spoken:
+            'Change at Central Station: less than a minute between services; your transfer buffer is 0 minutes.',
+        },
+      ],
+      [],
+    ]);
+  });
+
+  it('leaves the buffer out when the trip no longer says what it was planned with', () => {
+    expect(describeStepNotes(walkingChange, null)[1]).toContainEqual({
+      text: 'Change at Wynyard Station: 8 min including the walk.',
+      spoken: 'Change at Wynyard Station: 8 minutes including the walk.',
+    });
+  });
+
+  it('adds nothing to a trip with one service', () => {
+    const office = place('60 Example Street, Sydney', -33.8677, 151.2088);
+    const legs = [
+      ride('B1', 'bus', STOPS.collaroy, STOPS.wynyard, [0, 54]),
+      walk(STOPS.wynyard, office, [54, 60]),
+    ];
+
+    expect(describeStepNotes(legs, 3)).toEqual([[], []]);
   });
 });
 

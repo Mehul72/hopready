@@ -1,10 +1,13 @@
 import {
   addMinutes,
+  DEFAULT_PREFERENCES,
   type DriveLeg,
   type Itinerary,
   legSeconds,
+  type PlanRequest,
   type PlanResponse,
 } from '@hopready/core';
+import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
 import { ActionSheetIOS, Linking } from 'react-native';
@@ -30,8 +33,8 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-async function planDemoCommute(): Promise<PlanResponse> {
-  const outcome = await planSession.plan(demoCommuteRequest());
+async function planDemoCommute(overrides: Partial<PlanRequest> = {}): Promise<PlanResponse> {
+  const outcome = await planSession.plan(demoCommuteRequest(overrides));
   if (outcome.status !== 'ready')
     throw new Error(`The demo plan did not finish: ${outcome.status}`);
   return outcome.response;
@@ -69,6 +72,31 @@ describe('itinerary screen', () => {
     expect(screen.getByTestId('leg-transit')).toBeOnTheScreen();
     expect(screen.getByTestId('arrival')).toBeOnTheScreen();
     expect(screen.getByText(DEMO_ATTRIBUTION)).toBeOnTheScreen();
+  });
+
+  it('sets a change against the transfer buffer the trip was planned with', async () => {
+    // Settings now say 4 min, but the trip on screen was planned with 5.
+    appStorage.preferences.change({ transferBufferMinutes: 4 });
+    const response = await planDemoCommute({
+      origin: DEMO_PLACES.collaroyHome,
+      destination: DEMO_PLACES.waterlooOffice,
+      access: { transit: true, drive: false, dropOff: false },
+      preferences: { ...DEFAULT_PREFERENCES, transferBufferMinutes: 5, excludedTransitModes: [] },
+    });
+    const itinerary = response.itineraries.find((option) => option.transfers > 0);
+    if (!itinerary) throw new Error('The demo plan offered no option with a change');
+    await renderApp(`/itinerary/${itinerary.id}`);
+
+    expect(
+      screen.getByText(
+        /^Change at Wynyard Station: \d+ min including the walk; your transfer buffer is 5 min\.$/,
+      ),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        /Change at Wynyard Station: \d+ minutes including the walk; your transfer buffer is 5 minutes\./,
+      ),
+    ).toBeOnTheScreen();
   });
 
   it('credits Transport for NSW and Apple on live trips', async () => {

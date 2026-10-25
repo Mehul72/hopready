@@ -12,11 +12,11 @@ import {
 import { render, screen, userEvent, within } from '@testing-library/react-native';
 import { Linking } from 'react-native';
 
-import { PLACES, TALLAWONG_PARKING } from '@/test-support/trips';
+import { place, PLACES, TALLAWONG_PARKING } from '@/test-support/trips';
 
 import { LegRow } from './leg-row';
 import { SPACES_CAN_FILL_NOTE } from '../shared/occupancy-wording';
-import { PLATFORM_NOT_PROVIDED } from './trip-text';
+import { describeStepNotes, PLATFORM_NOT_PROVIDED } from './trip-text';
 
 beforeEach(() => {
   jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
@@ -117,9 +117,32 @@ function bufferLeg(kind: 'drop-off' | 'wait' | 'car-retrieval', minutes: number)
   };
 }
 
+function service(name: string, mode: TransitLeg['mode'], overrides: Partial<TransitLeg>) {
+  return transitLeg({
+    id: name,
+    mode,
+    service: { name, description: null, headsign: null, operator: null },
+    ...overrides,
+  });
+}
+
 async function renderLeg(leg: Leg, onStartDriving = jest.fn()) {
   await render(<LegRow leg={leg} nowMs={NOW.getTime()} onStartDriving={onStartDriving} />);
   return onStartDriving;
+}
+
+// One step of a trip, with what it says about the steps around it.
+async function renderStepOf(legs: Leg[], index: number, transferBufferMinutes = 3) {
+  const leg = legs[index];
+  if (!leg) throw new Error(`The trip has no step ${index}`);
+  await render(
+    <LegRow
+      leg={leg}
+      notes={describeStepNotes(legs, transferBufferMinutes)[index]}
+      nowMs={NOW.getTime()}
+      onStartDriving={jest.fn()}
+    />,
+  );
 }
 
 const leaveTime = formatSydneyTime(START);
@@ -335,5 +358,75 @@ describe('LegRow', () => {
     expect(
       screen.getByText('5 min to reach your car and drive off (your car retrieval buffer).'),
     ).toBeOnTheScreen();
+  });
+
+  describe('at a change between services', () => {
+    const wynyard = place('Wynyard Station', -33.865945, 151.206103, 'stop');
+    const carringtonStreet = place('Wynyard Station, Carrington St', -33.8653, 151.2056, 'stop');
+    const warringahMall = place('Warringah Mall, Pittwater Rd', -33.767526, 151.268564, 'stop');
+    const central = place('Central Station', -33.884024, 151.206203, 'stop');
+
+    it('sets the change against the transfer buffer on the walk, on screen and for VoiceOver', async () => {
+      await renderStepOf(
+        [
+          service('B1', 'bus', { to: wynyard, start: addMinutes(START, -54), end: START }),
+          { ...walkLeg(300), from: wynyard, to: carringtonStreet, end: addMinutes(START, 5) },
+          service('324', 'bus', { from: carringtonStreet, start: addMinutes(START, 8) }),
+        ],
+        1,
+      );
+
+      expect(screen.getByText('Walk 5 min to Wynyard Station, Carrington St')).toBeOnTheScreen();
+      expect(
+        screen.getByText(
+          'Change at Wynyard Station: 8 min including the walk; your transfer buffer is 3 min.',
+        ),
+      ).toBeOnTheScreen();
+      expect(
+        screen.getByLabelText(
+          `${leaveTime}. Walk 5 minutes to Wynyard Station, Carrington St, 300 metres. Change at Wynyard Station: 8 minutes including the walk; your transfer buffer is 3 minutes.`,
+        ),
+      ).toBeOnTheScreen();
+    });
+
+    it('sets a change at one stop against the transfer buffer on the wait', async () => {
+      await renderStepOf(
+        [
+          service('B1', 'bus', { to: warringahMall, start: addMinutes(START, -14), end: START }),
+          { ...bufferLeg('wait', 4), from: warringahMall, to: warringahMall },
+          service('280', 'bus', { from: warringahMall, start: addMinutes(START, 4) }),
+        ],
+        1,
+      );
+
+      expect(screen.getByText('Wait 4 min at Warringah Mall, Pittwater Rd')).toBeOnTheScreen();
+      expect(
+        screen.getByLabelText(
+          `${leaveTime}. Wait 4 minutes at Warringah Mall, Pittwater Rd. Change at Warringah Mall, Pittwater Rd: 4 minutes between services; your transfer buffer is 3 minutes.`,
+        ),
+      ).toBeOnTheScreen();
+    });
+
+    it('ends the service being left with the change when the next one leaves straight away', async () => {
+      await renderStepOf(
+        [
+          service('T1', 'train', { to: central, end: addMinutes(START, 6) }),
+          service('T8', 'train', { from: central, start: addMinutes(START, 6) }),
+        ],
+        0,
+        0,
+      );
+
+      expect(
+        screen.getByText(
+          'Change at Central Station: under 1 min between services; your transfer buffer is 0 min.',
+        ),
+      ).toBeOnTheScreen();
+      expect(
+        screen.getByLabelText(
+          /Timetable time, not live\. Change at Central Station: less than a minute between services; your transfer buffer is 0 minutes\.$/,
+        ),
+      ).toBeOnTheScreen();
+    });
   });
 });

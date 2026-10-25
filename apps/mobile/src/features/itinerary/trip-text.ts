@@ -1,6 +1,7 @@
 import {
   formatDurationMinutes,
   type Itinerary,
+  type Leg,
   type ParkingRules,
   secondsBetween,
   type ServiceAlert,
@@ -131,6 +132,60 @@ function liveDelay(leg: TransitLeg): Wording {
   }
   const early = -minutes;
   return { text: `${early} min early`, spoken: `${plural(early, 'minute')} early` };
+}
+
+// Sentences a step adds about the steps around it, shown after its own details and read after them.
+export type StepNotes = readonly Wording[];
+
+// One entry per leg. `transferBufferMinutes` is the buffer the trip was planned with, or null when
+// that is not known, and the change notes then leave it out.
+export function describeStepNotes(
+  legs: readonly Leg[],
+  transferBufferMinutes: number | null,
+): StepNotes[] {
+  const changes = changeNotes(legs, transferBufferMinutes);
+  return legs.map((_, index) => {
+    const change = changes.get(index);
+    return change ? [change] : [];
+  });
+}
+
+// Every two services in a row are a change, as in the planner's transfer check. The note goes on
+// the walk or wait that starts the change, or on the service being left when nothing comes between.
+function changeNotes(
+  legs: readonly Leg[],
+  transferBufferMinutes: number | null,
+): Map<number, Wording> {
+  const services = legs.flatMap((leg, index) => (leg.kind === 'transit' ? [{ leg, index }] : []));
+  const notes = new Map<number, Wording>();
+  services.forEach((departing, position) => {
+    const arriving = services[position - 1];
+    if (!arriving) return;
+    const between = legs.slice(arriving.index + 1, departing.index);
+    const walks = between.some((leg) => leg.kind === 'walk');
+    const noteIndex = between.length > 0 ? arriving.index + 1 : arriving.index;
+    notes.set(noteIndex, describeChange(arriving.leg, departing.leg, walks, transferBufferMinutes));
+  });
+  return notes;
+}
+
+// The planner holds every change to at least the transfer buffer, walk included, so the note
+// shows how much room this one leaves.
+function describeChange(
+  arriving: TransitLeg,
+  departing: TransitLeg,
+  walks: boolean,
+  transferBufferMinutes: number | null,
+): Wording {
+  const time = duration(secondsBetween(arriving.end, departing.start));
+  const span = walks ? 'including the walk' : 'between services';
+  const text = `Change at ${arriving.to.name}: ${time.text} ${span}`;
+  const spoken = `Change at ${arriving.to.name}: ${time.spoken} ${span}`;
+  if (transferBufferMinutes === null) return { text: `${text}.`, spoken: `${spoken}.` };
+  return {
+    text: `${text}; your transfer buffer is ${transferBufferMinutes} min.`,
+    spoken: `${spoken}; your transfer buffer is ${plural(transferBufferMinutes, 'minute')}.`,
+  };
 }
 
 export const ALERT_TONES: Readonly<Record<ServiceAlert['severity'], BannerTone>> = {

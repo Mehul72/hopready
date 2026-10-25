@@ -12,6 +12,7 @@ import { ActiveTripStatus } from './active-trip-status';
 import { DataAttribution } from './data-attribution';
 import { AlertBanner, ArrivalRow, LegRow } from './leg-row';
 import { TripSummaryCard } from './trip-summary-card';
+import { describeStepNotes } from './trip-text';
 import { useCurrentMinute } from './use-current-minute';
 import { type DisplayedTrip, useDisplayedTrip } from './use-displayed-trip';
 import { useStartDriving } from './use-start-driving';
@@ -183,6 +184,12 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
       .map((alert) => alert.id),
   );
   const tripAlerts = itinerary.alerts.filter((alert) => !legAlertIds.has(alert.id));
+  // Changes are set against the buffer this trip was planned with, as its parking and drop-off
+  // steps are, not whatever Settings say now.
+  const stepNotes = describeStepNotes(
+    itinerary.legs,
+    trip.request?.preferences.transferBufferMinutes ?? null,
+  );
   const mapHeight = Math.round(
     Math.min(MAP_MAX_HEIGHT, Math.max(MAP_MIN_HEIGHT, height * MAP_SHARE_OF_WINDOW)),
   );
@@ -208,6 +215,7 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
         <LegRow
           key={`${index}:${leg.id}`}
           leg={leg}
+          notes={stepNotes[index]}
           nowMs={nowMs}
           onStartDriving={(destination) => {
             void startDriving(destination);

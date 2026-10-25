@@ -27,6 +27,7 @@ import {
   duration,
   serviceTitle,
   statedPlatform,
+  type StepNotes,
   stopCount,
   type Wording,
 } from './trip-text';
@@ -37,20 +38,23 @@ export interface LegRowProps {
   // The current minute, for the age of car park counts.
   nowMs: number;
   onStartDriving: (destination: DriveDestination) => void;
+  // From describeStepNotes. Only walks, waits and services ever get any, so only their rows
+  // show them.
+  notes?: StepNotes;
 }
 
 // One step of the trip. Each card is one VoiceOver element that reads the step as a sentence;
 // buttons and links inside it stay separate so they can still be reached and activated.
-export function LegRow({ leg, nowMs, onStartDriving }: LegRowProps) {
+export function LegRow({ leg, nowMs, onStartDriving, notes = [] }: LegRowProps) {
   switch (leg.kind) {
     case 'drive':
       return <DriveRow leg={leg} onStartDriving={onStartDriving} />;
     case 'ride':
       return <RideRow leg={leg} />;
     case 'walk':
-      return <WalkRow leg={leg} />;
+      return <WalkRow leg={leg} notes={notes} />;
     case 'transit':
-      return <TransitRow leg={leg} />;
+      return <TransitRow leg={leg} notes={notes} />;
     case 'park':
       return <ParkRow leg={leg} nowMs={nowMs} />;
     case 'drop-off':
@@ -63,7 +67,7 @@ export function LegRow({ leg, nowMs, onStartDriving }: LegRowProps) {
         />
       );
     case 'wait':
-      return <WaitRow leg={leg} />;
+      return <WaitRow leg={leg} notes={notes} />;
     case 'car-retrieval':
       return (
         <BufferRow
@@ -82,15 +86,17 @@ interface LegCardProps {
   // The whole step as one sentence, without the start time (added here).
   spoken: string;
   details?: ReactNode;
+  notes?: StepNotes;
   // Buttons, links and alerts, outside the spoken summary.
   actions?: ReactNode;
 }
 
-function LegCard({ leg, title, spoken, details, actions }: LegCardProps) {
+function LegCard({ leg, title, spoken, details, notes = [], actions }: LegCardProps) {
   const start = formatSydneyTime(leg.start);
+  const label = [`${start}.`, spoken, ...notes.map((note) => note.spoken)].join(' ');
   return (
     <Card testID={`leg-${leg.kind}`}>
-      <View accessible accessibilityLabel={`${start}. ${spoken}`} style={styles.summary}>
+      <View accessible accessibilityLabel={label} style={styles.summary}>
         <View style={styles.header}>
           <ModeIcon mode={legVisualKind(leg)} size={20} showLabel />
           <AppText variant="subheadline" tone="secondary" weight="semibold" tabularNumbers>
@@ -99,6 +105,9 @@ function LegCard({ leg, title, spoken, details, actions }: LegCardProps) {
         </View>
         <AppText variant="headline">{title}</AppText>
         {details}
+        {notes.map((note) => (
+          <Detail key={note.text}>{note.text}</Detail>
+        ))}
       </View>
       {actions ? <View style={styles.actions}>{actions}</View> : null}
     </Card>
@@ -173,7 +182,7 @@ function RideRow({ leg }: { leg: RideLeg }) {
   );
 }
 
-function WalkRow({ leg }: { leg: WalkLeg }) {
+function WalkRow({ leg, notes }: { leg: WalkLeg; notes: StepNotes }) {
   const seconds = legSeconds(leg);
   // Transport for NSW marks a change of platform or stop without always giving a walking time.
   // "Walk 0 min" would read as no walk at all, so the change itself is the step.
@@ -184,6 +193,7 @@ function WalkRow({ leg }: { leg: WalkLeg }) {
         title={`Change to ${leg.to.name}`}
         spoken={`Change to ${leg.to.name}. Walking time not given.`}
         details={<Detail>Walking time not given</Detail>}
+        notes={notes}
       />
     );
   }
@@ -195,17 +205,19 @@ function WalkRow({ leg }: { leg: WalkLeg }) {
       title={`Walk ${time.text} to ${leg.to.name}`}
       spoken={`Walk ${time.spoken} to ${leg.to.name}${length ? `, ${length.spoken}` : ''}.`}
       details={length ? <Detail>{length.text}</Detail> : null}
+      notes={notes}
     />
   );
 }
 
-function WaitRow({ leg }: { leg: Leg }) {
+function WaitRow({ leg, notes }: { leg: Leg; notes: StepNotes }) {
   const time = duration(legSeconds(leg));
   return (
     <LegCard
       leg={leg}
       title={`Wait ${time.text} at ${leg.from.name}`}
       spoken={`Wait ${time.spoken} at ${leg.from.name}.`}
+      notes={notes}
     />
   );
 }
@@ -288,7 +300,7 @@ function ParkingRulesSourceLink({ source }: { source: { url: string; label: stri
   );
 }
 
-function TransitRow({ leg }: { leg: TransitLeg }) {
+function TransitRow({ leg, notes }: { leg: TransitLeg; notes: StepNotes }) {
   const modeName = LEG_VISUALS[leg.mode].label;
   const title = serviceTitle(leg);
   const platform = describePlatform(leg.departurePlatform);
@@ -332,6 +344,7 @@ function TransitRow({ leg }: { leg: TransitLeg }) {
           </View>
         </>
       }
+      notes={notes}
       actions={
         leg.cancelled || leg.alerts.length > 0 ? (
           <>
