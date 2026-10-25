@@ -195,6 +195,20 @@ describe('LegRow', () => {
     expect(screen.queryByText(/late|early|On time/)).not.toBeOnTheScreen();
   });
 
+  it('names the platform to get off at when one is stated, on screen and for VoiceOver', async () => {
+    await renderLeg(transitLeg({ arrivalPlatform: '3' }));
+    const arrive = formatSydneyTime(addMinutes(START, 40));
+
+    expect(
+      screen.getByText(`To Chatswood Station, Platform 3, arrive ${arrive} · 13 stops`),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        `${leaveTime}. Metro M1 towards Sydenham. From Tallawong Station, ${PLATFORM_NOT_PROVIDED}. To Chatswood Station, Platform 3, arriving ${arrive}. 13 stops. Timetable time, not live.`,
+      ),
+    ).toBeOnTheScreen();
+  });
+
   it('shows the platform, live delay and alerts of a live service', async () => {
     await renderLeg(
       transitLeg({

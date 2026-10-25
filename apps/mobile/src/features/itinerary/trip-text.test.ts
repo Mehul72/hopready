@@ -11,6 +11,7 @@ import {
   formatSydneyDay,
   PLATFORM_NOT_PROVIDED,
   serviceTitle,
+  statedPlatform,
   stopCount,
   UNKNOWN_RULES_TEXT,
 } from './trip-text';
@@ -71,6 +72,13 @@ describe('public transport wording', () => {
     expect(describePlatform('Stand A')).toBe('Stand A');
     expect(describePlatform(null)).toBe(PLATFORM_NOT_PROVIDED);
     expect(describePlatform('  ')).toBe('Platform not provided');
+  });
+
+  it('gives a stated platform, and nothing when none is stated', () => {
+    expect(statedPlatform('3')).toBe('Platform 3');
+    expect(statedPlatform('Stand C')).toBe('Stand C');
+    expect(statedPlatform(null)).toBeNull();
+    expect(statedPlatform('  ')).toBeNull();
   });
 
   it('names the service with its headsign when there is one', () => {

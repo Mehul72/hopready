@@ -26,6 +26,7 @@ import {
   distance,
   duration,
   serviceTitle,
+  statedPlatform,
   stopCount,
   type Wording,
 } from './trip-text';
@@ -291,6 +292,10 @@ function TransitRow({ leg }: { leg: TransitLeg }) {
   const modeName = LEG_VISUALS[leg.mode].label;
   const title = serviceTitle(leg);
   const platform = describePlatform(leg.departurePlatform);
+  // The arrival platform helps with finding the exit or the next service, but nobody needs it to
+  // get off, so it is shown only when stated rather than called missing.
+  const arrivalPlatform = statedPlatform(leg.arrivalPlatform);
+  const arrival = arrivalPlatform ? `${leg.to.name}, ${arrivalPlatform}` : leg.to.name;
   const stops = stopCount(leg.stopCount);
   const delay = describeDelay(leg);
   const arrive = formatSydneyTime(leg.end);
@@ -299,7 +304,7 @@ function TransitRow({ leg }: { leg: TransitLeg }) {
   const spokenParts = [
     `${modeName} ${title}`,
     `From ${leg.from.name}, ${platform}`,
-    `To ${leg.to.name}, arriving ${arrive}`,
+    `To ${arrival}, arriving ${arrive}`,
     stops,
     leg.cancelled ? 'This service is cancelled' : null,
     delay ? `${timing}, ${delay.spoken}` : timing,
@@ -316,9 +321,7 @@ function TransitRow({ leg }: { leg: TransitLeg }) {
       details={
         <>
           <Detail>{`From ${leg.from.name} · ${platform}`}</Detail>
-          <Detail>
-            {[`To ${leg.to.name}, arrive ${arrive}`, stops].filter(Boolean).join(' · ')}
-          </Detail>
+          <Detail>{[`To ${arrival}, arrive ${arrive}`, stops].filter(Boolean).join(' · ')}</Detail>
           <View style={styles.badges}>
             <TimingBadge timing={leg.timing} sample={sample} />
             {delay ? (

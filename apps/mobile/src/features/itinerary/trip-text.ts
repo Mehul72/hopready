@@ -94,10 +94,15 @@ export function describeRules(rules: ParkingRules): RulesWording {
 const BARE_PLATFORM_NUMBER = /^\d{1,3}[A-Z]?$/;
 
 // TfNSW states platforms as "Platform 2" or "Stand A"; demo data and some feeds give just "2".
-export function describePlatform(platform: string | null): string {
-  if (platform === null || platform.trim() === '') return PLATFORM_NOT_PROVIDED;
-  const trimmed = platform.trim();
+export function statedPlatform(platform: string | null): string | null {
+  const trimmed = platform?.trim() ?? '';
+  if (trimmed === '') return null;
   return BARE_PLATFORM_NUMBER.test(trimmed) ? `Platform ${trimmed}` : trimmed;
+}
+
+// People need the departure platform to board, so a missing one is said rather than left out.
+export function describePlatform(platform: string | null): string {
+  return statedPlatform(platform) ?? PLATFORM_NOT_PROVIDED;
 }
 
 export function serviceTitle(leg: TransitLeg): string {
