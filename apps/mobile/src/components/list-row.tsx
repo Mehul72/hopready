@@ -2,7 +2,7 @@ import { type SFSymbol, SymbolView } from 'expo-symbols';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { MIN_TOUCH_TARGET, SPACING, useTheme } from '@/theme';
+import { MIN_TOUCH_TARGET, SPACING, STACKED_LAYOUT_FONT_SCALE, useTheme } from '@/theme';
 
 import { AppText } from './app-text';
 
@@ -22,9 +22,6 @@ export interface ListRowProps {
   disabled?: boolean;
   testID?: string;
 }
-
-// From this text size on, the value moves under the title so neither gets squeezed.
-const STACKED_LAYOUT_FONT_SCALE = 1.35;
 
 export function ListRow({
   title,

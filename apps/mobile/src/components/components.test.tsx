@@ -1,5 +1,6 @@
 import { render, screen, userEvent } from '@testing-library/react-native';
 import * as Location from 'expo-location';
+import * as ReactNative from 'react-native';
 import { AccessibilityInfo } from 'react-native';
 
 import { animateToRegion, fitToCoordinates } from '@/test-support/mocks/react-native-maps';
@@ -100,6 +101,30 @@ describe('SegmentedControl', () => {
     expect(screen.getByRole('radio', { name: 'Arrive by' })).not.toBeChecked();
     await userEvent.setup().press(screen.getByRole('radio', { name: 'Arrive by' }));
     expect(onChange).toHaveBeenCalledWith('arrive');
+  });
+
+  it('stacks its segments at large text sizes, so labels keep whole words', async () => {
+    jest.spyOn(ReactNative, 'useWindowDimensions').mockReturnValue({
+      width: 393,
+      height: 852,
+      scale: 3,
+      fontScale: 2.6,
+    });
+    await render(
+      <SegmentedControl
+        accessibilityLabel="When"
+        options={[
+          { value: 'now', label: 'Leave now' },
+          { value: 'depart', label: 'Depart at' },
+          { value: 'arrive', label: 'Arrive by' },
+        ]}
+        value="now"
+        onChange={jest.fn()}
+        testID="when"
+      />,
+    );
+
+    expect(screen.getByTestId('when')).toHaveStyle({ flexDirection: 'column' });
   });
 });
 

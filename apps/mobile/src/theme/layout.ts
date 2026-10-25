@@ -26,3 +26,6 @@ export const MIN_TOUCH_TARGET = 44;
 export const MAX_CONTENT_WIDTH = 640;
 
 export const HAIRLINE = 1;
+
+// From this text size on (AX1 and up), side-by-side layouts stack so words are not split.
+export const STACKED_LAYOUT_FONT_SCALE = 1.35;

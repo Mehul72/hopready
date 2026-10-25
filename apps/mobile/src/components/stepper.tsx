@@ -1,6 +1,6 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { SPACING, useTheme } from '@/theme';
+import { SPACING, STACKED_LAYOUT_FONT_SCALE, useTheme } from '@/theme';
 
 import { AppText } from './app-text';
 import { IconButton } from './icon-button';
@@ -15,9 +15,6 @@ export interface StepperProps {
   accessibilityHint?: string;
   testID?: string;
 }
-
-// From this text size on, the label sits above the controls instead of beside them.
-const STACKED_LAYOUT_FONT_SCALE = 1.35;
 
 export function spokenMinutes(minutes: number): string {
   return minutes === 1 ? '1 minute' : `${minutes} minutes`;

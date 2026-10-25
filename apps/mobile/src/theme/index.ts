@@ -6,7 +6,14 @@ export {
   darkColours,
   lightColours,
 } from './colours';
-export { HAIRLINE, MAX_CONTENT_WIDTH, MIN_TOUCH_TARGET, RADII, SPACING } from './layout';
+export {
+  HAIRLINE,
+  MAX_CONTENT_WIDTH,
+  MIN_TOUCH_TARGET,
+  RADII,
+  SPACING,
+  STACKED_LAYOUT_FONT_SCALE,
+} from './layout';
 export {
   isTravelMode,
   LEG_VISUALS,

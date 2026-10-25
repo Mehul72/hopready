@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { MIN_TOUCH_TARGET, RADII, SPACING, useTheme } from '@/theme';
+import { MIN_TOUCH_TARGET, RADII, SPACING, STACKED_LAYOUT_FONT_SCALE, useTheme } from '@/theme';
 
 import { AppText } from './app-text';
 
@@ -29,13 +29,21 @@ export function SegmentedControl<Value extends string>({
   testID,
 }: SegmentedControlProps<Value>) {
   const { colours } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  // At large text sizes three segments side by side split words ("Depar / t at"), so the
+  // segments stack into a list instead.
+  const stacked = fontScale >= STACKED_LAYOUT_FONT_SCALE;
 
   return (
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={accessibilityLabel}
       testID={testID}
-      style={[styles.track, { backgroundColor: colours.surfaceMuted }]}>
+      style={[
+        styles.track,
+        stacked ? styles.stackedTrack : null,
+        { backgroundColor: colours.surfaceMuted },
+      ]}>
       {options.map((option, index) => {
         const selected = option.value === value;
         return (
@@ -77,6 +85,9 @@ const styles = StyleSheet.create({
     borderRadius: RADII.md,
     padding: SPACING.xxs,
     gap: SPACING.xxs,
+  },
+  stackedTrack: {
+    flexDirection: 'column',
   },
   segment: {
     flex: 1,
