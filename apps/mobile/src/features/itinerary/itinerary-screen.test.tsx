@@ -252,6 +252,20 @@ describe('the followed trip after a refresh', () => {
     expect(screen.getByLabelText(describeTripSummary(laterRun))).toBeOnTheScreen();
   });
 
+  it('shows the latest times after a check that found the same trip running late', async () => {
+    const { response, itinerary } = await followParkAndRide();
+    const runningLate: Itinerary = { ...itinerary, arriveAt: addMinutes(itinerary.arriveAt, 3) };
+    jest
+      .spyOn(tripService, 'planTrip')
+      .mockResolvedValue({ ...response, itineraries: [runningLate] });
+
+    await act(() => planSession.refreshActiveTrip());
+
+    expect(appStorage.activeTrip.get()?.itinerary.arriveAt).toBe(runningLate.arriveAt);
+    expect(screen.getByLabelText(describeTripSummary(runningLate))).toBeOnTheScreen();
+    expect(screen.queryByLabelText(describeTripSummary(itinerary))).not.toBeOnTheScreen();
+  });
+
   it('reports a failed check with a way to try again', async () => {
     await followParkAndRide();
     jest.spyOn(tripService, 'planTrip').mockRejectedValue(new ApiError('offline'));

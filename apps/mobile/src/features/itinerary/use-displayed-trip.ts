@@ -44,6 +44,11 @@ export function findDisplayedTrip(
   }
 
   const fromResults = response?.itineraries.find((itinerary) => itinerary.id === itineraryId);
+  // A check on resume stores fresher live times under the same id. The search results still hold
+  // the copy from when it was planned, so the followed trip wins whenever it is this one.
+  if (activeTrip?.itinerary.id === itineraryId) {
+    return { ...followedTrip(activeTrip, session), inResults: Boolean(fromResults) };
+  }
   if (response && fromResults) {
     return {
       itinerary: fromResults,
