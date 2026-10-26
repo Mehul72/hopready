@@ -318,6 +318,8 @@ export const CAR_PARK_OUTCOMES = [
   'used',
   // Its option worked but is left out: a car park shown with it is as good.
   'matched-by-another',
+  // Its option worked but is left out: more options worked than the list has room for.
+  'left-out-for-space',
   'too-far-to-drive',
   'not-towards-destination',
   'no-workable-connection',

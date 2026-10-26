@@ -68,5 +68,8 @@ describe('carParkOutcomeText', () => {
     expect(carParkOutcomeText('matched-by-another', 25)).toBe(
       'A car park shown above gets you there as early, with no more driving',
     );
+    expect(carParkOutcomeText('left-out-for-space', 25)).toBe(
+      'Works, but more options were found than fit on the list',
+    );
   });
 });

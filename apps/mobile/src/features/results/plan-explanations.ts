@@ -10,6 +10,8 @@ export function carParkOutcomeText(outcome: CarParkOutcome, maxDriveMinutes: num
       return 'A connection was found from here';
     case 'matched-by-another':
       return 'A car park shown above gets you there as early, with no more driving';
+    case 'left-out-for-space':
+      return 'Works, but more options were found than fit on the list';
     case 'too-far-to-drive':
       return `Further than your ${maxDriveMinutes} min driving limit`;
     case 'not-towards-destination':

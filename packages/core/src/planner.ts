@@ -1126,7 +1126,11 @@ function selectItineraries(context: PlanContext, candidates: Itinerary[]): Itine
       : shown.sort(
           (a, b) => secondsBetween(a.departAt, b.departAt) || a.durationSeconds - b.durationSeconds,
         );
-  return ordered.slice(0, context.limits.maxItineraries);
+  const listed = ordered.slice(0, context.limits.maxItineraries);
+  for (const option of ordered.slice(listed.length)) {
+    recordUnlistedCarPark(context, option, 'left-out-for-space');
+  }
+  return listed;
 }
 
 // Another car park or station that is no better on anything the results can be sorted by is padding,
@@ -1177,16 +1181,20 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
     if (dominated) hidden.add(option);
     else shown.push(option);
   }
-  for (const option of hidden) recordMatchedCarPark(context, option);
+  for (const option of hidden) recordUnlistedCarPark(context, option, 'matched-by-another');
   return options.filter((option) => !hidden.has(option));
 }
 
-// A hidden car park still worked, so the list of checked car parks says a shown one is as good,
-// instead of calling it used when the traveller cannot find its card.
-function recordMatchedCarPark(context: PlanContext, option: Itinerary) {
+// A car park whose option worked but is not listed says why, rather than reading as used when the
+// traveller cannot find its card.
+function recordUnlistedCarPark(
+  context: PlanContext,
+  option: Itinerary,
+  outcome: Extract<CarParkOutcome, 'matched-by-another' | 'left-out-for-space'>,
+) {
   const checked = option.parking && context.checkedCarParks.get(option.parking.carPark.id);
   if (!checked) return;
-  context.checkedCarParks.set(checked.id, { ...checked, outcome: 'matched-by-another' });
+  context.checkedCarParks.set(checked.id, { ...checked, outcome });
 }
 
 // At least as good on everything the results can be sorted by, read the way the app shows it, without

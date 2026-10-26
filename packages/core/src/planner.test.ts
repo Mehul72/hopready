@@ -1007,6 +1007,51 @@ describe('leaving out car parks that are no better', () => {
   });
 });
 
+describe('more options than the list has room for', () => {
+  it('says a car park whose option is cut from the list was left out for space, not used', async () => {
+    // Four public transport journeys, three car parks, three drop-off stations and the drive make
+    // eleven options. Each car park and station has a service alert of its own, so none matches
+    // another, and Bella Vista's train is slow, so its car park arrives last of all.
+    const transit = fakeTransit((query) => {
+      if (query.from.name === BOX_HILL.name) {
+        const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
+        return [0, 1, 2, 3].map((n) =>
+          metroJourney(query.from, query.to, addMinutes(first, n * METRO_HEADWAY_MINUTES)),
+        );
+      }
+      const slower = query.from.name.startsWith('Bella Vista')
+        ? { name: 'M1 slow', extraRideMinutes: 45 }
+        : null;
+      const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
+      const alert: ServiceAlert = {
+        id: `works-${query.from.name}`,
+        severity: 'info',
+        title: `Station works at ${query.from.name}`,
+      };
+      return [{ ...metroJourney(query.from, query.to, first, slower), alerts: [alert] }];
+    });
+    const response = await planTrip(
+      request({
+        access: { transit: true, drive: true, dropOff: true },
+        preferences: { ...DEFAULT_PREFERENCES, maxDriveMinutes: 120 },
+      }),
+      deps({ transit }),
+    );
+    const outcomeOf = (carPark: CarParkFacility) =>
+      response.checkedCarParks.find((checked) => checked.id === carPark.id)?.outcome;
+
+    expect(response.rejected).toEqual([]);
+    expect(response.itineraries).toHaveLength(DEFAULT_PLANNER_LIMITS.maxItineraries);
+    expect(response.itineraries.map((it) => it.parking?.carPark.id).filter(Boolean)).toEqual([
+      KELLYVILLE.id,
+      TALLAWONG.id,
+    ]);
+    expect(outcomeOf(TALLAWONG)).toBe('used');
+    expect(outcomeOf(KELLYVILLE)).toBe('used');
+    expect(outcomeOf(BELLA_VISTA)).toBe('left-out-for-space');
+  });
+});
+
 describe('transfer strategies need public transport', () => {
   it('does not offer parking when the only answer from the car park is a walk', async () => {
     const walkOnly = fakeTransit((query) => [

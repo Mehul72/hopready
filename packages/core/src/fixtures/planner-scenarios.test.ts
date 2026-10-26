@@ -754,6 +754,9 @@ describe('only real choices', () => {
       if (outcome === 'matched-by-another' && listed.has(id)) {
         return [`${name} has a card but reads as matched by another`];
       }
+      if (outcome === 'left-out-for-space' && listed.has(id)) {
+        return [`${name} has a card but reads as left out for space`];
+      }
       return [];
     });
   }
@@ -829,7 +832,7 @@ describe('only real choices', () => {
     expect(padded).toEqual([]);
   });
 
-  it('reads a car park as used only with a card, and as matched by another only without', async () => {
+  it('reads a car park as used only with a card, and as left out only without', async () => {
     const misread: string[] = [];
     for await (const { when, response } of planSampleCommutes()) {
       misread.push(...misreadCarParks(response).map((entry) => `${when}: ${entry}`));
