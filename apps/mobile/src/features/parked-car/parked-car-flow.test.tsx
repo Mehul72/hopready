@@ -642,6 +642,16 @@ describe('correcting the parked car', () => {
     });
   });
 
+  it('takes no hint from a trip followed on another day', async () => {
+    parkAtKellyvilleNorth();
+    // Friday's drive and park, still stored on Tuesday morning.
+    follow(parkAndRideItinerary({ departAt: '2026-10-22T20:40:00.000Z' }));
+    await renderApp('/parked-car/correct');
+
+    expect(screen.getByRole('radio', { name: /^Where I am now/ })).toBeOnTheScreen();
+    expect(screen.queryByRole('radio', { name: /Suggested by your trip/ })).toBeNull();
+  });
+
   it('switches to another documented car park', async () => {
     parkAtKellyvilleNorth();
     await renderApp('/parked-car/correct');

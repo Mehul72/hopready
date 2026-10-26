@@ -7,11 +7,13 @@ import { AppText, Button, EmptyState, Screen } from '@/components';
 import { appStorage, type ParkedCarState, useActiveTrip, useParkedCar } from '@/storage';
 import { SPACING } from '@/theme';
 
+import { useCurrentMinute } from '../itinerary/use-current-minute';
 import { writeOrAlert } from '../saved/storage-writes';
 import { closeParkingSheet } from './close-sheet';
 import {
   choiceCoordinate,
   choiceKey,
+  itineraryFollowedToday,
   parkedCarFrom,
   parkedCarName,
   type ParkingChoice,
@@ -50,8 +52,10 @@ export function removeParkedCar(onRemoved?: () => void): void {
 
 function CorrectParkedCar({ state }: { state: ParkedState }) {
   const original = state.parkedCar.location.coordinate;
-  // The followed trip's car park, unless that is already where the car is saved.
-  const tripCarPark = suggestedCarParkOf(useActiveTrip()?.itinerary);
+  // The car park of the trip followed today, unless that is already where the car is saved.
+  const tripCarPark = suggestedCarParkOf(
+    itineraryFollowedToday(useActiveTrip(), useCurrentMinute()),
+  );
   const suggestion = tripCarPark?.carParkId === state.parkedCar.carParkId ? null : tripCarPark;
   const [choice, setChoice] = useState<ParkingChoice | null>(null);
   // The place last chosen from the list. A pin moved by hand afterwards started there, not where
