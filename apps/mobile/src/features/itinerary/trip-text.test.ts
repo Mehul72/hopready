@@ -405,6 +405,8 @@ describe('how live the times are', () => {
 
   it('calls times live for as long as car park counts count as current', () => {
     expect(staleCheckOf(checkedAt, minutesLater(15))).toBeNull();
+    // Not a minute later: the moment the check is more than 15 minutes old.
+    expect(staleCheckOf(checkedAt, minutesLater(15) + 1)).toBe(checkedAt);
     expect(staleCheckOf(checkedAt, minutesLater(16))).toBe(checkedAt);
     expect(staleCheckOf(null, minutesLater(60))).toBeNull();
   });

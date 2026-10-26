@@ -14,9 +14,10 @@ import { ActiveTripStatus } from './active-trip-status';
 import { DataAttribution } from './data-attribution';
 import { AlertBanner, ArrivalRow, LegRow } from './leg-row';
 import { TripSummaryCard } from './trip-summary-card';
-import { describeStepNotes, staleCheckOf } from './trip-text';
+import { describeStepNotes } from './trip-text';
 import { useCurrentMinute } from './use-current-minute';
 import { type DisplayedTrip, useDisplayedTrip } from './use-displayed-trip';
+import { useStaleCheckAt } from './use-stale-check-at';
 import { useStartDriving } from './use-start-driving';
 
 const MAP_MIN_HEIGHT = 180;
@@ -189,6 +190,7 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
   const startDriving = useStartDriving();
   const { height } = useWindowDimensions();
   const tripHomeOutOfDate = useTripHomeOutOfDate(trip?.request ?? null);
+  const staleCheckAt = useStaleCheckAt(trip?.plannedAt ?? null);
 
   if (!trip) return <TripNotFound />;
 
@@ -209,7 +211,6 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
   const mapHeight = Math.round(
     Math.min(MAP_MAX_HEIGHT, Math.max(MAP_MIN_HEIGHT, height * MAP_SHARE_OF_WINDOW)),
   );
-  const staleCheckAt = staleCheckOf(trip.plannedAt, nowMs);
   // A trip home planned before the car changed says so, followed or not. Any check of it was about
   // the car as it was, so what that found gives way.
   const status = tripHomeOutOfDate ? (

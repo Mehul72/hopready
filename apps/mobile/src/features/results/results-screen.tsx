@@ -35,7 +35,7 @@ import { appStorage, usePreferences } from '@/storage';
 import { MAX_CONTENT_WIDTH, SPACING, useTheme } from '@/theme';
 import { MANUAL_REFRESH_MIN_INTERVAL_SECONDS, replanRequest, useTripHomeOutOfDate } from '@/trip';
 
-import { staleCheckOf } from '../itinerary/trip-text';
+import { useStaleCheckAt } from '../itinerary/use-stale-check-at';
 import { TripHomeOutOfDate } from '../shared/trip-home-out-of-date';
 import { CarParksChecked } from './car-parks-checked';
 import { optionsChangedSince, withCurrentOptions } from './current-options';
@@ -113,6 +113,7 @@ export function ResultsScreen() {
   const preferences = usePreferences();
   const choices = usePlanChoices();
   const tripHomeOutOfDate = useTripHomeOutOfDate(request);
+  const staleCheckAt = useStaleCheckAt(plannedAt);
 
   // VoiceOver users hear nothing when the loading rows are replaced, so the outcome is spoken.
   useEffect(() => {
@@ -155,7 +156,6 @@ export function ResultsScreen() {
   const currentRequest = withCurrentOptions(request, preferences, choices);
   const optionsChanged = response !== null && optionsChangedSince(request, currentRequest);
   // The same limit as the trip screen, so an option is not called live here but not there.
-  const staleCheckAt = staleCheckOf(plannedAt, now.getTime());
   // Refreshing could only plan back to the car as it was, so the banner asks for Take me home.
   const canRefresh = response !== null && !tripHomeOutOfDate;
 

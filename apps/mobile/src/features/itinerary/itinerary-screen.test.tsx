@@ -268,6 +268,28 @@ describe('the followed trip after a refresh', () => {
     return { response, itinerary };
   }
 
+  it('stops calling the alternatives live once the check that found them is old', async () => {
+    const { response } = await followParkAndRide();
+    const alternative = transitItinerary({
+      departAt: addMinutes(WEEKDAY_MORNING, 30),
+      realtime: true,
+    });
+    jest
+      .spyOn(tripService, 'planTrip')
+      .mockResolvedValue({ ...response, itineraries: [alternative] });
+    await act(() => planSession.refreshActiveTrip());
+    const { checkedAt } = planSession.getState().activeTripRefresh;
+    expect(
+      screen.getByRole('button', { name: describeTripSummary(alternative) }),
+    ).toBeOnTheScreen();
+
+    await act(() => jest.advanceTimersByTime(15 * 60_000 + 1_000));
+
+    expect(
+      screen.getByRole('button', { name: describeTripSummary(alternative, checkedAt) }),
+    ).toBeOnTheScreen();
+  });
+
   it('offers the alternatives when the chosen option is no longer offered', async () => {
     const { response } = await followParkAndRide();
     const alternative = firstWithStrategy(response, 'transit-only');
@@ -611,6 +633,27 @@ describe('how live the times are', () => {
     ).toBeOnTheScreen();
     expect(screen.queryByText('Live')).not.toBeOnTheScreen();
     expect(screen.getByLabelText('Times checked at 7:30 am')).toBeOnTheScreen();
+  });
+
+  it('stops calling them live the moment the check turns 15 minutes old', async () => {
+    appStorage.settings.setDemoMode(false);
+    const live = parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z', realtime: true });
+    jest
+      .spyOn(tripService, 'planTrip')
+      .mockResolvedValueOnce(planResponse([live]))
+      .mockReturnValue(new Promise<PlanResponse>(() => undefined));
+    // Checked half way through a minute, which the screen's minute clock would round away.
+    jest.setSystemTime(new Date(WEEKDAY_MORNING.getTime() + 30_000));
+    await planSession.plan(planRequest());
+    planSession.select(live.id);
+    await renderApp(`/itinerary/${live.id}`);
+    const summary = within(screen.getByTestId('trip-summary'));
+    expect(summary.getByText('Live times')).toBeOnTheScreen();
+
+    await act(() => jest.advanceTimersByTime(15 * 60_000 + 1_000));
+
+    expect(summary.queryByText('Live times')).not.toBeOnTheScreen();
+    expect(summary.getByText('Checked 7:30 am')).toBeOnTheScreen();
   });
 });
 

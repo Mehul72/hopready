@@ -24,6 +24,7 @@ import { describeTripSummary } from './trip-summary-card';
 import { optionLabel } from '../shared/option-labels';
 import { duration } from './trip-text';
 import type { DisplayedTrip } from './use-displayed-trip';
+import { useStaleCheckAt } from './use-stale-check-at';
 
 // Follows another option after the chosen one stopped being offered. The alternatives come from
 // the same refresh, so the trip keeps the search they answer and the same mode. Once the trip has
@@ -71,7 +72,9 @@ function AlternativeCard({
   // Once the trip has started, an option leaves from the stop of its next service, not from where
   // the trip began, so someone still on the way there can tell where Leave applies.
   const from = refresh.restOfTrip ? (refresh.request?.origin.name ?? null) : null;
-  const summary = describeTripSummary(alternative);
+  // The alternatives are only as fresh as the check that found them.
+  const staleCheckAt = useStaleCheckAt(refresh.checkedAt);
+  const summary = describeTripSummary(alternative, staleCheckAt);
   return (
     <Card
       onPress={() => followAlternative(alternative, refresh)}

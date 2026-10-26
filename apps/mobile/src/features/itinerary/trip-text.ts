@@ -270,12 +270,13 @@ export const ALERT_TONES: Readonly<Record<ServiceAlert['severity'], BannerTone>>
   severe: 'error',
 };
 
+export const LIVE_TIMES_FRESH_MS = OCCUPANCY_FRESH_MINUTES * 60_000;
+
 // Live times are only called live while they are fresh, by the limit the app already applies to
 // car park counts. Returns when they were checked once that is longer ago, or null while fresh.
 export function staleCheckOf(checkedAt: string | null, nowMs: number): string | null {
   if (checkedAt === null) return null;
-  const minutes = Math.floor(secondsBetween(checkedAt, new Date(nowMs)) / 60);
-  return minutes > OCCUPANCY_FRESH_MINUTES ? checkedAt : null;
+  return nowMs - Date.parse(checkedAt) > LIVE_TIMES_FRESH_MS ? checkedAt : null;
 }
 
 // `staleCheckAt`, from staleCheckOf, words live times by when they were checked instead.
