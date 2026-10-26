@@ -2,7 +2,7 @@
 
 Read this first when picking the work up. The plan with step-level detail is docs/plans/hopready-v1.md. Owner-side blockers are in docs/OWNER-ACTIONS.md.
 
-## Where things stand (2026-10-26, morning AEDT)
+## Where things stand (2026-10-26, early afternoon AEDT)
 
 - Branch `feat/hopready-v1`, local only (nothing pushed). `git log --oneline` lists every step.
 - **The app is feature complete for v1** and runs end to end on the iOS simulator in demo mode. Live mode is built and tested against fakes, schema-derived samples and a local API serving demo data. It has not met the real Transport for NSW or Apple Maps services, because there are no keys yet. HopReady is not production ready until it has.
@@ -11,7 +11,7 @@ Read this first when picking the work up. The plan with step-level detail is doc
   - API: routes, validation, rate limits, daily provider budgets, redacted logs, Workers config, TfNSW and Apple Maps adapters. `pnpm --filter @hopready/api test`.
   - App: Plan, place search, trip options, results, trip timeline with Start driving, parked car and Take me home, Saved, Settings, the first-launch live data agreement (ADR-0006), demo mode. `pnpm --filter @hopready/mobile test`.
   - Two independent reviews (API and planner; the app), with each finding checked by a second reviewer. Every confirmed finding is fixed with a test that fails without the fix.
-  - A third review traced the brief requirement by requirement and found 24 gaps. The documentation gaps are fixed; the code gaps are being fixed and reviewed one by one (docs/plans/hopready-v1.md, log).
+  - A third review traced the brief requirement by requirement and found 24 gaps; all were real and all are fixed. A fourth review of those fixes found 21 more issues; all but one low one are fixed (docs/plans/hopready-v1.md, log).
 - **Blocked on the owner** (docs/OWNER-ACTIONS.md, "Fastest path to TestFlight"): provider keys, the Cloudflare and Expo accounts, the App Store Connect record, one interactive signing setup, the support email, and decisions 22 to 24.
 - **Next, once the owner has acted:**
   1. Record real TfNSW responses (`apps/api/scripts/record-tfnsw-samples.ts`) and run the live provider checks (docs/testing.md). In the recorded trips, look for station entrance and exit details in `footPathInfo[].footPathElem` and walking legs' `pathDescriptions`, which HopReady drops today; if they name entrances or exits reliably, parse them in `apps/api/src/providers/tfnsw/transit.ts` and show them on the walk step.
@@ -47,9 +47,9 @@ Live provider keys are read from the macOS Keychain (service `hopready`). See do
 
 | Claim                                         | Status                                            | How                                                                               |
 | --------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Core rules, planner and demo scenarios        | Verified                                          | `pnpm --filter @hopready/core test`: 191 tests                                    |
+| Core rules, planner and demo scenarios        | Verified                                          | `pnpm --filter @hopready/core test`: 223 tests                                    |
 | API routes, adapters and limits               | Verified against fakes and schema-derived samples | `pnpm --filter @hopready/api test`: 315 passed, 8 live tests skipped without keys |
-| App screens and flows                         | Verified in Jest                                  | `pnpm --filter @hopready/mobile test`: 552 tests in 42 suites                     |
+| App screens and flows                         | Verified in Jest                                  | `pnpm --filter @hopready/mobile test`: 697 tests in 46 suites                     |
 | Typecheck, lint and format                    | Verified                                          | `pnpm check`                                                                      |
 | iOS Release simulator build                   | Verified                                          | `xcodebuild build-for-testing` (docs/testing.md)                                  |
 | UI journeys on the simulator                  | Verified (demo mode)                              | XCUITest, 5 journeys; see the testing log                                         |
@@ -76,6 +76,8 @@ Fixture and simulator results only. No test has reached the real TfNSW or Apple 
 | 2026-10-26 09:20          | All UI tests on the demo build after the gap fixes were merged                                                                | 5 passed, 1 skipped, no animation waits                                                                                                                                                                                                                                                                                     |
 | 2026-10-26 09:30 to 10:45 | `HopReadyLiveApiTests`, four runs while four review agents were running test suites on the same Mac                           | 3 failed and 1 passed slowly: XCTest timed out delivering a tap or swipe, or setting up its session, for 1 to 11 minutes. Spindumps taken at the failures show the app idle (main and JavaScript threads waiting), and the taps that did land had taken effect. Cause not proven; a simulator reboot alone did not clear it |
 | 2026-10-26 12:34          | `HopReadyLiveApiTests` on the current code, after the review agents finished                                                  | Passed (89 s), no step over 4 s                                                                                                                                                                                                                                                                                             |
+| 2026-10-26 13:05          | `pnpm check` on the final branch                                                                                              | Passed: core 223; API 315 passed, 8 live tests skipped; app 697 in 46 suites; lint and format clean                                                                                                                                                                                                                         |
+| 2026-10-26 13:19          | All UI tests on the final demo build, then `HopReadyLiveApiTests` on a build pointed at the local demo API                    | Demo build: 5 passed, 1 skipped by design, no animation waits. API build: passed (30 s)                                                                                                                                                                                                                                     |
 
 ## Known limitations
 
