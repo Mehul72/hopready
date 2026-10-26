@@ -9,7 +9,14 @@ import {
 } from '@hopready/core';
 
 import type { ActiveTrip } from '@/storage';
-import { parkAndRideItinerary, PLACES, planRequest, transitItinerary } from '@/test-support/trips';
+import {
+  metroThenBusItinerary,
+  parkAndRideItinerary,
+  place,
+  PLACES,
+  planRequest,
+  transitItinerary,
+} from '@/test-support/trips';
 
 import { joinAlternative, matchItinerary, matchRestOfTrip } from './itinerary-match';
 import {
@@ -286,7 +293,59 @@ describe('matchItinerary', () => {
   it('reports nothing when the chosen option is no longer offered', () => {
     expect(matchItinerary(chosen, [transitItinerary({ departAt: NOW.toISOString() })])).toBeNull();
   });
+
+  it('keeps following the same runs when a delay adds a wait between them', () => {
+    const tight = withBusLeaving(metroThenBusItinerary({ departAt: NOW.toISOString() }), 0.5);
+    const busLate = withBusLeaving(tight, 0.5, 2);
+    // The wait before the late bus changes the fingerprint, but it is the same trip.
+    expect(busLate.id).not.toBe(tight.id);
+    expect(matchItinerary(tight, [busLate])).toEqual({
+      itinerary: { ...busLate, id: tight.id },
+      exact: true,
+    });
+  });
+
+  it('keeps to the drop-off station when the chosen run is gone', () => {
+    const chosenDropOff = dropOffItinerary('2026-10-26T21:00:00.000Z');
+    const sameStationLater = dropOffItinerary('2026-10-26T21:04:00.000Z');
+    const otherStationSooner = atStation(dropOffItinerary('2026-10-26T21:02:00.000Z'), KELLYVILLE);
+    expect(matchItinerary(chosenDropOff, [otherStationSooner, sameStationLater])).toEqual({
+      itinerary: sameStationLater,
+      exact: false,
+    });
+  });
 });
+
+const KELLYVILLE = place('Kellyville Station', -33.7136, 150.9353, 'stop', { stopId: '2155495' });
+
+// The same trip with the drop-off moved to another station on the line.
+function atStation(itinerary: Itinerary, station: typeof KELLYVILLE): Itinerary {
+  return buildItinerary({
+    strategy: itinerary.strategy,
+    legs: itinerary.legs.map((leg) => {
+      if (leg.kind === 'ride') return { ...leg, to: station };
+      if (leg.kind === 'drop-off') return { ...leg, from: station, to: station };
+      return leg;
+    }),
+  });
+}
+
+// The metro then the bus, with the bus leaving `gapMinutes` after the metro arrives as timetabled,
+// and running `lateMinutes` behind that.
+function withBusLeaving(itinerary: Itinerary, gapMinutes: number, lateMinutes = 0): Itinerary {
+  const metro = itinerary.legs.find((leg): leg is TransitLeg => leg.kind === 'transit');
+  if (!metro) throw new Error('The trip has no metro');
+  const legs = itinerary.legs.filter((leg) => leg.kind !== 'wait');
+  return buildItinerary({
+    strategy: itinerary.strategy,
+    legs: legs.map((leg) => {
+      if (leg.kind !== 'transit' || leg === metro) return leg;
+      const scheduledStart = addMinutes(metro.end, gapMinutes);
+      const start = addMinutes(scheduledStart, lateMinutes);
+      return { ...leg, scheduledStart, start, end: addMinutes(start, 10) };
+    }),
+  });
+}
 
 // Drive and park done, the metro still to come.
 const started = parkAndRideItinerary({ departAt: '2026-10-26T20:50:00.000Z' });

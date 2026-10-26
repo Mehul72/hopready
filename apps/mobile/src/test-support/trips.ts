@@ -285,3 +285,27 @@ export function metroThenBusItinerary({ departAt }: Pick<ItineraryOptions, 'depa
     ],
   });
 }
+
+// The same option on a later run: every leg `minutes` later, its timetabled times included.
+export function laterRunOf(itinerary: Itinerary, minutes: number): Itinerary {
+  const shift = (at: string) => addMinutes(at, minutes);
+  return buildItinerary({
+    strategy: itinerary.strategy,
+    legs: itinerary.legs
+      .filter((leg) => leg.kind !== 'wait')
+      .map((leg) =>
+        leg.kind === 'transit'
+          ? {
+              ...leg,
+              start: shift(leg.start),
+              end: shift(leg.end),
+              scheduledStart: shift(leg.scheduledStart),
+            }
+          : { ...leg, start: shift(leg.start), end: shift(leg.end) },
+      ),
+    parking: itinerary.parking,
+    fare: itinerary.fare,
+    alerts: itinerary.alerts,
+    notes: itinerary.notes,
+  });
+}

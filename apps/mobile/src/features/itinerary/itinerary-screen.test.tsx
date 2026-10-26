@@ -19,6 +19,7 @@ import { ApiError } from '@/api';
 import { planSession } from '@/state';
 import { appStorage } from '@/storage';
 import {
+  laterRunOf,
   metroThenBusItinerary,
   parkAndRideItinerary,
   place,
@@ -318,17 +319,12 @@ describe('the followed trip after a refresh', () => {
 
   it('follows a later run of the same option and says what changed', async () => {
     const { response, itinerary } = await followParkAndRide();
-    const laterRun: Itinerary = {
-      ...itinerary,
-      id: 'later-run',
-      departAt: addMinutes(itinerary.departAt, 4),
-      arriveAt: addMinutes(itinerary.arriveAt, 4),
-    };
+    const laterRun = laterRunOf(itinerary, 4);
     jest.spyOn(tripService, 'planTrip').mockResolvedValue({ ...response, itineraries: [laterRun] });
 
     await act(() => planSession.refreshActiveTrip());
 
-    expect(appStorage.activeTrip.get()?.itinerary.id).toBe('later-run');
+    expect(appStorage.activeTrip.get()?.itinerary.id).toBe(laterRun.id);
     expect(screen.getByLabelText(/^Warning\. Your trip changed\./)).toBeOnTheScreen();
     expect(screen.getByLabelText(describeTripSummary(laterRun))).toBeOnTheScreen();
   });

@@ -5,7 +5,7 @@ import { act, screen } from 'expo-router/testing-library';
 import { FOLLOWED_TRIP_SHOWN_AFTER_ARRIVAL_MINUTES } from '@/features/itinerary';
 import { planSession } from '@/state';
 import { appStorage } from '@/storage';
-import { parkAndRideItinerary, planRequest, planResponse } from '@/test-support/trips';
+import { laterRunOf, parkAndRideItinerary, planRequest, planResponse } from '@/test-support/trips';
 import { tripService } from '@/trip';
 
 import { freezeClockAt, renderApp, TUESDAY_0730 } from './test-harness';
@@ -50,7 +50,7 @@ describe('the followed trip on the Plan tab', () => {
 
   it('says when the check on resume found the trip changed', async () => {
     const itinerary = followTrip();
-    const laterRun = { ...itinerary, id: 'later-run', departAt: addMinutes(itinerary.departAt, 4) };
+    const laterRun = laterRunOf(itinerary, 4);
     jest
       .spyOn(tripService, 'planTrip')
       .mockResolvedValue(planResponse([laterRun], { mode: 'demo' }));

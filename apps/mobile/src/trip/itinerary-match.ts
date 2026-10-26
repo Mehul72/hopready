@@ -8,12 +8,14 @@ export interface ItineraryMatch {
 }
 
 // The option a person chose, described the way docs/design/routing.md matches it after a
-// refresh: same strategy, same car park, same first service.
+// refresh: same strategy, same car park or drop-off station, same first service.
 function optionSignature(itinerary: Itinerary): string {
   const firstTransit = itinerary.legs.find((leg) => leg.kind === 'transit');
+  const dropOff = itinerary.legs.find((leg) => leg.kind === 'drop-off');
   return [
     itinerary.strategy,
     itinerary.parking?.carPark.id ?? '',
+    dropOff ? (dropOff.to.stopId ?? dropOff.to.name) : '',
     firstTransit ? `${firstTransit.mode}:${firstTransit.service.name}` : '',
   ].join('|');
 }
@@ -22,17 +24,21 @@ export function matchItinerary(
   previous: Itinerary,
   candidates: readonly Itinerary[],
 ): ItineraryMatch | null {
-  const same = candidates.find((candidate) => candidate.id === previous.id);
-  if (same) return { itinerary: same, exact: true };
-
   const signature = optionSignature(previous);
-  const closest = candidates
-    .filter((candidate) => optionSignature(candidate) === signature)
-    .sort(
-      (a, b) =>
-        Math.abs(secondsBetween(previous.departAt, a.departAt)) -
-        Math.abs(secondsBetween(previous.departAt, b.departAt)),
-    )[0];
+  const sameOption = candidates.filter((candidate) => optionSignature(candidate) === signature);
+  // The same services on the same runs are the same trip, even when a delay adds or drops a wait
+  // between them and so changes its id, which is a fingerprint of every leg.
+  const runs = runsOf(previous.legs);
+  const same =
+    candidates.find((candidate) => candidate.id === previous.id) ??
+    sameOption.find((candidate) => runsOf(candidate.legs) === runs);
+  if (same) return { itinerary: { ...same, id: previous.id }, exact: true };
+
+  const closest = sameOption.sort(
+    (a, b) =>
+      Math.abs(secondsBetween(previous.departAt, a.departAt)) -
+      Math.abs(secondsBetween(previous.departAt, b.departAt)),
+  )[0];
   return closest ? { itinerary: closest, exact: false } : null;
 }
 
