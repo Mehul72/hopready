@@ -889,6 +889,24 @@ describe('only real choices', () => {
 
     expect(carParksListed(response)).toEqual(['Tallawong P2', 'Kellyville (south)']);
   });
+
+  it('keeps a car park at the station asked for beside a quicker one asked for by name', async () => {
+    // From Rouse Hill, Kellyville (north) beats Tallawong P2 on every count, and its count will still
+    // be fresh when the traveller parks. Only a car park at Tallawong could hide Tallawong P2.
+    const tallawong = PARK_AND_RIDE_CATALOGUE.find((entry) => entry.facilityId === '27')!.station;
+    const response = await plan(
+      request({
+        origin: DEMO_PLACES.rouseHillHome,
+        preferredStop: { ...tallawong, kind: 'stop' },
+        preferredCarParkId: '29',
+      }),
+      { now: TUESDAY_0730 },
+    );
+    expectSoundResponse(response);
+
+    expect(carParksListed(response)).toEqual(['Kellyville (north)', 'Tallawong P2']);
+    expect(checkedOutcomes(response)).toMatchObject({ 'Tallawong P3': 'matched-by-another' });
+  });
 });
 
 describe('no valid route', () => {

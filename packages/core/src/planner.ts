@@ -1134,16 +1134,20 @@ function selectItineraries(context: PlanContext, candidates: Itinerary[]): Itine
 // is the fallback for when the shown one fills, so it is hidden only while the shown one's count will
 // still be fresh, with room, when the traveller parks. Car parks at one station share its services,
 // so there one hides another whenever its count is no worse, however old it will be by then. The car
-// park the traveller asked for is never hidden, and a station they asked for can lose a car park only
-// to a better one at that station.
+// park the traveller asked for is never hidden, and an option at a station they asked for is hidden
+// only behind another option at that station, whatever car park they also asked for.
 function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): Itinerary[] {
   const isPreferred = (option: Itinerary) => context.preferredOptions.has(option.id);
   const isCarParkAskedFor = (option: Itinerary) =>
     option.parking !== null && option.parking.carPark.id === context.request.preferredCarParkId;
+  const { preferredStop } = context.request;
+  const stationAskedFor = preferredStop ? stationKey(preferredStop) : undefined;
+  const isAtStationAskedFor = (option: Itinerary) =>
+    stationAskedFor !== undefined && context.optionStations.get(option.id) === stationAskedFor;
   // Strongest first, so an option is only ever hidden behind one that is shown. Options through the
-  // car park or station the traveller asked for lead, so nothing else hides them. After that, an
-  // option sorts ahead of any it strictly dominates, and of two that dominate each other, the one
-  // surer of a space, then the one that leaves later, goes first.
+  // car park or station the traveller asked for lead, so of two that read the same, theirs is shown.
+  // After that, an option sorts ahead of any it strictly dominates, and of two that dominate each
+  // other, the one surer of a space, then the one that leaves later, goes first.
   const strongestFirst = options
     .filter((option) => option.strategy === 'park-and-ride' || option.strategy === 'drop-off')
     .sort(
@@ -1166,6 +1170,7 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
       shown.some(
         (other) =>
           other.strategy === option.strategy &&
+          (isAtStationAskedFor(other) || !isAtStationAskedFor(option)) &&
           canStandInFor(context, other, option) &&
           dominates(other, option),
       );
