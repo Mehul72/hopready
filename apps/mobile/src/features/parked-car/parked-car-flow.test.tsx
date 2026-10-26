@@ -498,6 +498,51 @@ describe('correcting the parked car', () => {
     expect(state.parkedCar.confirmedAt).toBe('2026-10-26T20:45:00.000Z');
   });
 
+  it('names a nudged pin after the car park just chosen, not the one saved before', async () => {
+    parkAtKellyvilleNorth();
+    await renderApp('/parked-car/correct');
+    const user = userEvent.setup();
+
+    // Kellyville (south) is listed at the same position as the north car park.
+    await user.press(screen.getByRole('button', { name: 'Choose another car park' }));
+    await user.press(
+      await screen.findByRole('radio', { name: 'Kellyville (south), Kellyville Station' }),
+    );
+    await user.press(screen.getByRole('button', { name: 'Move pin north' }));
+    await user.press(screen.getByRole('button', { name: 'Save new location' }));
+
+    expect(appStorage.parkedCar.get()).toMatchObject({
+      status: 'parked',
+      parkedCar: {
+        location: { name: 'Kellyville (south)', kind: 'parked-car' },
+        carParkId: null,
+      },
+      carParkName: null,
+    });
+  });
+
+  it('names a nudged pin after the street just found, not the car park saved before', async () => {
+    // Live mode, where the street name is looked up, about 100 m from the saved car park.
+    appStorage.settings.setDemoMode(false);
+    grantLocationAt(
+      { lat: -33.7143, lon: 150.9358 },
+      { name: '3 Example Lane', city: 'Kellyville' },
+    );
+    parkAtKellyvilleNorth();
+    await renderApp('/parked-car/correct');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('radio', { name: /^Where I am now/ }));
+    await screen.findByRole('radio', { name: 'Where I am now, 3 Example Lane, Kellyville' });
+    await user.press(screen.getByRole('button', { name: 'Move pin north' }));
+    await user.press(screen.getByRole('button', { name: 'Save new location' }));
+
+    expect(appStorage.parkedCar.get()).toMatchObject({
+      status: 'parked',
+      parkedCar: { location: { name: 'Near 3 Example Lane, Kellyville', kind: 'parked-car' } },
+    });
+  });
+
   it('keeps a pin moved while the location was still being found', async () => {
     parkAtKellyvilleNorth();
     const location = holdLocationAt({ lat: -33.7962, lon: 151.1848 });

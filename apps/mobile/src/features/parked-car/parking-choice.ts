@@ -31,6 +31,8 @@ export type ParkingChoice =
 
 export const PINNED_LOCATION_NAME = 'Pinned location';
 
+type ParkedState = Extract<ParkedCarState, { status: 'parked' }>;
+
 // The documented car park a trip planned to use. Spots the person saved are listed separately.
 export interface SuggestedCarPark {
   carParkId: string;
@@ -153,8 +155,35 @@ export function choiceKey(choice: ParkingChoice): string {
 }
 
 // A reverse-geocoded address is only roughly where the car is, so it is labelled "Near ...".
+// Storage takes place names of up to 200 characters.
 function nameForCurrentLocation(place: Place): string {
-  return place.name === CURRENT_LOCATION_LABEL ? 'Your parked car' : `Near ${place.name}`;
+  const name = place.name === CURRENT_LOCATION_LABEL ? 'Your parked car' : `Near ${place.name}`;
+  return name.slice(0, 200);
+}
+
+// The name a choice is saved under.
+function choiceName(choice: ParkingChoice): string {
+  switch (choice.kind) {
+    case 'car-park':
+    case 'pin':
+      return choice.name;
+    case 'current-location':
+      return nameForCurrentLocation(choice.place);
+    case 'saved-spot':
+      return choice.spot.name;
+  }
+}
+
+// Where a pin moved by hand on the correct screen started: the place last chosen from the list, or
+// else where the car is saved. While the pin stays near it, the car is saved under `keptName`.
+export interface PinOrigin {
+  coordinate: Coordinate;
+  keptName: string;
+}
+
+export function pinOriginOf(listed: ParkingChoice | null, saved: ParkedState): PinOrigin {
+  if (listed) return { coordinate: choiceCoordinate(listed), keptName: choiceName(listed) };
+  return { coordinate: saved.parkedCar.location.coordinate, keptName: parkedCarName(saved) };
 }
 
 export function parkedCarFrom(choice: ParkingChoice, confirmedAt: string): ParkedCarRecord {
@@ -177,7 +206,7 @@ export function parkedCarFrom(choice: ParkingChoice, confirmedAt: string): Parke
       return {
         parkedCar: {
           location: {
-            name: nameForCurrentLocation(choice.place).slice(0, 200),
+            name: nameForCurrentLocation(choice.place),
             coordinate: choice.place.coordinate,
             kind: 'parked-car',
           },
@@ -211,7 +240,7 @@ export function parkedCarFrom(choice: ParkingChoice, confirmedAt: string): Parke
   }
 }
 
-export function parkedCarName(state: Extract<ParkedCarState, { status: 'parked' }>): string {
+export function parkedCarName(state: ParkedState): string {
   return state.carParkName ?? state.parkedCar.location.name;
 }
 

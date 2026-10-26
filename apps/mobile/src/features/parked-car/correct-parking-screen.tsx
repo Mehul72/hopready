@@ -16,6 +16,7 @@ import {
   parkedCarName,
   type ParkingChoice,
   PINNED_LOCATION_NAME,
+  pinOriginOf,
   suggestedCarParkOf,
 } from './parking-choice';
 import { ParkingLocationPicker } from './parking-location-picker';
@@ -52,18 +53,27 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
   const tripCarPark = suggestedCarParkOf(useActiveTrip()?.itinerary);
   const suggestion = tripCarPark?.carParkId === state.parkedCar.carParkId ? null : tripCarPark;
   const [choice, setChoice] = useState<ParkingChoice | null>(null);
+  // The place last chosen from the list. A pin moved by hand afterwards started there, not where
+  // the car is saved.
+  const [lastListed, setLastListed] = useState<ParkingChoice | null>(null);
   const [pinMoves, setPinMoves] = useState(0);
   const pin = choice ? choiceCoordinate(choice) : original;
+  const pinOrigin = pinOriginOf(lastListed, state);
   // Choosing a listed place re-centres the map on it; moving the pin by hand never does.
   const mapKey = choice && choice.kind !== 'pin' ? choiceKey(choice) : 'pin';
 
+  const chooseListed = (listed: ParkingChoice | null) => {
+    setChoice(listed);
+    if (listed) setLastListed(listed);
+  };
+
   const movePin = (coordinate: Coordinate) => {
-    const nearOriginal = haversineMetres(coordinate, original) <= SAME_SPOT_METRES;
+    const nearOrigin = haversineMetres(coordinate, pinOrigin.coordinate) <= SAME_SPOT_METRES;
     setPinMoves((count) => count + 1);
     setChoice({
       kind: 'pin',
       coordinate,
-      name: nearOriginal ? parkedCarName(state) : PINNED_LOCATION_NAME,
+      name: nearOrigin ? pinOrigin.keptName : PINNED_LOCATION_NAME,
     });
   };
 
@@ -101,7 +111,7 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
         <ParkingLocationPicker
           suggestion={suggestion}
           selected={choice?.kind === 'pin' ? null : choice}
-          onSelect={setChoice}
+          onSelect={chooseListed}
           choicesMadeElsewhere={pinMoves}
         />
       </View>
