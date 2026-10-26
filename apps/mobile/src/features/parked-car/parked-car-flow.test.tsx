@@ -498,6 +498,32 @@ describe('correcting the parked car', () => {
     expect(state.parkedCar.confirmedAt).toBe('2026-10-26T20:45:00.000Z');
   });
 
+  it('says where the pin is after each move, from the place it last came from', async () => {
+    parkAtKellyvilleNorth();
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    await renderApp('/parked-car/correct');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Move pin north' }));
+    await user.press(screen.getByRole('button', { name: 'Move pin north' }));
+
+    expect(announce).toHaveBeenLastCalledWith('Pin 20 metres north of Kellyville (north).');
+    expect(screen.getByText('Pin 20 m north of Kellyville (north).')).toHaveProp(
+      'accessibilityLabel',
+      'Pin 20 metres north of Kellyville (north).',
+    );
+
+    await user.press(screen.getByRole('button', { name: 'Choose another car park' }));
+    await user.press(
+      await screen.findByRole('radio', { name: 'Bella Vista, Bella Vista Station' }),
+    );
+    expect(screen.queryByText(/^Pin /)).toBeNull();
+    await user.press(screen.getByRole('button', { name: 'Move pin west' }));
+
+    expect(announce).toHaveBeenLastCalledWith('Pin 10 metres west of Bella Vista.');
+    expect(screen.getByText('Pin 10 m west of Bella Vista.')).toBeOnTheScreen();
+  });
+
   it('names a nudged pin after the car park just chosen, not the one saved before', async () => {
     parkAtKellyvilleNorth();
     await renderApp('/parked-car/correct');

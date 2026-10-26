@@ -1,9 +1,10 @@
-import type { Itinerary } from '@hopready/core';
+import type { Itinerary, Place } from '@hopready/core';
 
-import type { ActiveTrip } from '@/storage';
+import { CURRENT_LOCATION_LABEL } from '@/location';
+import type { ActiveTrip, ParkedCarState } from '@/storage';
 import { parkAndRideItinerary, planRequest, PLACES } from '@/test-support/trips';
 
-import { itineraryFollowedToday, pinPosition } from './parking-choice';
+import { itineraryFollowedToday, pinOriginOf, pinPosition } from './parking-choice';
 import { nudge } from './pin-drop-map';
 
 // Tuesday 27 October 2026, 7.30 am in Sydney.
@@ -70,5 +71,71 @@ describe('pinPosition', () => {
       text: 'Pin 1.2 km south of Tallawong P1',
       spoken: 'Pin 1.2 kilometres south of Tallawong P1',
     });
+  });
+});
+
+describe('pinOriginOf', () => {
+  const street = { lat: -33.7143, lon: 150.9358 };
+
+  function parkedAt(location: Place, carParkName: string | null) {
+    return {
+      status: 'parked',
+      parkedCar: {
+        location,
+        carParkId: location.carParkId ?? null,
+        confirmedAt: '2026-10-26T20:45:00.000Z',
+      },
+      carParkName,
+    } satisfies ParkedCarState;
+  }
+
+  function hereAt(name: string) {
+    return {
+      kind: 'current-location',
+      place: { name, coordinate: street, kind: 'current-location' },
+    } as const;
+  }
+
+  // Where a pin 20 m north of the origin is said to be, and the name it is saved under.
+  function nudgedFrom(origin: ReturnType<typeof pinOriginOf>) {
+    return [pinPosition(nudge(origin.coordinate, 'north', 20), origin).text, origin.keptName];
+  }
+
+  it('names the car park or saved spot the car is saved at', () => {
+    const atCarPark = parkedAt(PLACES.tallawongCarPark, 'Tallawong P1');
+    expect(nudgedFrom(pinOriginOf(null, atCarPark))).toEqual([
+      'Pin 20 m north of Tallawong P1',
+      'Tallawong P1',
+    ]);
+    const spot = {
+      name: 'Kerb on Example Road',
+      coordinate: street,
+      kind: 'saved-parking',
+    } as const;
+    expect(nudgedFrom(pinOriginOf(null, parkedAt(spot, spot.name)))).toEqual([
+      'Pin 20 m north of Kerb on Example Road',
+      'Kerb on Example Road',
+    ]);
+  });
+
+  it('describes a car saved as a pin or an address by where it is saved', () => {
+    const location = { name: 'Near 3 Example Lane, Kellyville', coordinate: street };
+    const saved = parkedAt({ ...location, kind: 'parked-car' }, null);
+    expect(nudgedFrom(pinOriginOf(null, saved))).toEqual([
+      'Pin 20 m north of where your car is saved',
+      'Near 3 Example Lane, Kellyville',
+    ]);
+  });
+
+  it('names the current location by its address, and keeps it as only near there', () => {
+    const saved = parkedAt(PLACES.tallawongCarPark, 'Tallawong P1');
+    expect(nudgedFrom(pinOriginOf(hereAt('3 Example Lane, Kellyville'), saved))).toEqual([
+      'Pin 20 m north of 3 Example Lane, Kellyville',
+      'Near 3 Example Lane, Kellyville',
+    ]);
+    expect(nudgedFrom(pinOriginOf(hereAt(CURRENT_LOCATION_LABEL), saved))).toEqual([
+      'Pin 20 m north of where you are',
+      'Your parked car',
+    ]);
   });
 });

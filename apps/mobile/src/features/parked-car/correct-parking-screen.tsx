@@ -17,6 +17,7 @@ import {
   type ParkingChoice,
   PINNED_LOCATION_NAME,
   pinOriginOf,
+  pinPosition,
   suggestedCarParkOf,
 } from './parking-choice';
 import { ParkingLocationPicker } from './parking-location-picker';
@@ -59,6 +60,7 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
   const [pinMoves, setPinMoves] = useState(0);
   const pin = choice ? choiceCoordinate(choice) : original;
   const pinOrigin = pinOriginOf(lastListed, state);
+  const pinWording = choice?.kind === 'pin' ? pinPosition(choice.coordinate, pinOrigin) : null;
   // Choosing a listed place re-centres the map on it; moving the pin by hand never does.
   const mapKey = choice && choice.kind !== 'pin' ? choiceKey(choice) : 'pin';
 
@@ -75,6 +77,9 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
       coordinate,
       name: nearOrigin ? pinOrigin.keptName : PINNED_LOCATION_NAME,
     });
+    // VoiceOver hears where the pin went after every move, without having to find the text under
+    // the map.
+    AccessibilityInfo.announceForAccessibility(`${pinPosition(coordinate, pinOrigin).spoken}.`);
   };
 
   const save = () => {
@@ -104,6 +109,9 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
       }>
       <AppText tone="secondary">{`Saved now: ${parkedCarName(state)}`}</AppText>
       <PinDropMap key={mapKey} coordinate={pin} onMove={movePin} />
+      {pinWording ? (
+        <AppText accessibilityLabel={`${pinWording.spoken}.`}>{`${pinWording.text}.`}</AppText>
+      ) : null}
       <View style={styles.section}>
         <AppText variant="title3" accessibilityRole="header">
           Or choose a place

@@ -175,15 +175,34 @@ function choiceName(choice: ParkingChoice): string {
 }
 
 // Where a pin moved by hand on the correct screen started: the place last chosen from the list, or
-// else where the car is saved. While the pin stays near it, the car is saved under `keptName`.
-export interface PinOrigin {
-  coordinate: Coordinate;
+// else where the car is saved. `name` says where the pin is in words ("Pin 20 m north of ..."),
+// and while the pin stays near, the car is saved under `keptName`.
+export interface PinOrigin extends PinStart {
   keptName: string;
 }
 
+// A car park or saved spot is named. A pin or an address saved before would read badly after "of"
+// ("Pin 20 m north of Pinned location"), so it is described instead.
+function savedCarOrigin(saved: ParkedState): PinOrigin {
+  const { coordinate, kind } = saved.parkedCar.location;
+  const keptName = parkedCarName(saved);
+  const named = kind === 'car-park' || kind === 'saved-parking';
+  return { name: named ? keptName : 'where your car is saved', coordinate, keptName };
+}
+
+// A place chosen from the list is named as it is saved, except the current location: by its
+// address ("Pin 20 m north of 3 Example Lane", not "of Near 3 Example Lane"), or as where the
+// person is when the phone gave no address.
+function listedOrigin(listed: ParkingChoice): PinOrigin {
+  const keptName = choiceName(listed);
+  const coordinate = choiceCoordinate(listed);
+  if (listed.kind !== 'current-location') return { name: keptName, coordinate, keptName };
+  const { name } = listed.place;
+  return { name: name === CURRENT_LOCATION_LABEL ? 'where you are' : name, coordinate, keptName };
+}
+
 export function pinOriginOf(listed: ParkingChoice | null, saved: ParkedState): PinOrigin {
-  if (listed) return { coordinate: choiceCoordinate(listed), keptName: choiceName(listed) };
-  return { coordinate: saved.parkedCar.location.coordinate, keptName: parkedCarName(saved) };
+  return listed ? listedOrigin(listed) : savedCarOrigin(saved);
 }
 
 export function parkedCarFrom(choice: ParkingChoice, confirmedAt: string): ParkedCarRecord {
