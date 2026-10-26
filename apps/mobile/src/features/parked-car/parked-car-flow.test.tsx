@@ -220,6 +220,23 @@ describe('confirming where the car is', () => {
     expect(appStorage.parkedCar.get()).toMatchObject({ carParkName: 'Kellyville (north)' });
   });
 
+  it('still shows a car park chosen from the list after switching arrival and back', async () => {
+    await renderApp('/parked-car/confirm');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Choose another car park' }));
+    await user.press(
+      await screen.findByRole('radio', { name: 'Bella Vista, Bella Vista Station' }),
+    );
+    await user.press(screen.getByRole('radio', { name: 'I was dropped off' }));
+    await user.press(screen.getByRole('radio', { name: 'I parked my car' }));
+
+    // What Save would store is on screen and checked, never chosen but hidden.
+    expect(
+      await screen.findByRole('radio', { name: 'Bella Vista, Bella Vista Station' }),
+    ).toBeChecked();
+  });
+
   it('says when the location cannot be used and keeps the other choices', async () => {
     denyLocation(false);
     await renderApp('/parked-car/confirm');

@@ -249,6 +249,10 @@ export function ParkingLocationPicker({
   // "Somewhere else" is chosen, but its pin has not been put anywhere yet.
   const [placingPin, setPlacingPin] = useState(false);
   const selectedKey = selected ? choiceKey(selected) : null;
+  // A car park chosen from the full list keeps the list open, even when the picker comes back
+  // after "I was dropped off", so what Save would store is always on screen and checked.
+  const chosenFromList =
+    selected?.kind === 'car-park' && selected.carParkId !== suggestion?.carParkId;
   // A position fix can take several seconds. A choice made meanwhile, or leaving the screen, makes
   // a late answer stale: it must never replace where the person said the car is.
   const locateRun = useRef(0);
@@ -372,7 +376,7 @@ export function ParkingLocationPicker({
       <AppText variant="headline" accessibilityRole="header" style={styles.heading}>
         Park&Ride car parks
       </AppText>
-      {showsAllCarParks ? (
+      {showsAllCarParks || chosenFromList ? (
         <DocumentedCarParks
           selectedKey={selectedKey}
           excludeId={suggestion?.carParkId ?? null}
