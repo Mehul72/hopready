@@ -172,16 +172,17 @@ describe('when nothing works', () => {
     expect(
       screen.getByLabelText('Tallawong P2: A connection was found from here'),
     ).toBeOnTheScreen();
+    // Both Kellyville car parks serve the same station, so one card stands for both.
     expect(
       screen.getByLabelText(
-        'Kellyville (north): A car park shown above gets you there as early, with no more driving',
+        'Kellyville (south): A car park shown above gets you there as early, with no more driving',
       ),
     ).toBeOnTheScreen();
-    expect(
-      shownItineraries().some(
-        (itinerary) => itinerary.parking?.carPark.name === 'Kellyville (north)',
-      ),
-    ).toBe(false);
+    const carParksWithCards = shownItineraries().map(
+      (itinerary) => itinerary.parking?.carPark.name,
+    );
+    expect(carParksWithCards).toContain('Kellyville (north)');
+    expect(carParksWithCards).not.toContain('Kellyville (south)');
   });
 });
 

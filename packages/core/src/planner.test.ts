@@ -12,7 +12,7 @@ import {
   type ServiceAlert,
   type Strategy,
 } from './model';
-import { planTrip, type PlannerDeps } from './planner';
+import { DEFAULT_PLANNER_LIMITS, planTrip, type PlannerDeps } from './planner';
 import {
   ProviderError,
   type CarParkFacility,
@@ -527,6 +527,11 @@ describe('leaving out car parks that are no better', () => {
     totalSpaces: 120,
     observedAt: addMinutes(NOW, -minutesAgo),
   });
+  // The traveller parks at Tallawong P1 20 minutes after a count taken just before planning, and at
+  // Kellyville later still. Unless a test says otherwise, counts here are trusted for 30 minutes, so
+  // one lasts the drive and a car park with room can stand in for one at another station.
+  const depsTrustingCountsForTheDrive = (overrides: Partial<PlannerDeps> = {}) =>
+    deps({ limits: { occupancyFreshMinutes: 30 }, ...overrides });
   const shownCarParks = (response: PlanResponse) =>
     response.itineraries.flatMap((it) => (it.parking ? [it.parking.carPark.id] : []));
   const LIFTS_OUT: ServiceAlert = {
@@ -556,7 +561,10 @@ describe('leaving out car parks that are no better', () => {
   it('hides the slower car park only while the quicker one has a fresh count with room', async () => {
     const planWith = async (tallawongCount: Occupancy | null) =>
       shownCarParks(
-        await planTrip(request(), deps({ carParks: tallawongAndBellaVista(tallawongCount) })),
+        await planTrip(
+          request(),
+          depsTrustingCountsForTheDrive({ carParks: tallawongAndBellaVista(tallawongCount) }),
+        ),
       );
 
     expect(await planWith(count(13))).toEqual([TALLAWONG.id]);
@@ -568,8 +576,12 @@ describe('leaving out car parks that are no better', () => {
 
   it('says a hidden car park is matched by a shown one, rather than used', async () => {
     const checkedWith = async (tallawongCount: Occupancy) =>
-      (await planTrip(request(), deps({ carParks: tallawongAndBellaVista(tallawongCount) })))
-        .checkedCarParks;
+      (
+        await planTrip(
+          request(),
+          depsTrustingCountsForTheDrive({ carParks: tallawongAndBellaVista(tallawongCount) }),
+        )
+      ).checkedCarParks;
     const bellaVista = (outcome: string) => ({
       id: BELLA_VISTA.id,
       name: BELLA_VISTA.name,
@@ -580,10 +592,108 @@ describe('leaving out car parks that are no better', () => {
     expect(await checkedWith(count(12))).toContainEqual(bellaVista('used'));
   });
 
+  describe('with a count that may be out of date by the time the traveller parks', () => {
+    // Tallawong P1's count has room, taken two minutes before planning.
+    const roomAtTallawongBefore = (plannedAt: string) =>
+      tallawongAndBellaVista({
+        status: 'known',
+        spacesAvailable: 60,
+        totalSpaces: 120,
+        observedAt: addMinutes(plannedAt, -2),
+      });
+
+    it('keeps the slower car park once the count is older than the limit at the car park', async () => {
+      // The traveller parks at Tallawong P1 at 7.48 am, 20 minutes after the count.
+      const planWithin = async (occupancyFreshMinutes: number) =>
+        shownCarParks(
+          await planTrip(
+            request(),
+            deps({ carParks: roomAtTallawongBefore(NOW), limits: { occupancyFreshMinutes } }),
+          ),
+        );
+
+      expect(await planWithin(DEFAULT_PLANNER_LIMITS.occupancyFreshMinutes)).toEqual([
+        TALLAWONG.id,
+        BELLA_VISTA.id,
+      ]);
+      expect(await planWithin(19)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
+      expect(await planWithin(20)).toEqual([TALLAWONG.id]);
+    });
+
+    it('keeps the slower car park for a trip planned the evening before', async () => {
+      const eveningBefore = '2026-10-26T10:00:00Z'; // 9 pm on Monday
+      const response = await planTrip(
+        request(),
+        depsTrustingCountsForTheDrive({
+          clock: { now: () => new Date(eveningBefore) },
+          carParks: roomAtTallawongBefore(eveningBefore),
+        }),
+      );
+
+      expect(shownCarParks(response)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
+    });
+
+    it('keeps the slower car park for an arrive-by trip planned an hour ahead', async () => {
+      // To arrive by 9.30 am, the traveller leaves at 7.51 am and parks at Tallawong P1 at 8.06 am.
+      const anHourAhead = '2026-10-26T19:50:00Z'; // 6.50 am
+      const response = await planTrip(
+        request({ time: { type: 'arrive', at: '2026-10-26T22:30:00Z' } }),
+        depsTrustingCountsForTheDrive({
+          clock: { now: () => new Date(anHourAhead) },
+          carParks: roomAtTallawongBefore(anHourAhead),
+        }),
+      );
+
+      expect(shownCarParks(response)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
+    });
+
+    it('lists the one whose count will hold, of two at different stations that read the same', async () => {
+      // A made-up car park beside Tallawong P1 that serves another station. Its train, a minute
+      // later, arrives with Tallawong's, but its count was taken 12 minutes before planning: 31
+      // minutes old when the traveller parks there, past the 30 minutes counts are trusted for here.
+      const NEXT_DOOR = facility(
+        '99',
+        'Next door',
+        TALLAWONG.coordinate.lat,
+        TALLAWONG.coordinate.lon,
+        'Another Station',
+        '9999999',
+      );
+      const transit = fakeTransit((query) => {
+        if (query.from.kind !== 'car-park') return metroTimetable(query);
+        const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
+        return query.from.name === NEXT_DOOR.name
+          ? [metroJourney(query.from, query.to, addMinutes(first, 1))]
+          : [
+              metroJourney(query.from, query.to, first, {
+                name: 'M1 all stops',
+                extraRideMinutes: 1,
+              }),
+            ];
+      });
+      const occupancy = new Map([
+        [TALLAWONG.id, count(60)],
+        [NEXT_DOOR.id, count(60, 12)],
+      ]);
+      const response = await planTrip(
+        request(),
+        depsTrustingCountsForTheDrive({
+          transit,
+          carParks: fakeCarParks(occupancy, [TALLAWONG, NEXT_DOOR]),
+        }),
+      );
+
+      expect(shownCarParks(response)).toEqual([TALLAWONG.id]);
+    });
+  });
+
   describe('with a service alert or live times on one car park only', () => {
     const planWith = async (transit: TransitProvider) =>
       shownCarParks(
-        await planTrip(request(), deps({ transit, carParks: tallawongAndBellaVista(count(60)) })),
+        await planTrip(
+          request(),
+          depsTrustingCountsForTheDrive({ transit, carParks: tallawongAndBellaVista(count(60)) }),
+        ),
       );
 
     it('keeps the slower car park when only the quicker one has an alert', async () => {
@@ -632,7 +742,9 @@ describe('leaving out car parks that are no better', () => {
         [KELLYVILLE.id, count(60)],
       ]);
       const carParks = fakeCarParks(occupancy, [TALLAWONG, KELLYVILLE]);
-      return shownCarParks(await planTrip(request(overrides), deps({ transit, carParks })));
+      return shownCarParks(
+        await planTrip(request(overrides), depsTrustingCountsForTheDrive({ transit, carParks })),
+      );
     };
 
     it('arrives sooner, even next to one at the station asked for that drives less', async () => {
@@ -684,7 +796,9 @@ describe('leaving out car parks that are no better', () => {
   });
 
   it('still shows a slower car park the traveller asked for', async () => {
-    const withRoomAtTallawong = deps({ carParks: tallawongAndBellaVista(count(60)) });
+    const withRoomAtTallawong = depsTrustingCountsForTheDrive({
+      carParks: tallawongAndBellaVista(count(60)),
+    });
 
     expect(shownCarParks(await planTrip(request(), withRoomAtTallawong))).toEqual([TALLAWONG.id]);
     expect(
@@ -719,6 +833,14 @@ describe('leaving out car parks that are no better', () => {
                 extraRideMinutes: 2,
               }),
             ];
+      });
+    // The same line from both, with P2's train a set number of minutes after P1's.
+    const p2TrainLater = (minutes: number) =>
+      fakeTransit((query) => {
+        if (query.from.kind !== 'car-park') return metroTimetable(query);
+        const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
+        const boards = query.from.name === TALLAWONG_P2.name ? addMinutes(first, minutes) : first;
+        return [metroJourney(query.from, query.to, boards)];
       });
 
     it('lists only the one with room when their cards would read the same', async () => {
@@ -769,21 +891,42 @@ describe('leaving out car parks that are no better', () => {
         [TALLAWONG.id, count(60)],
         [TALLAWONG_P2.id, count(60)],
       ]);
-      // The same line from both, with P2's train a set number of minutes after P1's.
-      const planWithP2Later = async (minutes: number) => {
-        const transit = fakeTransit((query) => {
-          if (query.from.kind !== 'car-park') return metroTimetable(query);
-          const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
-          const boards = query.from.name === TALLAWONG_P2.name ? addMinutes(first, minutes) : first;
-          return [metroJourney(query.from, query.to, boards)];
-        });
-        return shownCarParks(
-          await planTrip(request(), deps({ transit, carParks: tallawongTwins(occupancy) })),
+      const planWithP2Later = async (minutes: number) =>
+        shownCarParks(
+          await planTrip(
+            request(),
+            deps({ transit: p2TrainLater(minutes), carParks: tallawongTwins(occupancy) }),
+          ),
         );
-      };
 
       expect(await planWithP2Later(2)).toEqual([TALLAWONG.id, TALLAWONG_P2.id]);
       expect(await planWithP2Later(1)).toEqual([TALLAWONG.id]);
+    });
+
+    it('leaves one out only behind a twin no less likely to have a space, however old the counts', async () => {
+      // P1's train is a minute ahead of P2's, so P1 matches or beats P2 on every count. Neither
+      // count will still be fresh when the traveller parks, which matters only between stations.
+      const planWith = async (p1Count: Occupancy | null, p2Count: Occupancy | null) => {
+        const occupancy = new Map<string, Occupancy>();
+        if (p1Count) occupancy.set(TALLAWONG.id, p1Count);
+        if (p2Count) occupancy.set(TALLAWONG_P2.id, p2Count);
+        return shownCarParks(
+          await planTrip(
+            request(),
+            deps({ transit: p2TrainLater(1), carParks: tallawongTwins(occupancy) }),
+          ),
+        );
+      };
+      const withRoom = count(60);
+      const nearlyFull = count(12);
+      const stale = count(60, 45);
+
+      // Room beats no count or a stale one, which beats nearly full.
+      expect(await planWith(withRoom, nearlyFull)).toEqual([TALLAWONG.id]);
+      expect(await planWith(null, null)).toEqual([TALLAWONG.id]);
+      expect(await planWith(stale, nearlyFull)).toEqual([TALLAWONG.id]);
+      expect(await planWith(nearlyFull, null)).toEqual([TALLAWONG.id, TALLAWONG_P2.id]);
+      expect(await planWith(null, withRoom)).toEqual([TALLAWONG.id, TALLAWONG_P2.id]);
     });
 
     it('lists only the one without an alert, or with live times, when the rest reads the same', async () => {

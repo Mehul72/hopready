@@ -104,6 +104,9 @@ interface TransferPoint {
   name: string;
   place: Place;
   facility: CarParkFacility | null;
+  // The station the traveller catches public transport from: the one a car park serves, or the
+  // drop-off station. Null when there is none, as for a spot the traveller saved.
+  station: string | null;
   preferred: boolean;
 }
 
@@ -117,6 +120,8 @@ interface PlanContext {
   checkedCarParks: Map<string, PlanResponse['checkedCarParks'][number]>;
   // Ids of options through the car park or station the traveller asked for.
   preferredOptions: Set<string>;
+  // The station of each car park or drop-off option, by option id.
+  optionStations: Map<string, string>;
   unavailable: PlanResponse['unavailable'];
   notices: string[];
 }
@@ -140,6 +145,7 @@ export async function planTrip(
     rejected: new Map(),
     checkedCarParks: new Map(),
     preferredOptions: new Set(),
+    optionStations: new Map(),
     unavailable: [],
     notices: [],
   };
@@ -426,6 +432,7 @@ async function planViaTransferPoints(
     }
     itineraries.push(itinerary);
     if (point.preferred) context.preferredOptions.add(itinerary.id);
+    if (point.station) context.optionStations.set(itinerary.id, point.station);
     recordCarPark(context, strategy, point, 'used');
   });
 
@@ -728,6 +735,7 @@ async function transferPoints(
         carParkId: facility.id,
       },
       facility,
+      station: facility.station ? stationKey(facility.station) : null,
       preferred:
         facility.id === request.preferredCarParkId ||
         (preferredStopId !== undefined && facility.station?.stopId === preferredStopId),
@@ -748,6 +756,7 @@ async function transferPoints(
         name: spot.name,
         place: { name: spot.name, coordinate: spot.coordinate, kind: 'saved-parking' as const },
         facility,
+        station: null,
         preferred: spot.id === request.preferredCarParkId,
       };
     });
@@ -758,28 +767,34 @@ async function transferPoints(
   for (const facility of facilities) {
     const station = facility.station;
     if (!station) continue;
-    const key = station.stopId ?? station.name;
+    const key = stationKey(station);
     if (stations.has(key)) continue;
     stations.set(key, {
       id: `station:${key}`,
       name: station.name,
       place: station,
       facility: null,
+      station: key,
       preferred: preferredStopId !== undefined && station.stopId === preferredStopId,
     });
   }
   const preferredStop = request.preferredStop;
   if (preferredStop) {
-    const key = preferredStop.stopId ?? preferredStop.name;
+    const key = stationKey(preferredStop);
     stations.set(key, {
       id: `station:${key}`,
       name: preferredStop.name,
       place: preferredStop,
       facility: null,
+      station: key,
       preferred: true,
     });
   }
   return { points: [...stations.values()], listFailure };
+}
+
+function stationKey(station: Place): string {
+  return station.stopId ?? station.name;
 }
 
 function roughTransitMinutes(fromPlace: Place, toPlace: Place): number {
@@ -1115,9 +1130,12 @@ function selectItineraries(context: PlanContext, candidates: Itinerary[]): Itine
 }
 
 // Another car park or station that is no better on anything the results can be sorted by is padding,
-// not a choice. Such an option is hidden only behind one the traveller can count on for a space, so
-// a car park that may be full keeps its fallback. The car park the traveller asked for is never
-// hidden, and a station they asked for can lose a car park only to a better one at that station.
+// not a choice, as long as the shown one is as likely to have a space. A car park at another station
+// is the fallback for when the shown one fills, so it is hidden only while the shown one's count will
+// still be fresh, with room, when the traveller parks. Car parks at one station share its services,
+// so there one hides another whenever its count is no worse, however old it will be by then. The car
+// park the traveller asked for is never hidden, and a station they asked for can lose a car park only
+// to a better one at that station.
 function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): Itinerary[] {
   const isPreferred = (option: Itinerary) => context.preferredOptions.has(option.id);
   const isCarParkAskedFor = (option: Itinerary) =>
@@ -1125,7 +1143,7 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
   // Strongest first, so an option is only ever hidden behind one that is shown. Options through the
   // car park or station the traveller asked for lead, so nothing else hides them. After that, an
   // option sorts ahead of any it strictly dominates, and of two that dominate each other, the one
-  // with a space to count on, then the one that leaves later, goes first.
+  // surer of a space, then the one that leaves later, goes first.
   const strongestFirst = options
     .filter((option) => option.strategy === 'park-and-ride' || option.strategy === 'drop-off')
     .sort(
@@ -1136,7 +1154,8 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
         a.transfers - b.transfers ||
         a.alerts.length - b.alerts.length ||
         LIVE_TIMES_RANK[b.realtime] - LIVE_TIMES_RANK[a.realtime] ||
-        Number(canCountOnASpace(b)) - Number(canCountOnASpace(a)) ||
+        Number(canCountOnASpace(context, b)) - Number(canCountOnASpace(context, a)) ||
+        spaceOutlook(b) - spaceOutlook(a) ||
         shownSecondsBetween(a.departAt, b.departAt),
     );
   const shown: Itinerary[] = [];
@@ -1146,7 +1165,9 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
       !isCarParkAskedFor(option) &&
       shown.some(
         (other) =>
-          other.strategy === option.strategy && canCountOnASpace(other) && dominates(other, option),
+          other.strategy === option.strategy &&
+          canStandInFor(context, other, option) &&
+          dominates(other, option),
       );
     if (dominated) hidden.add(option);
     else shown.push(option);
@@ -1187,13 +1208,39 @@ function shownDriveMinutes(itinerary: Itinerary): number {
   return Math.round(itinerary.driveSeconds / 60);
 }
 
-// A drop-off needs no space. A car park needs a fresh count (see freshOccupancy) that is not nearly
-// full; an unknown, stale or nearly full one could be full on arrival.
-function canCountOnASpace(itinerary: Itinerary): boolean {
+// Whether `shown` leaves the traveller as sure of a space as `other` would. A drop-off needs no
+// space. A car park at the other's station shares its services, so a count no worse than the other's
+// is enough. One at another station needs a space to count on, or the other stays as the fallback
+// for when it fills.
+function canStandInFor(context: PlanContext, shown: Itinerary, other: Itinerary): boolean {
+  if (shown.strategy === 'drop-off') return true;
+  const station = context.optionStations.get(shown.id);
+  if (station !== undefined && station === context.optionStations.get(other.id)) {
+    return spaceOutlook(shown) >= spaceOutlook(other);
+  }
+  return canCountOnASpace(context, shown);
+}
+
+// A drop-off needs no space. A car park needs a count with room that is still within the freshness
+// limit when the traveller parks: a count says nothing about a space much later, however fresh it
+// was when the trip was planned.
+function canCountOnASpace(context: PlanContext, itinerary: Itinerary): boolean {
   if (itinerary.strategy === 'drop-off') return true;
   const occupancy = itinerary.parking?.occupancy;
-  return (
-    occupancy?.status === 'known' &&
-    occupancy.spacesAvailable > occupancy.totalSpaces * NEARLY_FULL_FREE_SHARE
-  );
+  const park = itinerary.legs.find((leg) => leg.kind === 'park');
+  if (occupancy?.status !== 'known' || !park) return false;
+  const minutesOldOnParking = secondsBetween(occupancy.observedAt, park.start) / 60;
+  return minutesOldOnParking <= context.limits.occupancyFreshMinutes && hasRoom(occupancy);
+}
+
+// How likely a car park is to have a space, judged from its count as it stands: room beats no count
+// or an old one, which beats nearly full.
+function spaceOutlook(itinerary: Itinerary): number {
+  const occupancy = itinerary.parking?.occupancy;
+  if (occupancy?.status !== 'known') return 1;
+  return hasRoom(occupancy) ? 2 : 0;
+}
+
+function hasRoom(occupancy: { spacesAvailable: number; totalSpaces: number }): boolean {
+  return occupancy.spacesAvailable > occupancy.totalSpaces * NEARLY_FULL_FREE_SHARE;
 }

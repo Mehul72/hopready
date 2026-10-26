@@ -30,6 +30,7 @@ import { createDemoProviders, DEMO_PLACES, type DemoScenario } from './index';
 // The real planner against the demo world, for every case the brief asks for. Times are fixed, so
 // every run plans against the same generated timetable.
 
+const MONDAY_2100 = '2026-10-26T10:00:00Z';
 const TUESDAY_0630 = '2026-10-26T19:30:00Z';
 const TUESDAY_0700 = '2026-10-26T20:00:00Z';
 const TUESDAY_0730 = '2026-10-26T20:30:00Z';
@@ -676,14 +677,42 @@ describe('only real choices', () => {
     LIVE_TIMES_RANK[better.realtime] >= LIVE_TIMES_RANK[other.realtime] &&
     better.alerts.every((alert) => other.alerts.some((same) => same.id === alert.id));
 
-  // A drop-off needs no space. A car park needs a fresh count with more than a tenth of it free.
+  const hasRoom = (count: { spacesAvailable: number; totalSpaces: number }) =>
+    count.spacesAvailable > count.totalSpaces * NEARLY_FULL_FREE_SHARE;
+
+  // A count with more than a tenth of the spaces free, taken at most 15 minutes before the traveller
+  // parks.
   const canCountOnASpace = (itinerary: Itinerary) => {
-    if (itinerary.strategy === 'drop-off') return true;
     const occupancy = itinerary.parking?.occupancy;
+    const park = itinerary.legs.find((leg) => leg.kind === 'park');
     return (
       occupancy?.status === 'known' &&
-      occupancy.spacesAvailable > occupancy.totalSpaces * NEARLY_FULL_FREE_SHARE
+      park !== undefined &&
+      secondsBetween(occupancy.observedAt, park.start) <= OCCUPANCY_FRESH_MINUTES * 60 &&
+      hasRoom(occupancy)
     );
+  };
+
+  // Room beats no count or a stale one, which beats nearly full.
+  const spaceOutlook = (itinerary: Itinerary) => {
+    const occupancy = itinerary.parking?.occupancy;
+    if (occupancy?.status !== 'known') return 1;
+    return hasRoom(occupancy) ? 2 : 0;
+  };
+
+  const stationOf = (itinerary: Itinerary) =>
+    PARK_AND_RIDE_CATALOGUE.find((entry) => entry.facilityId === itinerary.parking?.carPark.id)
+      ?.station.stopId;
+
+  // A drop-off needs no space. A car park at the other's station needs a count no worse; one at
+  // another station needs a space to count on, or the other is a fallback.
+  const canStandInFor = (better: Itinerary, other: Itinerary) => {
+    if (better.strategy === 'drop-off') return true;
+    const station = stationOf(better);
+    if (station !== undefined && station === stationOf(other)) {
+      return spaceOutlook(better) >= spaceOutlook(other);
+    }
+    return canCountOnASpace(better);
   };
 
   const placeOf = (itinerary: Itinerary) =>
@@ -691,8 +720,8 @@ describe('only real choices', () => {
     itinerary.legs.find((leg) => leg.kind === 'drop-off')?.to.name ??
     itinerary.strategy;
 
-  // Each listed car park or station that a listed one of the same kind, with a space to count on,
-  // is no worse than.
+  // Each listed car park or station that a listed one of the same kind, able to stand in for it, is
+  // no worse than.
   function paddedOptions(response: PlanResponse): string[] {
     const transfers = response.itineraries.filter(
       (itinerary) => itinerary.strategy === 'park-and-ride' || itinerary.strategy === 'drop-off',
@@ -703,7 +732,7 @@ describe('only real choices', () => {
           (better) =>
             better !== other &&
             better.strategy === other.strategy &&
-            canCountOnASpace(better) &&
+            canStandInFor(better, other) &&
             isNoWorse(better, other),
         )
         .map((better) => `${placeOf(other)} is no better than ${placeOf(better)}`),
@@ -757,17 +786,38 @@ describe('only real choices', () => {
     }
   }
 
-  it('lists Tallawong P2 from Box Hill at 7.30 am, without the slower Kellyville car parks behind it', async () => {
+  it('lists one of the two Kellyville car parks beside Tallawong P2 from Box Hill at 7.30 am', async () => {
+    // Tallawong P2's count will be over 15 minutes old when the traveller parks there at 7.52 am, so
+    // a car park at another station stays as somewhere else to park. Both Kellyville car parks serve
+    // the same station and read the same, so one card is enough.
     const response = await plan(request(), { now: TUESDAY_0730 });
     expectSoundResponse(response);
 
     expect(paddedOptions(response)).toEqual([]);
-    expect(carParksListed(response)).toEqual(['Tallawong P2']);
+    expect(carParksListed(response)).toEqual(['Tallawong P2', 'Kellyville (north)']);
     expect(checkedOutcomes(response)).toMatchObject({
       'Tallawong P2': 'used',
-      'Kellyville (north)': 'matched-by-another',
+      'Kellyville (north)': 'used',
       'Kellyville (south)': 'matched-by-another',
     });
+  });
+
+  it('keeps a Kellyville car park as somewhere else to park for a trip planned the evening before', async () => {
+    // At 9 pm Tallawong P2 is nearly empty, which says nothing about the morning peak.
+    const response = await plan(request({ at: TUESDAY_0745 }), { now: MONDAY_2100 });
+    expectSoundResponse(response);
+
+    expect(carParksListed(response)).toEqual(['Tallawong P2', 'Kellyville (north)']);
+  });
+
+  it('keeps a Kellyville car park as somewhere else to park for an arrive-by trip planned an hour ahead', async () => {
+    // Arriving by 9 am, the traveller parks at Tallawong P2 at 8.04 am, an hour after its count.
+    const response = await plan(request({ time: { type: 'arrive', at: TUESDAY_0900 } }), {
+      now: TUESDAY_0700,
+    });
+    expectSoundResponse(response);
+
+    expect(carParksListed(response)).toEqual(['Tallawong P2', 'Kellyville (north)']);
   });
 
   it('never lists a car park or station that a listed one matches or beats on every count', async () => {
@@ -788,10 +838,10 @@ describe('only real choices', () => {
     expect(misread).toEqual([]);
   });
 
-  it('never hides a car park that no listed one, with a space to count on, matches or beats', async () => {
+  it('never hides a car park unless a listed one that can stand in for it matches or beats it', async () => {
     const wronglyHidden: string[] = [];
     for await (const { when, request: planned, now, response } of planSampleCommutes()) {
-      const listed = byStrategy(response, 'park-and-ride').filter(canCountOnASpace);
+      const listed = byStrategy(response, 'park-and-ride');
       for (const { id, name, outcome } of response.checkedCarParks) {
         if (outcome !== 'matched-by-another') continue;
         // Asked for by name, the car park is listed with the same option it was hidden with.
@@ -799,7 +849,10 @@ describe('only real choices', () => {
         const hidden = byStrategy(askedFor, 'park-and-ride').find(
           (itinerary) => itinerary.parking!.carPark.id === id,
         );
-        if (!hidden || !listed.some((better) => isNoWorse(better, hidden))) {
+        if (
+          !hidden ||
+          !listed.some((better) => canStandInFor(better, hidden) && isNoWorse(better, hidden))
+        ) {
           wronglyHidden.push(`${when}: ${name}`);
         }
       }
