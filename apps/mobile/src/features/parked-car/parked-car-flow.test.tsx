@@ -239,6 +239,7 @@ describe('confirming where the car is', () => {
 
   it('says when the location cannot be used and keeps the other choices', async () => {
     denyLocation(false);
+    appStorage.parkingSpots.add('Kerb on Example Road', { lat: -33.7, lon: 150.94 });
     await renderApp('/parked-car/confirm');
 
     await userEvent.setup().press(screen.getByRole('radio', { name: /^Where I am now/ }));
@@ -321,9 +322,10 @@ describe('confirming where the car is', () => {
     const user = userEvent.setup();
 
     await user.press(screen.getByRole('radio', { name: /^Where I am now/ }));
+    // With no parking spots saved, none is offered.
     expect(
       await screen.findByLabelText(
-        'Warning. Location access is off for HopReady. You can turn it on in Settings. Choose Somewhere else to put a pin where you parked, or choose a car park or saved spot.',
+        'Warning. Location access is off for HopReady. You can turn it on in Settings. Choose Somewhere else to put a pin where you parked, or choose a car park.',
       ),
     ).toBeOnTheScreen();
     // The pin starts at the trip's car park, and the arrows move it without dragging.
@@ -657,6 +659,20 @@ describe('correcting the parked car', () => {
       parkedCar: { carParkId: '26', confirmedAt: '2026-10-26T20:45:00.000Z' },
       carParkName: 'Tallawong P1',
     });
+  });
+
+  it('points to the pin on the map when the location cannot be used', async () => {
+    parkAtKellyvilleNorth();
+    denyLocation(false);
+    await renderApp('/parked-car/correct');
+
+    await userEvent.setup().press(screen.getByRole('radio', { name: /^Where I am now/ }));
+
+    expect(
+      await screen.findByLabelText(
+        'Warning. Location access is off for HopReady. You can turn it on in Settings. Move the pin on the map, or choose a car park.',
+      ),
+    ).toBeOnTheScreen();
   });
 
   it('takes no hint from a trip followed on another day', async () => {

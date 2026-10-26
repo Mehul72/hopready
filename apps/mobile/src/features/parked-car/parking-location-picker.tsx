@@ -49,6 +49,10 @@ export interface ParkingLocationPickerProps {
   // Goes up each time the place is chosen outside this list, such as by moving a pin, so a
   // location lookup still running is dropped instead of overriding that choice.
   choicesMadeElsewhere?: number;
+  // How to use a pin the screen shows outside this picker, such as "Move the pin on the map".
+  // Offered first when the location cannot be used, since a pin is then the only way left to give
+  // a spot in none of the lists.
+  pinElsewhere?: string;
 }
 
 function normalise(text: string): string {
@@ -241,6 +245,7 @@ export function ParkingLocationPicker({
   selected,
   onSelect,
   choicesMadeElsewhere = 0,
+  pinElsewhere,
 }: ParkingLocationPickerProps) {
   const spots = useSavedParkingSpots();
   const [locating, setLocating] = useState(false);
@@ -303,10 +308,10 @@ export function ParkingLocationPicker({
   };
 
   // Without the location, a pin is the only way left to give a spot in none of the lists, such as
-  // a street near a full car park.
-  const otherWays = pin
-    ? 'Choose Somewhere else to put a pin where you parked, or choose a car park or saved spot.'
-    : 'Choose a car park or saved spot instead.';
+  // a street near a full car park. Saved spots are offered only when the person has some.
+  const lists = spots.length > 0 ? 'a car park or saved spot' : 'a car park';
+  const pinWay = pin ? 'Choose Somewhere else to put a pin where you parked' : pinElsewhere;
+  const otherWays = pinWay ? `${pinWay}, or choose ${lists}.` : `Choose ${lists} instead.`;
 
   return (
     <View style={styles.group}>

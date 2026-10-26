@@ -125,6 +125,7 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
           selected={choice?.kind === 'pin' ? null : choice}
           onSelect={chooseListed}
           choicesMadeElsewhere={pinMoves}
+          pinElsewhere="Move the pin on the map"
         />
       </View>
       <View style={styles.remove}>
