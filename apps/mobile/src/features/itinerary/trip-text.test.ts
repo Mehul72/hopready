@@ -14,6 +14,7 @@ import {
   describePlatform,
   describeRealtimeCoverage,
   describeRules,
+  departurePlatformOf,
   describeStepNotes,
   distance,
   duration,
@@ -165,6 +166,14 @@ describe('public transport wording', () => {
     expect(describePlatform('  ')).toBe('Platform not provided');
   });
 
+  it('calls a missing platform missing only for trains and metros', () => {
+    const metro = ride('M1', 'metro', STOPS.kellyville, PLACES.chatswoodStation, [0, 30]);
+    const bus = ride('B1', 'bus', STOPS.collaroy, STOPS.wynyard, [0, 54]);
+    expect(departurePlatformOf({ ...metro, departurePlatform: null })).toBe(PLATFORM_NOT_PROVIDED);
+    expect(departurePlatformOf({ ...bus, departurePlatform: null })).toBeNull();
+    expect(departurePlatformOf({ ...bus, departurePlatform: 'Stand C' })).toBe('Stand C');
+  });
+
   it('gives a stated platform, and nothing when none is stated', () => {
     expect(statedPlatform('3')).toBe('Platform 3');
     expect(statedPlatform('Stand C')).toBe('Stand C');
@@ -218,6 +227,28 @@ describe('changes between services', () => {
     wait(STOPS.martinPlace, [59, 62]),
     ride('M1', 'metro', STOPS.martinPlace, PLACES.chatswoodStation, [62, 73]),
   ];
+
+  it('says plainly when a change is shorter than the buffer or already missed', () => {
+    const short = [
+      ride('B1', 'bus', STOPS.collaroy, STOPS.wynyard, [0, 54]),
+      ride('M1', 'metro', STOPS.wynyard, PLACES.chatswoodStation, [56, 70]),
+    ];
+    const missed = [
+      ride('B1', 'bus', STOPS.collaroy, STOPS.wynyard, [0, 54]),
+      ride('M1', 'metro', STOPS.wynyard, PLACES.chatswoodStation, [53, 70]),
+    ];
+
+    expect(describeStepNotes(short, 3)[0]).toContainEqual({
+      text: 'Change at Wynyard Station: 2 min between services, shorter than your 3 min transfer buffer.',
+      spoken:
+        'Change at Wynyard Station: 2 minutes between services, shorter than your 3 minutes transfer buffer.',
+    });
+    expect(describeStepNotes(missed, 3)[0]).toContainEqual({
+      text: 'Change at Wynyard Station: the next service is due to leave 1 min before this one arrives.',
+      spoken:
+        'Change at Wynyard Station: the next service is due to leave 1 minute before this one arrives.',
+    });
+  });
 
   it('sets a change against the transfer buffer once, on the walk that starts it', () => {
     const notes = describeStepNotes(walkingChange, 3);

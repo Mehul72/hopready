@@ -223,6 +223,13 @@ describe('LegRow', () => {
     expect(screen.getByLabelText(/Time checked at 7:10\sam, on time\./)).toBeOnTheScreen();
   });
 
+  it('does not call a missing bus platform missing, since most stops have none', async () => {
+    await renderLeg(transitLeg({ mode: 'bus', departurePlatform: null }));
+
+    expect(screen.getByText('From Tallawong Station')).toBeOnTheScreen();
+    expect(screen.queryByText(new RegExp(PLATFORM_NOT_PROVIDED))).not.toBeOnTheScreen();
+  });
+
   it('says when no platform is provided, and labels timetable times', async () => {
     await renderLeg(transitLeg());
 
@@ -389,7 +396,7 @@ describe('LegRow', () => {
     await renderLeg(bufferLeg('drop-off', 2));
     expect(screen.getByText('Drop-off at Tallawong Station')).toBeOnTheScreen();
     expect(
-      screen.getByText('2 min to get out and head to the platform (your drop-off buffer).'),
+      screen.getByText('2 min to get out and head to your service (your drop-off buffer).'),
     ).toBeOnTheScreen();
 
     await renderLeg(bufferLeg('wait', 6));

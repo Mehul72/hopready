@@ -109,6 +109,18 @@ export function describePlatform(platform: string | null): string {
   return statedPlatform(platform) ?? PLATFORM_NOT_PROVIDED;
 }
 
+// Train and metro stations have several ways in and out, unlike bus, light rail and ferry stops.
+// Nothing HopReady reads from TfNSW names the one a person uses, and an exit is never guessed.
+const STATION_MODES: ReadonlySet<TransitMode> = new Set<TransitMode>(['train', 'metro']);
+
+// Only trains and metros always leave from a platform. A bus, ferry or light rail stop often has
+// none, so there a stated stand, wharf or bay is shown and a missing one is not called missing.
+export function departurePlatformOf(leg: TransitLeg): string | null {
+  return STATION_MODES.has(leg.mode)
+    ? describePlatform(leg.departurePlatform)
+    : statedPlatform(leg.departurePlatform);
+}
+
 // The platform to show after a stop's name, or null when the name already ends with it. The first
 // and last steps keep the name the trip was planned with, and a stop picked from search can be a
 // platform itself ("Chatswood Station, Platform 1").
@@ -187,28 +199,40 @@ function changeNotes(
   return notes;
 }
 
-// The planner holds every change to at least the transfer buffer, walk included, so the note
-// shows how much room this one leaves.
+// The planner holds every change it offers to at least the transfer buffer, walk included, so the
+// note shows how much room this one leaves. A trip joined from older times could fall short, and
+// then the note says so rather than calling a missed connection tight.
 function describeChange(
   arriving: TransitLeg,
   departing: TransitLeg,
   walks: boolean,
   transferBufferMinutes: number | null,
 ): Wording {
-  const time = duration(secondsBetween(arriving.end, departing.start));
+  const place = `Change at ${arriving.to.name}`;
+  const windowSeconds = secondsBetween(arriving.end, departing.start);
+  if (windowSeconds < 0) {
+    const early = duration(-windowSeconds);
+    return {
+      text: `${place}: the next service is due to leave ${early.text} before this one arrives.`,
+      spoken: `${place}: the next service is due to leave ${early.spoken} before this one arrives.`,
+    };
+  }
+  const time = duration(windowSeconds);
   const span = walks ? 'including the walk' : 'between services';
-  const text = `Change at ${arriving.to.name}: ${time.text} ${span}`;
-  const spoken = `Change at ${arriving.to.name}: ${time.spoken} ${span}`;
+  const text = `${place}: ${time.text} ${span}`;
+  const spoken = `${place}: ${time.spoken} ${span}`;
   if (transferBufferMinutes === null) return { text: `${text}.`, spoken: `${spoken}.` };
+  if (windowSeconds < transferBufferMinutes * 60) {
+    return {
+      text: `${text}, shorter than your ${transferBufferMinutes} min transfer buffer.`,
+      spoken: `${spoken}, shorter than your ${plural(transferBufferMinutes, 'minute')} transfer buffer.`,
+    };
+  }
   return {
     text: `${text}; your transfer buffer is ${transferBufferMinutes} min.`,
     spoken: `${spoken}; your transfer buffer is ${plural(transferBufferMinutes, 'minute')}.`,
   };
 }
-
-// Train and metro stations have several ways in and out, unlike bus, light rail and ferry stops.
-// Nothing HopReady reads from TfNSW names the one a person uses, and an exit is never guessed.
-const STATION_MODES: ReadonlySet<TransitMode> = new Set<TransitMode>(['train', 'metro']);
 
 type StationAccess = 'entrance' | 'exit';
 

@@ -21,7 +21,7 @@ import { openLink } from './open-link';
 import {
   ALERT_TONES,
   describeDelay,
-  describePlatform,
+  departurePlatformOf,
   describeRules,
   distance,
   duration,
@@ -66,7 +66,7 @@ export function LegRow({ leg, nowMs, staleCheckAt, onStartDriving, notes = [] }:
         <BufferRow
           leg={leg}
           title={`Drop-off at ${leg.to.name}`}
-          purpose="to get out and head to the platform"
+          purpose="to get out and head to your service"
           bufferName="drop-off buffer"
         />
       );
@@ -315,7 +315,7 @@ function TransitRow({
 }) {
   const modeName = LEG_VISUALS[leg.mode].label;
   const title = serviceTitle(leg);
-  const platform = platformToAdd(leg.from.name, describePlatform(leg.departurePlatform));
+  const platform = platformToAdd(leg.from.name, departurePlatformOf(leg));
   // The arrival platform helps with finding the exit or the next service, but nobody needs it to
   // get off, so it is shown only when stated rather than called missing.
   const arrivalPlatform = platformToAdd(leg.to.name, statedPlatform(leg.arrivalPlatform));
