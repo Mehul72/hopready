@@ -266,7 +266,9 @@ describe('confirming where the car is', () => {
         name: 'Somewhere else, Search for where you parked, then move the pin to your car.',
       }),
     ).toBeChecked();
-    expect(screen.getByRole('button', { name: 'Save where I parked' })).toBeDisabled();
+    const save = screen.getByRole('button', { name: 'Save where I parked' });
+    expect(save).toBeDisabled();
+    expect(save).toHaveProp('accessibilityHint', 'Search for where you parked first');
 
     await user.press(screen.getByRole('button', { name: 'Search for a street or place' }));
     await user.type(screen.getByLabelText('Search for a place'), 'Example Avenue');
@@ -305,7 +307,7 @@ describe('confirming where the car is', () => {
 
     expect(
       screen.getByRole('radio', {
-        name: 'Somewhere else, Pin at Tallawong Station. Move it to where you parked.',
+        name: 'Somewhere else, Pin at Tallawong Station. Move it if you parked elsewhere.',
       }),
     ).toBeChecked();
     const { lat, lon } = PLACES.tallawongStation.coordinate;
@@ -358,13 +360,35 @@ describe('confirming where the car is', () => {
 
     expect(
       screen.getByRole('radio', {
-        name: 'Somewhere else, Pin at 1 Help St, Chatswood. Move it to where you parked.',
+        name: 'Somewhere else, Pin at 1 Help St, Chatswood. Move it if you parked elsewhere.',
       }),
     ).toBeChecked();
     const { lat, lon } = PLACES.chatswoodOffice.coordinate;
     expect(screen.getByTestId('map-marker')).toHaveProp('coordinate', {
       latitude: lat,
       longitude: lon,
+    });
+  });
+
+  it('saves the pin where the drive ends without moving it, as no list offers that spot', async () => {
+    follow(driveOnlyItinerary({ departAt: '2026-10-26T20:00:00.000Z' }));
+    await renderApp('/parked-car/confirm');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+    await user.press(screen.getByRole('button', { name: 'Save where I parked' }));
+
+    expect(appStorage.parkedCar.get()).toMatchObject({
+      status: 'parked',
+      parkedCar: {
+        location: {
+          name: 'Pinned location',
+          coordinate: PLACES.chatswoodOffice.coordinate,
+          kind: 'parked-car',
+        },
+        carParkId: null,
+      },
+      carParkName: null,
     });
   });
 
@@ -380,8 +404,11 @@ describe('confirming where the car is', () => {
         name: 'Somewhere else, Pin at Tallawong P1. Move it to where you parked.',
       }),
     ).toBeChecked();
-    // Saved unmoved, the pin would only repeat the trip's guess under another name.
-    expect(screen.getByRole('button', { name: 'Save where I parked' })).toBeDisabled();
+    // Saved unmoved at the trip's car park, the pin would only repeat the suggestion under another
+    // name.
+    const save = screen.getByRole('button', { name: 'Save where I parked' });
+    expect(save).toBeDisabled();
+    expect(save).toHaveProp('accessibilityHint', 'Move the pin to where you parked first');
 
     await user.press(screen.getByRole('button', { name: 'Move pin west' }));
     await user.press(screen.getByRole('button', { name: 'Move pin west' }));
@@ -408,6 +435,24 @@ describe('confirming where the car is', () => {
     if (state.status !== 'parked') throw new Error('Expected the car to be parked');
     expect(state.parkedCar.location.coordinate.lon).toBeGreaterThan(
       PLACES.tallawongCarPark.coordinate.lon,
+    );
+  });
+
+  it('keeps Somewhere else chosen, still waiting for the pin, after switching arrival and back', async () => {
+    follow(parkAndRideItinerary({ departAt: '2026-10-26T20:40:00.000Z' }));
+    await renderApp('/parked-car/confirm');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('radio', { name: /^Somewhere else/ }));
+    await user.press(screen.getByRole('radio', { name: 'I was dropped off' }));
+    await user.press(screen.getByRole('radio', { name: 'I parked my car' }));
+
+    // The hint to move the pin always comes with the pin on screen.
+    expect(screen.getByRole('radio', { name: /^Somewhere else/ })).toBeChecked();
+    expect(screen.getByTestId('map-marker')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Save where I parked' })).toHaveProp(
+      'accessibilityHint',
+      'Move the pin to where you parked first',
     );
   });
 
@@ -453,7 +498,9 @@ describe('confirming where the car is', () => {
       name: 'Tallawong P1, Suggested by your trip, Choose it only if this is where you parked.',
     });
     expect(suggested).not.toBeChecked();
-    expect(screen.getByRole('button', { name: 'Save where I parked' })).toBeDisabled();
+    const save = screen.getByRole('button', { name: 'Save where I parked' });
+    expect(save).toBeDisabled();
+    expect(save).toHaveProp('accessibilityHint', 'Choose where you parked first');
   });
 
   it('takes no hints from a trip followed on another day', async () => {

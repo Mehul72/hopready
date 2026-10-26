@@ -18,6 +18,7 @@ import {
   type PlacedPin,
   pinStartOf,
   suggestedCarParkOf,
+  type TripPinStart,
 } from './parking-choice';
 import { ParkingLocationPicker } from './parking-location-picker';
 
@@ -32,6 +33,13 @@ export interface ConfirmParkingScreenProps {
   // The trip the person followed, for its car park suggestion.
   itineraryId: string | null;
   initialArrival: ArrivalKind;
+}
+
+// What a dimmed Save waits for, as VoiceOver says it. With "Somewhere else" chosen, the pin has to
+// be moved off the trip's car park, or with no trip, a street searched for.
+function saveHint(pinWaiting: boolean, pinStart: TripPinStart | null): string {
+  if (!pinWaiting) return 'Choose where you parked first';
+  return pinStart ? 'Move the pin to where you parked first' : 'Search for where you parked first';
 }
 
 function ReplacesEarlierNotice() {
@@ -55,8 +63,16 @@ export function ConfirmParkingScreen({ itineraryId, initialArrival }: ConfirmPar
   const pinStart = pinStartOf(itinerary);
   const [arrival, setArrival] = useState<ArrivalKind>(initialArrival);
   const [choice, setChoice] = useState<ParkingChoice | null>(null);
+  // "Somewhere else" is chosen, but its pin waits to be moved, or a street searched for.
+  const [pinWaiting, setPinWaiting] = useState(false);
   const [placedPin, setPlacedPin] = useState<PlacedPin | null>(null);
   const canSave = arrival === 'dropped-off' || choice !== null;
+
+  const select = (next: ParkingChoice | null) => {
+    setChoice(next);
+    // The picker chooses nothing only for "Somewhere else" with nothing to save yet.
+    setPinWaiting(next === null);
+  };
 
   const save = () => {
     const confirmedAt = toIso(new Date());
@@ -91,7 +107,7 @@ export function ConfirmParkingScreen({ itineraryId, initialArrival }: ConfirmPar
           label={arrival === 'parked' ? 'Save where I parked' : 'Save that I was dropped off'}
           fullWidth
           disabled={!canSave}
-          accessibilityHint={canSave ? undefined : 'Choose where you parked first'}
+          accessibilityHint={canSave ? undefined : saveHint(pinWaiting, pinStart)}
           onPress={save}
         />
       }>
@@ -112,9 +128,9 @@ export function ConfirmParkingScreen({ itineraryId, initialArrival }: ConfirmPar
           </AppText>
           <ParkingLocationPicker
             suggestion={suggestion}
-            pin={{ start: pinStart, placed: placedPin, onPlace: setPlacedPin }}
+            pin={{ start: pinStart, placed: placedPin, waiting: pinWaiting, onPlace: setPlacedPin }}
             selected={choice}
-            onSelect={setChoice}
+            onSelect={select}
           />
         </View>
       ) : (

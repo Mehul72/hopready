@@ -76,13 +76,20 @@ export interface PlacedPin {
   from: PinStart;
 }
 
+export interface TripPinStart extends PinStart {
+  // At the trip's Park&Ride car park, which its suggestion already offers as a choice, rather than
+  // where a drive or ride ends, which no other choice offers.
+  atCarPark: boolean;
+}
+
 // Where the trip expected the car to be left: its Park&Ride car park, or else where its drive ends.
 // After a drop-off trip it is where the ride ended, the likely spot for someone who drove after all.
-export function pinStartOf(itinerary: Itinerary | null | undefined): PinStart | null {
+export function pinStartOf(itinerary: Itinerary | null | undefined): TripPinStart | null {
   const carPark = suggestedCarParkOf(itinerary);
-  if (carPark) return { name: carPark.name, coordinate: carPark.coordinate };
+  if (carPark) return { name: carPark.name, coordinate: carPark.coordinate, atCarPark: true };
   const carLeg = itinerary?.legs.find((leg) => leg.kind === 'drive' || leg.kind === 'ride');
-  return carLeg ? { name: carLeg.to.name, coordinate: carLeg.to.coordinate } : null;
+  if (!carLeg) return null;
+  return { name: carLeg.to.name, coordinate: carLeg.to.coordinate, atCarPark: false };
 }
 
 const COMPASS_POINTS = [
