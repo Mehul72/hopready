@@ -28,7 +28,7 @@ A traveller who was dropped off gets `transit-home` and is never sent back for a
    - The detour (origin to car park to destination) must be at most 1.6 times the direct distance.
    - A preferred car park (a Park&Ride car park, or a parking spot the person saved and chose in Trip options) skips the direction checks but not the driving limit.
 3. **Ranking.** One Apple ETA call for up to 8 shortlisted candidates. Candidates beyond `maxDriveMinutes` are dropped. The rest are scored by drive time plus a rough transit estimate (distance × 1.35 at 35 km/h, plus 8 minutes), and the best 3 are kept. The preferred car park always ranks first.
-4. **Explanation.** Each checked car park is reported with one outcome: `used`, `matched-by-another`, `too-far-to-drive`, `not-towards-destination`, `no-workable-connection` or `provider-error`. A car park is `used` only when its option passes every feasibility check below and is shown. One whose option works but is left out because a car park shown with it is as good (see "Only real choices") is `matched-by-another`. One whose drive runs past the limit in traffic is `too-far-to-drive`.
+4. **Explanation.** Each checked car park is reported with one outcome: `used`, `matched-by-another`, `left-out-for-space`, `too-far-to-drive`, `not-towards-destination`, `no-workable-connection` or `provider-error`. A car park is `used` only when its option passes every feasibility check below and is shown. One whose option works but is left out because a car park shown with it is as good (see "Only real choices") is `matched-by-another`. One whose option works but is cut because more options work than the 10 a response lists is `left-out-for-space`. One whose drive runs past the limit in traffic is `too-far-to-drive`.
 
 Drop-off uses the stations served by those car parks, plus a preferred station, through the same steps. When no drop-off option works, an `unavailable` entry says whether no station was within the driving limit or no connection worked from the stations checked.
 
@@ -92,9 +92,14 @@ After the feasibility checks, a `park-and-ride` or `drop-off` option is left out
 - it arrives no later, drives no more and has no more changes, with times and drives read to the minute the way the cards show them;
 - it leaves no more than a minute earlier, because a minute is not worth a card of its own;
 - it has no service alert the other avoids, and at least as many live times (live, then partly live, then timetable);
-- for a car park, its occupancy is `known` (fresh) with more than 10% of the spaces free. An unknown, stale or nearly full count could mean no space on arrival, so the other car park stays as a fallback.
+- for a car park, the traveller is as sure of a space there, as set out below. A drop-off needs no space.
 
-The car park the traveller asked for is never left out this way. A station they asked for can lose a car park only to a better one at that same station. Options are compared strongest first, so an option is only ever left out behind one that is shown. Public transport only, `drive-only` and return trips are never left out this way.
+How sure the traveller can be of a space depends on whether the two car parks serve the same station:
+
+- **Another station.** The other car park is the fallback for when the shown one fills, so it is left out only when the shown car park's count can be counted on when the traveller gets there: `known`, taken no more than 15 minutes (the occupancy freshness limit) before they reach the car park, and with more than 10% of the spaces free. A count says nothing about a space much later, however fresh it was when the trip was planned, so a trip planned the evening before or an hour ahead keeps its fallback, and so does a drive long enough for the count to go out of date on the way. An unknown, stale or nearly full count keeps it too.
+- **The same station.** Car parks serving one station have the same services, so they are duplicates rather than fallbacks. One is left out, however old the counts will be by the time the traveller gets there, when the shown one's count is no worse: `known` with more than 10% of the spaces free beats unknown or stale, which beats `known` and nearly full.
+
+The car park the traveller asked for is never left out this way. An option at a station they asked for is left out only behind another option at that same station, whatever car park they also asked for. Options are compared strongest first, so an option is only ever left out behind one that is shown. Public transport only, `drive-only` and return trips are never left out this way.
 
 ## Unknown is unknown
 
