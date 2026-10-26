@@ -590,6 +590,31 @@ describe('correcting the parked car', () => {
     expect(screen.getByText('Pin 10 m west of Bella Vista.')).toBeOnTheScreen();
   });
 
+  it('keeps the map as it is when the pin is first moved after choosing a place', async () => {
+    parkAtKellyvilleNorth();
+    await renderApp('/parked-car/correct');
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Choose another car park' }));
+    await user.press(
+      await screen.findByRole('radio', { name: 'Bella Vista, Bella Vista Station' }),
+    );
+    // Choosing a listed place centres the map on it.
+    const map = screen.getByTestId('map-view');
+    expect(map).toHaveProp(
+      'initialRegion',
+      expect.objectContaining({ latitude: -33.730592, longitude: 150.944024 }),
+    );
+    await user.press(screen.getByRole('button', { name: 'Move pin north' }));
+
+    // A new map would open at its first zoom again, losing the zoom the person chose.
+    expect(screen.getByTestId('map-view')).toBe(map);
+
+    // Choosing the place again brings the map back to it.
+    await user.press(screen.getByRole('radio', { name: 'Bella Vista, Bella Vista Station' }));
+    expect(screen.getByTestId('map-view')).not.toBe(map);
+  });
+
   it('names a nudged pin after the car park just chosen, not the one saved before', async () => {
     parkAtKellyvilleNorth();
     await renderApp('/parked-car/correct');

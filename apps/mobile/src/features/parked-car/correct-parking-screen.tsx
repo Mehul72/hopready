@@ -12,7 +12,6 @@ import { writeOrAlert } from '../saved/storage-writes';
 import { closeParkingSheet } from './close-sheet';
 import {
   choiceCoordinate,
-  choiceKey,
   itineraryFollowedToday,
   parkedCarFrom,
   parkedCarName,
@@ -61,16 +60,17 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
   // The place last chosen from the list. A pin moved by hand afterwards started there, not where
   // the car is saved.
   const [lastListed, setLastListed] = useState<ParkingChoice | null>(null);
+  const [placesChosen, setPlacesChosen] = useState(0);
   const [pinMoves, setPinMoves] = useState(0);
   const pin = choice ? choiceCoordinate(choice) : original;
   const pinOrigin = pinOriginOf(lastListed, state);
   const pinWording = choice?.kind === 'pin' ? pinPosition(choice.coordinate, pinOrigin) : null;
-  // Choosing a listed place re-centres the map on it; moving the pin by hand never does.
-  const mapKey = choice && choice.kind !== 'pin' ? choiceKey(choice) : 'pin';
 
   const chooseListed = (listed: ParkingChoice | null) => {
     setChoice(listed);
-    if (listed) setLastListed(listed);
+    if (!listed) return;
+    setLastListed(listed);
+    setPlacesChosen((count) => count + 1);
   };
 
   const movePin = (coordinate: Coordinate) => {
@@ -112,7 +112,13 @@ function CorrectParkedCar({ state }: { state: ParkedState }) {
         />
       }>
       <AppText tone="secondary">{`Saved now: ${parkedCarName(state)}`}</AppText>
-      <PinDropMap key={mapKey} coordinate={pin} onMove={movePin} />
+      <PinDropMap
+        // Choosing a listed place re-centres the map on it, even the same place again. Moving the
+        // pin by hand never does, so the map keeps the zoom the person chose.
+        key={placesChosen}
+        coordinate={pin}
+        onMove={movePin}
+      />
       {pinWording ? (
         <AppText accessibilityLabel={`${pinWording.spoken}.`}>{`${pinWording.text}.`}</AppText>
       ) : null}
