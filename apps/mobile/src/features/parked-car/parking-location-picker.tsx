@@ -297,7 +297,7 @@ export function ParkingLocationPicker({
   const placePin = (option: PinOption, placed: PlacedPin) => {
     option.onPlace(placed);
     choose(pinAt(placed.coordinate));
-    // Only the map shows where the pin went, so VoiceOver hears it after every move.
+    // The row's text changes as the pin moves, but VoiceOver does not read it again by itself.
     AccessibilityInfo.announceForAccessibility(
       `${pinPosition(placed.coordinate, placed.from).spoken}.`,
     );
