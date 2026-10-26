@@ -82,6 +82,26 @@ function sumSeconds(legs: readonly Leg[], kinds: readonly Leg['kind'][]): number
     .reduce((total, leg) => total + legSeconds(leg), 0);
 }
 
+// The transfer buffer is the minimum time between stepping off one service and the next one leaving,
+// including any walk between them. It is applied once and never stacked on the provider's walk time.
+export function hasShortTransfer(legs: readonly Leg[], bufferSeconds: number): boolean {
+  let lastArrival: string | null = null;
+  let walkSinceArrival = 0;
+  for (const leg of legs) {
+    if (leg.kind === 'transit') {
+      if (lastArrival !== null) {
+        const windowSeconds = secondsBetween(lastArrival, leg.start);
+        if (windowSeconds < Math.max(bufferSeconds, walkSinceArrival)) return true;
+      }
+      lastArrival = leg.end;
+      walkSinceArrival = 0;
+    } else if (leg.kind === 'walk') {
+      walkSinceArrival += legSeconds(leg);
+    }
+  }
+  return false;
+}
+
 export function transitLegsOf(legs: readonly Leg[]): TransitLeg[] {
   return legs.filter((leg): leg is TransitLeg => leg.kind === 'transit');
 }

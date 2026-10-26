@@ -3,6 +3,7 @@ import { haversineMetres } from './geo';
 import {
   buildItinerary,
   findContinuityIssues,
+  hasShortTransfer,
   legSeconds,
   MAX_LOCATION_GAP_METRES,
   transitLegsOf,
@@ -1054,26 +1055,6 @@ function journeyProblem(context: PlanContext, legs: readonly Leg[]): RejectionRe
   }
   if (hasShortTransfer(legs, preferences.transferBufferMinutes * 60)) return 'transfer-too-short';
   return null;
-}
-
-// The transfer buffer is the minimum time between stepping off one service and the next one leaving,
-// including any walk between them. It is applied once and never stacked on the provider's walk time.
-function hasShortTransfer(legs: readonly Leg[], bufferSeconds: number): boolean {
-  let lastArrival: string | null = null;
-  let walkSinceArrival = 0;
-  for (const leg of legs) {
-    if (leg.kind === 'transit') {
-      if (lastArrival !== null) {
-        const windowSeconds = secondsBetween(lastArrival, leg.start);
-        if (windowSeconds < Math.max(bufferSeconds, walkSinceArrival)) return true;
-      }
-      lastArrival = leg.end;
-      walkSinceArrival = 0;
-    } else if (leg.kind === 'walk') {
-      walkSinceArrival += legSeconds(leg);
-    }
-  }
-  return false;
 }
 
 function itineraryProblem(context: PlanContext, itinerary: Itinerary): RejectionReason | null {
