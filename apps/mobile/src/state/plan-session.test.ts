@@ -469,6 +469,23 @@ describe('a followed trip that has started', () => {
     expect(storage.activeTrip.get()?.itinerary).toEqual(started);
   });
 
+  it('reports the trip gone when its metro now leaves before the platform is reached', async () => {
+    const { session, storage, trips } = followingStartedTrip();
+    const checked = session.refreshActiveTrip();
+    const searched = lastPending(trips.pending);
+    // The same run made up time, and a later one leaves after the walk to the platform.
+    const madeUpTime = restFromStation(started, -3);
+    const nextRun = restFromStation(parkAndRideItinerary({ departAt: START.toISOString() }));
+    searched.resolve(planResponse([madeUpTime, nextRun]));
+    await checked;
+
+    expect(session.getState().activeTripRefresh).toMatchObject({
+      status: 'no-longer-offered',
+      alternatives: [nextRun],
+    });
+    expect(storage.activeTrip.get()?.itinerary).toEqual(started);
+  });
+
   it('has nothing to check once the metro has left', async () => {
     const { session, trips, advanceSeconds } = followingStartedTrip();
     advanceSeconds(13 * 60);

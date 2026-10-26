@@ -17,7 +17,7 @@ import {
   useActiveTrip,
   useSettings,
 } from '@/storage';
-import { matchItinerary, matchRestOfTrip } from '@/trip/itinerary-match';
+import { alternativesThatCanBeMade, matchItinerary, matchRestOfTrip } from '@/trip/itinerary-match';
 import {
   manualRefreshAvailability,
   partToCheck,
@@ -280,10 +280,16 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
       // Ignore the answer if the session was reset or the person chose another trip meanwhile.
       if (run.signal.aborted || storage.activeTrip.get() !== trip) return { status: 'checked' };
       const checkedAt = toIso(clock.now());
+      const { transferBufferMinutes } = tripWithCar.preferences;
       const match =
         part.kind === 'whole-trip'
           ? matchItinerary(trip.itinerary, response.itineraries)
-          : matchRestOfTrip(trip.itinerary, part.legIndex, response.itineraries);
+          : matchRestOfTrip(
+              trip.itinerary,
+              part.legIndex,
+              response.itineraries,
+              transferBufferMinutes,
+            );
       const restOfTrip =
         part.kind === 'whole-trip'
           ? null
@@ -298,7 +304,15 @@ export function createPlanSession(dependencies: PlanSessionDependencies): PlanSe
           activeTripRefresh: {
             status: 'no-longer-offered',
             error: null,
-            alternatives: response.itineraries,
+            alternatives:
+              part.kind === 'whole-trip'
+                ? response.itineraries
+                : alternativesThatCanBeMade(
+                    trip.itinerary,
+                    part.legIndex,
+                    response.itineraries,
+                    transferBufferMinutes,
+                  ),
             request,
             restOfTrip,
             previous: null,

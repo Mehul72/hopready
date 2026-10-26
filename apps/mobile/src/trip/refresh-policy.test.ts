@@ -18,7 +18,12 @@ import {
   transitItinerary,
 } from '@/test-support/trips';
 
-import { joinAlternative, matchItinerary, matchRestOfTrip } from './itinerary-match';
+import {
+  alternativesThatCanBeMade,
+  joinAlternative,
+  matchItinerary,
+  matchRestOfTrip,
+} from './itinerary-match';
 import {
   manualRefreshAvailability,
   partToCheck,
@@ -29,6 +34,7 @@ import {
 } from './refresh-policy';
 
 const NOW = new Date('2026-10-26T20:55:00.000Z');
+const TRANSFER_BUFFER_MINUTES = 3;
 const secondsAgo = (seconds: number) => new Date(NOW.getTime() - seconds * 1000).toISOString();
 
 // A lift to Tallawong Station, then the metro to Chatswood.
@@ -367,7 +373,7 @@ describe('matchRestOfTrip', () => {
     const running = restFromStation(started, 3);
     const nextRun = restFromStation(parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z' }));
 
-    const match = matchRestOfTrip(started, metroIndex, [nextRun, running]);
+    const match = matchRestOfTrip(started, metroIndex, [nextRun, running], TRANSFER_BUFFER_MINUTES);
 
     expect(match?.exact).toBe(true);
     // The same trip, so it keeps its id, its start and its car park.
@@ -391,8 +397,24 @@ describe('matchRestOfTrip', () => {
 
   it('finds nothing when a service still to come is not offered on its run', () => {
     const nextRun = restFromStation(parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z' }));
-    expect(matchRestOfTrip(started, metroIndex, [nextRun])).toBeNull();
-    expect(matchRestOfTrip(started, metroIndex, [])).toBeNull();
+    expect(matchRestOfTrip(started, metroIndex, [nextRun], TRANSFER_BUFFER_MINUTES)).toBeNull();
+    expect(matchRestOfTrip(started, metroIndex, [], TRANSFER_BUFFER_MINUTES)).toBeNull();
+  });
+
+  it('finds nothing when the same run now leaves before the traveller reaches its stop', () => {
+    // The metro made up time and now leaves 3 min before the walk to the platform ends.
+    const madeUpTime = restFromStation(started, -3);
+    expect(matchRestOfTrip(started, metroIndex, [madeUpTime], TRANSFER_BUFFER_MINUTES)).toBeNull();
+  });
+});
+
+describe('alternativesThatCanBeMade', () => {
+  it('drops a service that leaves before the traveller reaches its stop', () => {
+    const tooSoon = restFromStation(started, -3);
+    const later = restFromStation(parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z' }));
+    expect(
+      alternativesThatCanBeMade(started, metroIndex, [tooSoon, later], TRANSFER_BUFFER_MINUTES),
+    ).toEqual([later]);
   });
 });
 

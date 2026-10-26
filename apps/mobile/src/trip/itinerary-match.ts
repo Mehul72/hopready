@@ -1,4 +1,11 @@
-import { buildItinerary, type Itinerary, type Leg, secondsBetween } from '@hopready/core';
+import {
+  buildItinerary,
+  findContinuityIssues,
+  hasShortTransfer,
+  type Itinerary,
+  type Leg,
+  secondsBetween,
+} from '@hopready/core';
 
 export interface ItineraryMatch {
   itinerary: Itinerary;
@@ -58,17 +65,27 @@ function joinedLegs(trip: Itinerary, fromLegIndex: number, rest: readonly Leg[])
   return [...travelled, ...rest];
 }
 
+// The rules the planner holds every option to: no leg starts before the one before it ends, and
+// every change leaves at least the transfer buffer, walk included. The part already travelled keeps
+// its planned times, so a service now leaving before the traveller reaches its stop fails here.
+function canBeMade(legs: readonly Leg[], transferBufferMinutes: number): boolean {
+  return (
+    findContinuityIssues(legs).length === 0 && !hasShortTransfer(legs, transferBufferMinutes * 60)
+  );
+}
+
 // For a trip that has started, checked by planning the rest of it from the next stop
 // (restOfTripRequest). The trip still runs when an option rides every service still to come, on
-// the same runs; joined to the part already travelled, that option is the trip with the latest
-// times, and keeps its id because it is the same trip. Null when a service still to come is not
-// offered on its run, such as after a cancellation. A service that has already left cannot be
-// planned again, so the part travelled keeps its times, and a delay on it that breaks a connection
-// is not found here.
+// the same runs, and can still be made from the part already travelled; joined to that part, it is
+// the trip with the latest times, and keeps its id because it is the same trip. Null when a service
+// still to come is not offered on its run, such as after a cancellation, or now leaves before the
+// traveller can reach it. A service that has already left cannot be planned again, so the part
+// travelled keeps its times, and a delay on it that breaks a connection is not found here.
 export function matchRestOfTrip(
   trip: Itinerary,
   fromLegIndex: number,
   candidates: readonly Itinerary[],
+  transferBufferMinutes: number,
 ): ItineraryMatch | null {
   const runsToCome = runsOf(trip.legs.slice(fromLegIndex));
   const same = candidates.find((candidate) => runsOf(candidate.legs) === runsToCome);
@@ -82,6 +99,7 @@ export function matchRestOfTrip(
     alerts: same.alerts,
     notes: [...new Set([...trip.notes, ...same.notes])],
   });
+  if (!canBeMade(updated.legs, transferBufferMinutes)) return null;
   return { itinerary: { ...updated, id: trip.id }, exact: true };
 }
 
@@ -103,4 +121,17 @@ export function joinAlternative(
     alerts: alternative.alerts,
     notes: [...new Set([...trip.notes, ...alternative.notes])],
   });
+}
+
+// The options for the rest of a started trip that can be made from the part already travelled.
+// Planning from the stop can offer a service that leaves before the traveller gets there.
+export function alternativesThatCanBeMade(
+  trip: Itinerary,
+  fromLegIndex: number,
+  alternatives: readonly Itinerary[],
+  transferBufferMinutes: number,
+): Itinerary[] {
+  return alternatives.filter((alternative) =>
+    canBeMade(joinAlternative(trip, fromLegIndex, alternative).legs, transferBufferMinutes),
+  );
 }

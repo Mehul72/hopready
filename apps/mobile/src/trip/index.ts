@@ -1,4 +1,5 @@
 export {
+  alternativesThatCanBeMade,
   type ItineraryMatch,
   joinAlternative,
   matchItinerary,
