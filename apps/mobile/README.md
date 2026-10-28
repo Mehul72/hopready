@@ -68,7 +68,7 @@ npx jest
 
 ### Components
 
-`Screen`, `AppText`, `Button`, `IconButton`, `Card`, `Chip`, `SegmentedControl`, `ListRow`, `SectionHeader`, `Banner`, `EmptyState`, `ErrorState`, `LoadingState`, `ModeIcon`, `TimingBadge`, `Stepper`, `TripMap` and `DemoModeBanner`, all exported from `@/components`. Each one has a role and a spoken label, a touch target of at least 44 points, scales with Dynamic Type, and follows light and dark mode.
+`Screen`, `AppText`, `Button`, `IconButton`, `Card`, `Chip`, `SegmentedControl`, `ListRow`, `SectionHeader`, `Banner`, `EmptyState`, `ErrorState`, `LoadingState`, `ModeIcon`, `TimingBadge`, `Stepper`, `TripMap`, `MapCard` and `DemoModeBanner`, all exported from `@/components`. Each one has a role and a spoken label, a touch target of at least 44 points, scales with Dynamic Type, and follows light and dark mode.
 
 ## Rules for screens
 
