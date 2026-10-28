@@ -25,6 +25,10 @@ npx eas-cli@latest submit -p ios --profile production --latest
 
 A successful upload is not the end of it. Apple then processes the build, which usually takes 10 to 15 minutes, and only after that can testers install it. Check App Store Connect > TestFlight for the build state before reporting it as available.
 
+## Changing the API and the app together
+
+The app checks every API answer against a schema and refuses an answer it cannot read in full. Since build 3 it tolerates two kinds of growth: a car park outcome it does not know shows as "Checked. Update HopReady to see what happened here", and a rejection reason it does not know is left out of the explanations. Any other change to an answer's shape still needs the app update on phones before the API deploy, or the results screen shows "HopReady received an answer it could not read". Build 2 was caught this way on 2026-10-28, and staging was rolled back with `wrangler rollback` until build 3 was out.
+
 ## TestFlight checklist
 
 Before the first upload, list `Frameworks/` inside the production build (`unzip -l HopReady.ipa | grep Frameworks/`). Apple requires a privacy manifest, and a signature, for SDKs on its list of commonly used third-party SDKs. HopReady removed `expo-image` so SDWebImage is no longer included. Hermes (`hermesvm.framework`) is also on Apple's list and the React Native build of it carries no manifest of its own; if App Store Connect answers the upload with ITMS-91061 naming it, update Expo and React Native to the latest patch release before working around it.
