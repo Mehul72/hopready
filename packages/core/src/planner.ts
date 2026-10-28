@@ -920,9 +920,19 @@ async function rankByDriveTime(
     });
   });
 
-  return reachable
+  // The local station is the first place most people would think of, so the quickest drive is
+  // always tried, even when a car park nearer the destination scores better on the estimate.
+  const byScore = reachable.sort((a, b) => a.score - b.score);
+  const nearest = byScore.reduce<(typeof byScore)[number] | undefined>(
+    (best, candidate) =>
+      best === undefined || candidate.driveSeconds < best.driveSeconds ? candidate : best,
+    undefined,
+  );
+  const kept = (
+    nearest ? [nearest, ...byScore.filter((candidate) => candidate !== nearest)] : []
+  ).slice(0, context.limits.maxTransferCandidates);
+  return kept
     .sort((a, b) => a.score - b.score)
-    .slice(0, context.limits.maxTransferCandidates)
     .map(({ point, driveSeconds }) => ({ point, driveSeconds }));
 }
 

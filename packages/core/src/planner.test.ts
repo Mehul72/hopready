@@ -332,6 +332,21 @@ describe('drive, park, then metro', () => {
     });
   });
 
+  it('always tries the quickest drive, even when further car parks score better', async () => {
+    // From Rouse Hill, Tallawong is the quickest drive (about 5 minutes), but Kellyville scores
+    // better on the rough estimate because it is nearer Chatswood. With room for one car park,
+    // the estimate alone would pick Kellyville.
+    const response = await planTrip(
+      request({ origin: ROUSE_HILL }),
+      deps({ limits: { maxTransferCandidates: 1 } }),
+    );
+    const outcomeOf = (id: string) =>
+      response.checkedCarParks.find((carPark) => carPark.id === id)?.outcome;
+
+    expect(outcomeOf(TALLAWONG.id)).toBe('used');
+    expect(outcomeOf(KELLYVILLE.id)).toBeUndefined();
+  });
+
   it('skips car parks well behind the traveller and explains which car parks it checked', async () => {
     // From Bella Vista, Kellyville is 2.1 km back and Tallawong 5.6 km back, both on a modest
     // detour, so only the 5 km rule tells them apart.

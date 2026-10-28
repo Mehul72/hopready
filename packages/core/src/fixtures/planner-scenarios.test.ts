@@ -50,7 +50,7 @@ const TUESDAY_MORNING = Array.from({ length: 13 }, (_, step) =>
 
 const TRANSIT_ONLY = { transit: true, drive: false, dropOff: false };
 const METRO_NORTH_WEST_CAR_PARKS = ['26', '27', '28', '29', '30', '31', '32', '33'];
-const B_LINE_CAR_PARKS = ['10', '12', '13', '489', '490'];
+const B_LINE_CAR_PARKS = ['10', '11', '12', '13', '489', '490'];
 const OCCUPANCY_FRESH_MINUTES = 15;
 // A count with no more than this share of the spaces free is nearly full.
 const NEARLY_FULL_FREE_SHARE = 0.1;

@@ -24,7 +24,7 @@ Constraints:
 - Use TfNSW `/v1/tp/trip` only for walking and public transport, with documented parameters only.
 - Build the drive leg, the parking or drop-off buffer, the car retrieval buffer and the return through the car in our own planner (`packages/core/src/planner.ts`).
 - Candidate car parks come from the TfNSW Car Park API, plus spots the user saved.
-- Candidates are filtered by straight-line bounds, then ranked with one driving ETA call. Only the best 3 are asked for transit journeys.
+- Candidates are filtered by straight-line bounds, then ranked with one driving ETA call. Only 3 are asked for transit journeys: the quickest drive, then the best of the rest by the estimate (changed 2026-10-28; it was the best 3 by the estimate alone, which could leave out the local station).
 
 ## Alternatives considered
 
