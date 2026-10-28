@@ -153,13 +153,15 @@ describe('when nothing works', () => {
       expect.objectContaining({ expanded: true }),
     );
     expect(
-      screen.getByLabelText('Tallawong P2: Not on the way to your destination'),
-    ).toBeOnTheScreen();
-    expect(
       screen.getByLabelText('Cherrybrook: Further than your 30 min driving limit'),
     ).toBeOnTheScreen();
     expect(
       screen.getByLabelText('Kellyville (north): A connection was found from here'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        'Kellyville (south): A car park shown above gets you there as early, with no more driving',
+      ),
     ).toBeOnTheScreen();
   });
 
