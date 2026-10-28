@@ -53,18 +53,18 @@ npx jest
 
 ## Where things are
 
-| Folder             | What it holds                                                                                                                                                                                                               |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app`          | Routes only. Every file here becomes a route and ships in the bundle, so tests live elsewhere.                                                                                                                              |
-| `src/features`     | The screens, one folder per area: `plan`, `results`, `itinerary`, `parked-car`, `saved`, `settings` and `consent`, with their flow tests. `shared` holds wording used by several, such as car park counts and option names. |
-| `src/theme`        | Colour tokens for light and dark (WCAG AA, checked by `contrast.test.ts`), transport mode colours, labels and SF Symbols, typography and spacing. `useTheme()` returns the current theme.                                   |
-| `src/components`   | Building blocks for screens (list below).                                                                                                                                                                                   |
-| `src/storage`      | Everything saved on the device, in `expo-sqlite/kv-store`: stores, hooks and `deleteAllData()`.                                                                                                                             |
-| `src/api`          | The HTTP client for the HopReady API, `ApiError`, and the TanStack Query client.                                                                                                                                            |
-| `src/trip`         | `tripService` (plans, place search and car parks, in live or demo mode), query hooks, the refresh policy and the resume hook.                                                                                               |
-| `src/state`        | `planSession`, the shared store for the latest search, its results and the active trip refresh; `apiAnswerMode`, the mode of the API's latest answer, which `useShowsDemoData` reads to show the demo banner.               |
-| `src/location`     | `requestCurrentPlace()` and the location permission hook.                                                                                                                                                                   |
-| `src/test-support` | Jest mocks for native modules, and builders for places, requests and itineraries.                                                                                                                                           |
+| Folder             | What it holds                                                                                                                                                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app`          | Routes only. Every file here becomes a route and ships in the bundle, so tests live elsewhere.                                                                                                                    |
+| `src/features`     | The screens, one folder per area: `plan`, `results`, `itinerary`, `parked-car`, `saved`, `settings` and `consent`, with their flow tests; `shared` holds pieces several areas use, including the full-screen map. |
+| `src/theme`        | Colour tokens for light and dark (WCAG AA, checked by `contrast.test.ts`), transport mode colours, labels and SF Symbols, typography and spacing. `useTheme()` returns the current theme.                         |
+| `src/components`   | Building blocks for screens (list below).                                                                                                                                                                         |
+| `src/storage`      | Everything saved on the device, in `expo-sqlite/kv-store`: stores, hooks and `deleteAllData()`.                                                                                                                   |
+| `src/api`          | The HTTP client for the HopReady API, `ApiError`, and the TanStack Query client.                                                                                                                                  |
+| `src/trip`         | `tripService` (plans, place search and car parks, in live or demo mode), query hooks, the refresh policy and the resume hook.                                                                                     |
+| `src/state`        | `planSession`, the shared store for the latest search, its results and the active trip refresh; `apiAnswerMode`, the mode of the API's latest answer, which `useShowsDemoData` reads to show the demo banner.     |
+| `src/location`     | `requestCurrentPlace()` and the location permission hook.                                                                                                                                                         |
+| `src/test-support` | Jest mocks for native modules, and builders for places, requests and itineraries.                                                                                                                                 |
 
 ### Components
 
