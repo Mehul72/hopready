@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react-native';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
 
 import { appStorage } from '@/storage';
 import { COMPACT_MAX_FONT_SCALE } from '@/theme';
@@ -65,6 +66,18 @@ describe('Screen', () => {
     expect(
       screen.queryByLabelText(`Demo. ${DEMO_BANNER_TITLE}. ${DEMO_BANNER_MESSAGE}`),
     ).not.toBeOnTheScreen();
+  });
+
+  it('starts fixed content below a floating navigation header', async () => {
+    await render(
+      <HeaderHeightContext value={96}>
+        <Screen scroll={false} testID="fixed">
+          <AppText>Choose a place</AppText>
+        </Screen>
+      </HeaderHeightContext>,
+    );
+
+    expect(screen.getByTestId('fixed-content')).toHaveStyle({ paddingTop: 96 });
   });
 
   it('leaves the banner to the window strip on ordinary screens', async () => {

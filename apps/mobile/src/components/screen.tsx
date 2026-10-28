@@ -1,4 +1,5 @@
-import { type ComponentRef, type ReactNode, useRef, useState } from 'react';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
+import { type ComponentRef, type ReactNode, use, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   ScrollView,
@@ -43,6 +44,10 @@ export function Screen({
   const { colours } = useTheme();
   const insets = useSafeAreaInsets();
   const presentation = useScreenPresentation();
+  // The native stack's header floats over the screen, so fixed content must start below it. A
+  // scrolling screen gets this from iOS through contentInsetAdjustmentBehavior. Outside a
+  // navigator, as in tests, there is no header.
+  const headerHeight = use(HeaderHeightContext) ?? 0;
   const containerRef = useRef<ComponentRef<typeof View>>(null);
   // KeyboardAvoidingView measures against its parent, not the window. In a sheet or below the
   // demo strip that parent starts lower down, so the offset to the window top is passed in.
@@ -50,7 +55,8 @@ export function Screen({
 
   const inModal = presentation === 'modal';
   const edgePadding: ViewStyle = {
-    paddingTop: safeAreaEdges.includes('top') ? insets.top : 0,
+    // A shown header already covers the status bar, so its height replaces the top inset.
+    paddingTop: headerHeight > 0 ? headerHeight : safeAreaEdges.includes('top') ? insets.top : 0,
     paddingBottom: safeAreaEdges.includes('bottom') && !footer ? insets.bottom : 0,
     paddingLeft: safeAreaEdges.includes('left') ? insets.left : 0,
     paddingRight: safeAreaEdges.includes('right') ? insets.right : 0,
@@ -71,7 +77,9 @@ export function Screen({
       </View>
     </ScrollView>
   ) : (
-    <View style={[styles.fill, edgePadding, contentContainerStyle]}>
+    <View
+      style={[styles.fill, edgePadding, contentContainerStyle]}
+      testID={testID ? `${testID}-content` : undefined}>
       {inModal ? <DemoModeBanner placement="compact" style={styles.fixedBanner} /> : null}
       {children}
     </View>
