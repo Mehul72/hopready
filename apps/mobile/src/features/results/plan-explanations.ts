@@ -22,6 +22,8 @@ export function carParkOutcomeText(outcome: CarParkOutcome, maxDriveMinutes: num
       return 'No public transport connection worked from here';
     case 'provider-error':
       return "Couldn't be checked just now";
+    case 'not-understood':
+      return 'Checked. Update HopReady to see what happened here';
   }
 }
 

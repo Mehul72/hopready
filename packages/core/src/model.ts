@@ -326,6 +326,9 @@ export const CAR_PARK_OUTCOMES = [
   'not-tried',
   'no-workable-connection',
   'provider-error',
+  // Never sent by the server. An app older than a newly added outcome reads that outcome as this,
+  // so a new outcome never stops an older app from showing the trip.
+  'not-understood',
 ] as const;
 
 export const planResponseSchema = z.object({

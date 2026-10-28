@@ -329,6 +329,15 @@ describe('drive, park, then metro', () => {
     }
   });
 
+  it('never reports the outcome reserved for apps older than the server', async () => {
+    for (const origin of [BOX_HILL, ROUSE_HILL, BELLA_VISTA_HOME]) {
+      const response = await planTrip(request({ origin }), deps());
+      expect(response.checkedCarParks.map((carPark) => carPark.outcome)).not.toContain(
+        'not-understood',
+      );
+    }
+  });
+
   it('checks a car park a short drive back from the start, as a local would', async () => {
     // Tallawong is about 1.6 km behind Rouse Hill on the way to Chatswood.
     const response = await planTrip(request({ origin: ROUSE_HILL }), deps());

@@ -1,9 +1,4 @@
-import {
-  type Coordinate,
-  type PlanRequest,
-  type PlanResponse,
-  planResponseSchema,
-} from '@hopready/core';
+import type { Coordinate, PlanRequest, PlanResponse } from '@hopready/core';
 
 import { type HttpTransport, requestJson } from './http';
 import {
@@ -11,6 +6,7 @@ import {
   carParksResponseSchema,
   type PlaceSearchResults,
   placeSearchResponseSchema,
+  planResponseForThisAppSchema,
 } from './schemas';
 
 // The server accepts 2 to 80 characters. Shorter text returns no results without a request, and
@@ -44,7 +40,7 @@ export function createApiClient(transport: HttpTransport): ApiClient {
         method: 'POST',
         path: API_ROUTES.plan,
         body: request,
-        schema: planResponseSchema,
+        schema: planResponseForThisAppSchema,
         signal,
       }),
     searchPlaces: async (query, near, signal) => {

@@ -1,10 +1,13 @@
 import {
+  CAR_PARK_OUTCOMES,
   type CarParkFacility,
   carParkSchema,
   type Occupancy,
   occupancySchema,
   parkingRulesSchema,
   placeSchema,
+  planResponseSchema,
+  REJECTION_REASONS,
 } from '@hopready/core';
 import { z } from 'zod';
 
@@ -67,3 +70,39 @@ export function errorCodeOf(body: unknown): string | null {
   if (!parsed.success) return null;
   return 'code' in parsed.data ? parsed.data.code : parsed.data.error.code;
 }
+
+const KNOWN_CAR_PARK_OUTCOMES = new Set<string>(CAR_PARK_OUTCOMES);
+const KNOWN_REJECTION_REASONS = new Set<string>(REJECTION_REASONS);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// The server gains car park outcomes and rejection reasons before every phone has the update.
+// Build 2 rejected a whole plan over one unknown outcome. Now an unknown outcome reads as
+// 'not-understood', and an unknown reason is left out of the explanations; the rest is checked as
+// strictly as before.
+export const planResponseForThisAppSchema = z.preprocess((raw) => {
+  if (!isRecord(raw)) return raw;
+  const { checkedCarParks, rejected } = raw;
+  return {
+    ...raw,
+    checkedCarParks: Array.isArray(checkedCarParks)
+      ? checkedCarParks.map((carPark) =>
+          isRecord(carPark) &&
+          typeof carPark.outcome === 'string' &&
+          !KNOWN_CAR_PARK_OUTCOMES.has(carPark.outcome)
+            ? { ...carPark, outcome: 'not-understood' }
+            : carPark,
+        )
+      : checkedCarParks,
+    rejected: Array.isArray(rejected)
+      ? rejected.filter(
+          (rejection) =>
+            !isRecord(rejection) ||
+            typeof rejection.reason !== 'string' ||
+            KNOWN_REJECTION_REASONS.has(rejection.reason),
+        )
+      : rejected,
+  };
+}, planResponseSchema);

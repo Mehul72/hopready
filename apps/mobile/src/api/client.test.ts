@@ -155,6 +155,32 @@ describe('plan', () => {
     expect(error.cause).toBeInstanceOf(SyntaxError);
   });
 
+  it('keeps reading a plan whose outcomes or reasons are newer than this app', async () => {
+    const itinerary: Itinerary = transitItinerary({ departAt: '2026-10-26T21:00:00.000Z' });
+    const fetch = scriptedFetch(async () =>
+      jsonResponse(200, {
+        ...planResponse([itinerary]),
+        checkedCarParks: [
+          { id: '26', name: 'Tallawong P1', outcome: 'used' },
+          { id: '29', name: 'Kellyville (north)', outcome: 'added-next-year' },
+        ],
+        rejected: [
+          { reason: 'duplicate', count: 1 },
+          { reason: 'added-next-year', count: 2 },
+        ],
+      }),
+    );
+
+    const response = await clientWith(fetch).plan(planRequest());
+
+    expect(response.itineraries).toEqual([itinerary]);
+    expect(response.checkedCarParks).toEqual([
+      { id: '26', name: 'Tallawong P1', outcome: 'used' },
+      { id: '29', name: 'Kellyville (north)', outcome: 'not-understood' },
+    ]);
+    expect(response.rejected).toEqual([{ reason: 'duplicate', count: 1 }]);
+  });
+
   it('treats JSON in the wrong shape as an invalid response', async () => {
     const fetch = scriptedFetch(async () =>
       jsonResponse(200, { ...planResponse([]), itineraries: [{ id: 'missing everything' }] }),
