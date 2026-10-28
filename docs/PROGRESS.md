@@ -4,7 +4,7 @@ Read this first when picking the work up. The plan with step-level detail is doc
 
 ## Where things stand (2026-10-26, early afternoon AEDT)
 
-- Branch `feat/hopready-v1`, local only (nothing pushed). `git log --oneline` lists every step.
+- Branch `feat/hopready-v1`, pushed to GitHub on 2026-10-28 at the owner's request. No pull request yet. `git log --oneline` lists every step.
 - **The app is feature complete for v1** and runs end to end on the iOS simulator in demo mode. Live mode is built and tested against fakes, schema-derived samples and a local API serving demo data. It has not met the real Transport for NSW or Apple Maps services, because there are no keys yet. HopReady is not production ready until it has.
 - **Done and tested:**
   - Core: model, Sydney time, the planner (every strategy, buffers applied once, the feasibility rules) and the demo world built on real TfNSW stops. `pnpm --filter @hopready/core test`.

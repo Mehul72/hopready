@@ -1,7 +1,7 @@
 # Plan: HopReady v1 (iPhone, Greater Sydney)
 
 Status: in progress
-Branch: feat/hopready-v1 (local only; not pushed)
+Branch: feat/hopready-v1 (on GitHub since 2026-10-28; no pull request)
 
 ## Goal
 
