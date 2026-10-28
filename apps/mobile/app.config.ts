@@ -15,9 +15,12 @@ const DEFAULT_SUPPORT_URL = 'https://mehul72.github.io/hopready/support/';
 // The owner's Apple Developer team (individual membership), read from their provisioning profiles.
 const DEFAULT_APPLE_TEAM_ID = 'MACDPWQG37';
 
-function easExtra(): { eas: { projectId: string } } | Record<string, never> {
-  const projectId = process.env.EAS_PROJECT_ID;
-  return projectId ? { eas: { projectId } } : {};
+// The EAS project made with `eas init` on 2026-10-28. EAS cannot write this into a TypeScript
+// config itself, and every eas command needs it. Not secret.
+const DEFAULT_EAS_PROJECT_ID = '76281729-c139-46bd-b157-3de79437dd1f';
+
+function easExtra(): { eas: { projectId: string } } {
+  return { eas: { projectId: process.env.EAS_PROJECT_ID ?? DEFAULT_EAS_PROJECT_ID } };
 }
 
 // The XCUITest target is only for local end-to-end runs; store builds never carry it.
@@ -29,6 +32,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'HopReady',
   slug: 'hopready',
+  // The owner's personal Expo account; their login also has a team account, which EAS could pick.
+  owner: 'mehulfursule',
   scheme: 'hopready',
   version: '0.1.0',
   orientation: 'portrait',
