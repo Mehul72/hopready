@@ -359,12 +359,13 @@ function TransitRow({
       notes={notes}
       actions={
         leg.cancelled || leg.alerts.length > 0 ? (
-          <>
+          // The actions area shrink-wraps its children for buttons; banners need the full width.
+          <View style={styles.alerts} testID="leg-alerts">
             {leg.cancelled ? <Banner tone="error" message="This service is cancelled." /> : null}
             {leg.alerts.map((alert) => (
               <AlertBanner key={alert.id} alert={alert} />
             ))}
-          </>
+          </View>
         ) : null
       }
     />
@@ -436,5 +437,9 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingTop: SPACING.md,
     alignItems: 'flex-start',
+  },
+  alerts: {
+    alignSelf: 'stretch',
+    gap: SPACING.sm,
   },
 });

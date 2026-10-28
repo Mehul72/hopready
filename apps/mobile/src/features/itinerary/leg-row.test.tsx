@@ -312,6 +312,8 @@ describe('LegRow', () => {
 
     await userEvent.setup().press(screen.getByRole('button', { name: 'More about this alert' }));
     expect(Linking.openURL).toHaveBeenCalledWith('https://transportnsw.info/alerts/lift');
+    // Buttons in the card's actions area keep to their own width; a banner needs the whole card.
+    expect(screen.getByTestId('leg-alerts')).toHaveStyle({ alignSelf: 'stretch' });
   });
 
   it('explains the parking buffer and keeps occupancy and rules apart', async () => {
