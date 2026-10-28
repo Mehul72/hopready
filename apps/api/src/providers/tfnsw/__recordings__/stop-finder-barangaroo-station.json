@@ -1,0 +1,64 @@
+{
+  "version": "10.6.21.17",
+  "systemMessages": [
+    {
+      "type": "message",
+      "module": "BROKER",
+      "code": -8010,
+      "text": "Any - input uniquely verified"
+    }
+  ],
+  "locations": [
+    {
+      "id": "200046",
+      "isGlobalId": true,
+      "name": "Barangaroo Station, Barangaroo",
+      "disassembledName": "Barangaroo Station",
+      "coord": [
+        -33.859577,
+        151.202615
+      ],
+      "type": "stop",
+      "matchQuality": 996,
+      "isBest": true,
+      "parent": {
+        "id": "placeID:95301004:1",
+        "name": "Barangaroo",
+        "type": "locality"
+      },
+      "assignedStops": [
+        {
+          "id": "200046",
+          "isGlobalId": true,
+          "name": "Barangaroo Station, Barangaroo",
+          "disassembledName": "Barangaroo Station",
+          "type": "stop",
+          "coord": [
+            -33.859577,
+            151.202615
+          ],
+          "parent": {
+            "name": "Barangaroo",
+            "type": "locality"
+          },
+          "connectingMode": 100,
+          "properties": {
+            "stopId": "10101513"
+          },
+          "modes": [
+            2,
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "stopId": "10101513",
+        "mainLocality": "Barangaroo"
+      },
+      "modes": [
+        2,
+        5
+      ]
+    }
+  ]
+}

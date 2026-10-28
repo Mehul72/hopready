@@ -1,0 +1,109 @@
+{
+  "recordedAt": "2026-10-28T08:26:54.479Z",
+  "recordings": [
+    {
+      "file": "stop-finder-chatswood.json",
+      "path": "/v1/tp/stop_finder",
+      "params": {
+        "outputFormat": "rapidJSON",
+        "type_sf": "any",
+        "name_sf": "Chatswood",
+        "coordOutputFormat": "EPSG:4326",
+        "TfNSWSF": "true"
+      },
+      "status": 200,
+      "errorDetail": null
+    },
+    {
+      "file": "stop-finder-barangaroo-station.json",
+      "path": "/v1/tp/stop_finder",
+      "params": {
+        "outputFormat": "rapidJSON",
+        "type_sf": "any",
+        "name_sf": "Barangaroo Station",
+        "coordOutputFormat": "EPSG:4326",
+        "TfNSWSF": "true"
+      },
+      "status": 200,
+      "errorDetail": null
+    },
+    {
+      "file": "trip-tallawong-p1-to-chatswood.json",
+      "path": "/v1/tp/trip",
+      "params": {
+        "outputFormat": "rapidJSON",
+        "coordOutputFormat": "EPSG:4326",
+        "depArrMacro": "dep",
+        "itdDate": "20261029",
+        "itdTime": "0800",
+        "type_origin": "coord",
+        "name_origin": "150.905258:-33.693047:EPSG:4326",
+        "type_destination": "any",
+        "name_destination": "206710",
+        "calcNumberOfTrips": "6",
+        "TfNSWTR": "true"
+      },
+      "status": 200,
+      "errorDetail": null
+    },
+    {
+      "file": "trip-kellyville-to-barangaroo.json",
+      "path": "/v1/tp/trip",
+      "params": {
+        "outputFormat": "rapidJSON",
+        "coordOutputFormat": "EPSG:4326",
+        "depArrMacro": "arr",
+        "itdDate": "20261029",
+        "itdTime": "0900",
+        "type_origin": "any",
+        "name_origin": "2155382",
+        "type_destination": "any",
+        "name_destination": "200046",
+        "calcNumberOfTrips": "6",
+        "TfNSWTR": "true"
+      },
+      "status": 200,
+      "errorDetail": null
+    },
+    {
+      "file": "carpark-list.json",
+      "path": "/v1/carpark",
+      "params": {},
+      "status": 200,
+      "errorDetail": null
+    },
+    {
+      "file": "carpark-full-list.json",
+      "path": "/v1/carpark/full-list",
+      "params": {},
+      "status": 200,
+      "errorDetail": null
+    },
+    {
+      "file": "carpark-facility-26.json",
+      "path": "/v1/carpark",
+      "params": {
+        "facility": "26"
+      },
+      "status": 200,
+      "errorDetail": null
+    },
+    {
+      "file": "departure-mon-chatswood.json",
+      "path": "/v1/tp/departure_mon",
+      "params": {
+        "outputFormat": "rapidJSON",
+        "coordOutputFormat": "EPSG:4326",
+        "mode": "direct",
+        "type_dm": "stop",
+        "name_dm": "206710",
+        "departureMonitorMacro": "true",
+        "TfNSWDM": "true",
+        "itdDate": "20261028",
+        "itdTime": "1926"
+      },
+      "status": 200,
+      "errorDetail": null
+    }
+  ]
+}
