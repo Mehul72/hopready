@@ -97,6 +97,11 @@ final class HopReadyJourneyTests: HopReadyTestCase {
   func testCapturesTheMainScreens() throws {
     openTab("Plan")
     keepScreenshot("01-plan")
+    // The search sheet has a floating header; the capture shows whether the field sits below it.
+    tapWhenReady(element("place-field-origin"))
+    XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 10))
+    keepScreenshot("08-search")
+    tapWhenReady(app.buttons["Cancel"])
     planDriveAndParkTrip()
     XCTAssertTrue(parkAndRideOption().waitForExistence(timeout: 30))
     keepScreenshot("02-results")
