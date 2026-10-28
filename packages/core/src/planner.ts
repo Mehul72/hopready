@@ -55,7 +55,7 @@ export interface PlannerLimits {
 export const DEFAULT_PLANNER_LIMITS: PlannerLimits = {
   // Apple's ETA endpoint takes at most 10 destinations in one call.
   maxEtaCandidates: 8,
-  maxTransferCandidates: 3,
+  maxTransferCandidates: 4,
   journeysPerQuery: 4,
   maxItineraries: 10,
   providerTimeoutMs: 8_000,
@@ -85,6 +85,10 @@ const MIN_PROGRESS_METRES = 1_000;
 const ANY_DIRECTION_WITHIN_METRES = 5_000;
 const MAX_DETOUR_RATIO = 1.6;
 const MAX_EXPLAINED_SKIPPED_CAR_PARKS = 3;
+// The local stations are the first places most people would think of, so the quickest drives to
+// this many different stations are always tried, whatever the rough estimate says about car parks
+// nearer the destination.
+const QUICKEST_DRIVES_ALWAYS_TRIED = 2;
 // Provider times are whole minutes; allow that much slack before calling something early or late.
 const TIME_GRACE_SECONDS = 60;
 // A count with no more than this share of the spaces free could easily be full by the time the
@@ -861,10 +865,17 @@ function shortlistByGeometry(
   );
   const preferred = ranked.filter((point) => point.preferred);
   const others = ranked.filter((point) => !point.preferred);
-  return [...preferred, ...others].slice(
+  const shortlisted = [...preferred, ...others].slice(
     0,
     Math.max(context.limits.maxEtaCandidates, preferred.length),
   );
+  // Car parks that were on the way but lost their place say so, so none goes missing from the list.
+  for (const point of others.slice(shortlisted.length - preferred.length)) {
+    if (roughDriveMinutes(origin, point.place) <= preferences.maxDriveMinutes) {
+      recordCarPark(context, strategy, point, 'not-tried');
+    }
+  }
+  return shortlisted;
 }
 
 async function rankByDriveTime(
@@ -920,17 +931,22 @@ async function rankByDriveTime(
     });
   });
 
-  // The local station is the first place most people would think of, so the quickest drive is
-  // always tried, even when a car park nearer the destination scores better on the estimate.
+  // Two car parks at one station share its services, so the second would only repeat the first.
+  const quickestDrives: typeof reachable = [];
+  for (const candidate of [...reachable].sort((a, b) => a.driveSeconds - b.driveSeconds)) {
+    if (quickestDrives.length === QUICKEST_DRIVES_ALWAYS_TRIED) break;
+    const station = candidate.point.station;
+    if (station && quickestDrives.some((kept) => kept.point.station === station)) continue;
+    quickestDrives.push(candidate);
+  }
   const byScore = reachable.sort((a, b) => a.score - b.score);
-  const nearest = byScore.reduce<(typeof byScore)[number] | undefined>(
-    (best, candidate) =>
-      best === undefined || candidate.driveSeconds < best.driveSeconds ? candidate : best,
-    undefined,
-  );
-  const kept = (
-    nearest ? [nearest, ...byScore.filter((candidate) => candidate !== nearest)] : []
-  ).slice(0, context.limits.maxTransferCandidates);
+  const kept = [
+    ...quickestDrives,
+    ...byScore.filter((candidate) => !quickestDrives.includes(candidate)),
+  ].slice(0, context.limits.maxTransferCandidates);
+  for (const candidate of reachable) {
+    if (!kept.includes(candidate)) recordCarPark(context, strategy, candidate.point, 'not-tried');
+  }
   return kept
     .sort((a, b) => a.score - b.score)
     .map(({ point, driveSeconds }) => ({ point, driveSeconds }));

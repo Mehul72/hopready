@@ -60,6 +60,9 @@ describe('carParkOutcomeText', () => {
     expect(carParkOutcomeText('not-towards-destination', 25)).toBe(
       'Not on the way to your destination',
     );
+    expect(carParkOutcomeText('not-tried', 25)).toBe(
+      'Not tried: HopReady tries the four most promising car parks',
+    );
     expect(carParkOutcomeText('no-workable-connection', 25)).toBe(
       'No public transport connection worked from here',
     );

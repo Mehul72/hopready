@@ -76,6 +76,14 @@ const BELLA_VISTA = facility(
   'Bella Vista Station',
   '2153478',
 );
+const HILLS_SHOWGROUND = facility(
+  '32',
+  'Hills Showground',
+  -33.7289,
+  150.9817,
+  'Hills Showground Station',
+  '2154392',
+);
 
 const DRIVE_METRES_PER_MINUTE = 500;
 const METRO_HEADWAY_MINUTES = 6;
@@ -344,7 +352,45 @@ describe('drive, park, then metro', () => {
       response.checkedCarParks.find((carPark) => carPark.id === id)?.outcome;
 
     expect(outcomeOf(TALLAWONG.id)).toBe('used');
-    expect(outcomeOf(KELLYVILLE.id)).toBeUndefined();
+    expect(outcomeOf(KELLYVILLE.id)).toBe('not-tried');
+  });
+
+  it('tries the two quickest drives to different stations, and names the car parks left', async () => {
+    // From Rouse Hill: Tallawong 5 min, Kellyville 12 min, Bella Vista 17 min, Hills Showground
+    // 22 min. Hills Showground scores best because it is nearest Chatswood. With room for two,
+    // the estimate alone would pick Tallawong and Hills Showground.
+    const response = await planTrip(
+      request({ origin: ROUSE_HILL }),
+      deps({
+        carParks: fakeCarParks(new Map(), [TALLAWONG, KELLYVILLE, BELLA_VISTA, HILLS_SHOWGROUND]),
+        limits: { maxTransferCandidates: 2 },
+      }),
+    );
+    const outcomeOf = (id: string) =>
+      response.checkedCarParks.find((carPark) => carPark.id === id)?.outcome;
+
+    expect(outcomeOf(TALLAWONG.id)).toBe('used');
+    expect(outcomeOf(KELLYVILLE.id)).toBe('used');
+    expect(outcomeOf(HILLS_SHOWGROUND.id)).toBe('not-tried');
+    expect(outcomeOf(BELLA_VISTA.id)).toBe('not-tried');
+  });
+
+  it('counts two car parks at one station as one quickest drive', async () => {
+    // Tallawong P2 shares Tallawong Station with P1, so Kellyville is the second station tried.
+    const tallawongP2 = { ...TALLAWONG, id: '27', name: 'Tallawong P2' };
+    const response = await planTrip(
+      request({ origin: ROUSE_HILL }),
+      deps({
+        carParks: fakeCarParks(new Map(), [TALLAWONG, tallawongP2, KELLYVILLE, HILLS_SHOWGROUND]),
+        limits: { maxTransferCandidates: 2 },
+      }),
+    );
+    const outcomeOf = (id: string) =>
+      response.checkedCarParks.find((carPark) => carPark.id === id)?.outcome;
+
+    expect(outcomeOf(TALLAWONG.id)).toBe('used');
+    expect(outcomeOf(KELLYVILLE.id)).toBe('used');
+    expect(outcomeOf(tallawongP2.id)).toBe('not-tried');
   });
 
   it('skips car parks well behind the traveller and explains which car parks it checked', async () => {

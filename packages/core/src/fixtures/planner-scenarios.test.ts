@@ -864,18 +864,18 @@ describe('only real choices', () => {
     expect(wronglyHidden).toEqual([]);
   });
 
-  it('keeps Kellyville (north) as somewhere else to park while Tallawong P2 is nearly full', async () => {
+  it('parks at Tallawong P3 while P2 is nearly full, and keeps Kellyville (north) as a fallback', async () => {
     const response = await plan(request({ at: TUESDAY_0745 }), { now: TUESDAY_0745 });
     expectSoundResponse(response);
     const tallawong = byStrategy(response, 'park-and-ride')[0]!.parking!.occupancy;
 
-    expect(carParksListed(response)).toEqual(['Tallawong P2', 'Kellyville (north)']);
-    expect(tallawong.status).toBe('known');
-    if (tallawong.status === 'known') {
-      expect(tallawong.spacesAvailable).toBeLessThanOrEqual(
-        tallawong.totalSpaces * NEARLY_FULL_FREE_SHARE,
-      );
-    }
+    // P3 reports no count, which still beats P2's nearly full one at the same station, and a car
+    // park with no count cannot hide Kellyville at another station.
+    expect(carParksListed(response)).toEqual(['Tallawong P3', 'Kellyville (north)']);
+    expect(tallawong.status).toBe('unknown');
+    expect(
+      response.checkedCarParks.find((carPark) => carPark.name === 'Tallawong P2')?.outcome,
+    ).toBe('matched-by-another');
   });
 
   it('drops off at Tallawong only, the quicker of two stations on the same line', async () => {

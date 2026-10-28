@@ -16,6 +16,8 @@ export function carParkOutcomeText(outcome: CarParkOutcome, maxDriveMinutes: num
       return `Further than your ${maxDriveMinutes} min driving limit`;
     case 'not-towards-destination':
       return 'Not on the way to your destination';
+    case 'not-tried':
+      return 'Not tried: HopReady tries the four most promising car parks';
     case 'no-workable-connection':
       return 'No public transport connection worked from here';
     case 'provider-error':

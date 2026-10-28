@@ -322,6 +322,8 @@ export const CAR_PARK_OUTCOMES = [
   'left-out-for-space',
   'too-far-to-drive',
   'not-towards-destination',
+  // Within reach and on the way, but other car parks were tried first (maxTransferCandidates).
+  'not-tried',
   'no-workable-connection',
   'provider-error',
 ] as const;
