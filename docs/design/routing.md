@@ -24,7 +24,7 @@ A traveller who was dropped off gets `transit-home` and is never sent back for a
 1. **Pool.** Documented Transport Park&Ride facilities from the Car Park API, plus spots the user saved. Bus stops and stations are never treated as car parks.
 2. **Straight-line filter.**
    - The car park must be within `maxDriveMinutes × 1.5 km` of the origin. That is a 90 km/h bound, and straight-line distance never beats the road.
-   - It must be at least 1 km closer to the destination than the origin is.
+   - It must be at least 1 km closer to the destination than the origin is, unless it is within 5 km of the origin: driving a few minutes back to the local station is normal, so a nearby car park may lie in any direction.
    - The detour (origin to car park to destination) must be at most 1.6 times the direct distance.
    - A preferred car park (a Park&Ride car park, or a parking spot the person saved and chose in Trip options) skips the direction checks but not the driving limit.
 3. **Ranking.** One Apple ETA call for up to 8 shortlisted candidates. Candidates beyond `maxDriveMinutes` are dropped. The rest are scored by drive time plus a rough transit estimate (distance × 1.35 at 35 km/h, plus 8 minutes), and the best 3 are kept. The preferred car park always ranks first.

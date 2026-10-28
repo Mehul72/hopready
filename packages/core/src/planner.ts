@@ -80,6 +80,9 @@ const ROUGH_DRIVE_METRES_PER_MINUTE = 667;
 const ROUGH_TRANSIT_METRES_PER_MINUTE = 583;
 const ROUGH_TRANSIT_OVERHEAD_MINUTES = 8;
 const MIN_PROGRESS_METRES = 1_000;
+// Driving a few minutes back to the local station is normal, so a car park this close to the start
+// may lie in any direction. Beyond it, a car park must bring the traveller closer to the destination.
+const ANY_DIRECTION_WITHIN_METRES = 5_000;
 const MAX_DETOUR_RATIO = 1.6;
 const MAX_EXPLAINED_SKIPPED_CAR_PARKS = 3;
 // Provider times are whole minutes; allow that much slack before calling something early or late.
@@ -828,7 +831,9 @@ function shortlistByGeometry(
       return false;
     }
     if (point.preferred) return true;
-    const makesProgress = toDestination <= directMetres - MIN_PROGRESS_METRES;
+    const makesProgress =
+      fromOrigin <= ANY_DIRECTION_WITHIN_METRES ||
+      toDestination <= directMetres - MIN_PROGRESS_METRES;
     const reasonableDetour =
       (fromOrigin + toDestination) / Math.max(directMetres, 1) <= MAX_DETOUR_RATIO;
     if (!makesProgress || !reasonableDetour) wrongWay.push({ point, fromOrigin });

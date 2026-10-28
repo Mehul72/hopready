@@ -30,6 +30,7 @@ import { place, transit, walk } from './test-support/legs';
 
 const BOX_HILL = place('8 Example Rd, Box Hill', -33.6431, 150.8975);
 const ROUSE_HILL = place('12 Example St, Rouse Hill', -33.6789, 150.9152);
+const BELLA_VISTA_HOME = place('5 Example Close, Bella Vista', -33.7306, 150.9445);
 const CHATSWOOD_OFFICE = place('1 Help St, Chatswood', -33.7975, 151.1832);
 const NOW = '2026-10-26T20:30:00Z'; // 07:30 Tuesday in Sydney
 
@@ -320,19 +321,27 @@ describe('drive, park, then metro', () => {
     }
   });
 
-  it('skips car parks that are behind the traveller and explains which car parks it checked', async () => {
+  it('checks a car park a short drive back from the start, as a local would', async () => {
+    // Tallawong is about 1.6 km behind Rouse Hill on the way to Chatswood.
     const response = await planTrip(request({ origin: ROUSE_HILL }), deps());
-    const usedCarParks = response.itineraries.flatMap((it) =>
-      it.parking ? [it.parking.carPark.id] : [],
-    );
 
-    expect(usedCarParks).not.toContain(TALLAWONG.id);
-    expect(response.checkedCarParks.some((carPark) => carPark.outcome === 'used')).toBe(true);
     expect(response.checkedCarParks).toContainEqual({
       id: TALLAWONG.id,
       name: TALLAWONG.name,
-      outcome: 'not-towards-destination',
+      outcome: 'used',
     });
+  });
+
+  it('skips car parks well behind the traveller and explains which car parks it checked', async () => {
+    // From Bella Vista, Kellyville is 2.1 km back and Tallawong 5.6 km back, both on a modest
+    // detour, so only the 5 km rule tells them apart.
+    const response = await planTrip(request({ origin: BELLA_VISTA_HOME }), deps());
+    const outcomeOf = (id: string) =>
+      response.checkedCarParks.find((carPark) => carPark.id === id)?.outcome;
+
+    expect(outcomeOf(TALLAWONG.id)).toBe('not-towards-destination');
+    expect(outcomeOf(KELLYVILLE.id)).toBe('used');
+    expect(outcomeOf(BELLA_VISTA.id)).toBe('used');
   });
 
   it('labels fresh, stale and missing occupancy honestly', async () => {
@@ -1151,9 +1160,10 @@ describe('drop-off', () => {
   });
 
   it('says so when no station with drop-off access is within the driving limit', async () => {
+    // Box Hill is 5.5 km from Tallawong, the nearest station: a 15 minute drive in this world.
     const response = await planTrip(
       request({
-        origin: ROUSE_HILL,
+        origin: BOX_HILL,
         access: { transit: true, drive: false, dropOff: true },
         preferences: { ...DEFAULT_PREFERENCES, maxDriveMinutes: 5 },
       }),
