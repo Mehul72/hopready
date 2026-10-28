@@ -16,7 +16,7 @@ Read this first when picking the work up. The plan with step-level detail is doc
 - **Next, once the owner has acted:**
   1. Done 2026-10-28: real TfNSW responses are recorded and every live provider check passes (testing log). The two recorded trips name no station entrances or exits, so the timeline keeps saying to follow the station signs.
   2. Done 2026-10-28: the API runs on staging at https://hopready-api-staging.mehulfursule.workers.dev with every provider configured, and plans real trips (testing log). Still to look into: from Box Hill, the Tallawong P2 option rode a bus before the metro, and Hills Showground and Bella Vista were judged too far to drive at 7.45 am.
-  3. Create the EAS project, set `EXPO_PUBLIC_API_BASE_URL`, build with EAS and upload to TestFlight; report Apple's processing state.
+  3. Done 2026-10-28: EAS project @mehulfursule/hopready, builds pointed at the staging API, production build 0.1.0 (1) built in EAS and uploaded to App Store Connect (testing log). Apple processing and the on-device checklist come next.
   4. The on-device checklist in docs/release.md, including the Sydney drive time comparison before any public release.
 
 ## Resume
@@ -58,7 +58,7 @@ Live provider keys are read from the macOS Keychain (service `hopready`). See do
 | CI workflows on GitHub                        | Not verified                                                                | Nothing pushed. YAML parsed locally; actions pinned to full SHAs                                       |
 | Live TfNSW and Apple calls                    | Verified 2026-10-28                                                         | `pnpm --filter @hopready/api exec vitest run live`: 8 passed; real TfNSW responses recorded and parsed |
 | API deployment                                | Staging verified 2026-10-28; production not deployed                        | `/v1/health` reports every provider configured; a real plan returned 6 options                         |
-| TestFlight                                    | Not possible yet                                                            | Needs the Expo account and the App Store Connect record                                                |
+| TestFlight                                    | Build 0.1.0 (1) uploaded 2026-10-28; Apple processing state not yet checked | EAS build 7b88ed94, submission 06a39962 finished without error                                         |
 | Physical iPhone                               | Not verified                                                                | Simulator only                                                                                         |
 
 ## Testing log
@@ -81,6 +81,7 @@ Fixture and simulator results only. No test has reached the real TfNSW or Apple 
 | 2026-10-26 13:19          | All UI tests on the final demo build, then `HopReadyLiveApiTests` on a build pointed at the local demo API                                  | Demo build: 5 passed, 1 skipped by design, no animation waits. API build: passed (30 s)                                                                                                                                                                                                                                     |
 | 2026-10-28 19:27          | Live provider checks with real keys, then `record-tfnsw-samples.ts`                                                                         | 8 passed (TfNSW stop search, trip planning, car park list and occupancy; Apple estimates, routes including an arrive-by peak drive, place search). Recorded trips mapped to 6 journeys each; 41 car parks; occupancy read live                                                                                              |
 | 2026-10-28 19:45          | Staging API on Cloudflare Workers: health, a live place search, and a live plan from Box Hill to Chatswood Station for 7.45 am the next day | Health: every provider configured. Search: Chatswood Station first. Plan: 6 options (drop-off, 2 drive and park, 3 public transport), with live car park counts; Kellyville (south) matched by Kellyville (north)                                                                                                           |
+| 2026-10-28 19:53          | EAS cloud build, production profile, then EAS Submit to App Store Connect                                                                   | Build finished in 4 minutes; submission finished with no error. Processing by Apple not yet confirmed                                                                                                                                                                                                                       |
 
 ## Known limitations
 
