@@ -14,7 +14,7 @@ Read this first when picking the work up. The plan with step-level detail is doc
   - A third review traced the brief requirement by requirement and found 24 gaps; all were real and all are fixed. A fourth review of those fixes found 21 more issues; all but one low one are fixed (docs/plans/hopready-v1.md, log).
 - **Blocked on the owner** (docs/OWNER-ACTIONS.md, "Fastest path to TestFlight"): provider keys, the Cloudflare and Expo accounts, the App Store Connect record, one interactive signing setup, the support email, and decisions 22 to 24.
 - **Next, once the owner has acted:**
-  1. Record real TfNSW responses (`apps/api/scripts/record-tfnsw-samples.ts`) and run the live provider checks (docs/testing.md). In the recorded trips, look for station entrance and exit details in `footPathInfo[].footPathElem` and walking legs' `pathDescriptions`, which HopReady drops today; if they name entrances or exits reliably, parse them in `apps/api/src/providers/tfnsw/transit.ts` and show them on the walk step.
+  1. Done 2026-10-28: real TfNSW responses are recorded and every live provider check passes (testing log). The two recorded trips name no station entrances or exits, so the timeline keeps saying to follow the station signs.
   2. Deploy the API to staging and check `/v1/health` and one real plan.
   3. Create the EAS project, set `EXPO_PUBLIC_API_BASE_URL`, build with EAS and upload to TestFlight; report Apple's processing state.
   4. The on-device checklist in docs/release.md, including the Sydney drive time comparison before any public release.
@@ -45,20 +45,20 @@ Live provider keys are read from the macOS Keychain (service `hopready`). See do
 
 ## Verification status
 
-| Claim                                         | Status                                            | How                                                                               |
-| --------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Core rules, planner and demo scenarios        | Verified                                          | `pnpm --filter @hopready/core test`: 223 tests                                    |
-| API routes, adapters and limits               | Verified against fakes and schema-derived samples | `pnpm --filter @hopready/api test`: 315 passed, 8 live tests skipped without keys |
-| App screens and flows                         | Verified in Jest                                  | `pnpm --filter @hopready/mobile test`: 697 tests in 46 suites                     |
-| Typecheck, lint and format                    | Verified                                          | `pnpm check`                                                                      |
-| iOS Release simulator build                   | Verified                                          | `xcodebuild build-for-testing` (docs/testing.md)                                  |
-| UI journeys on the simulator                  | Verified (demo mode)                              | XCUITest, 5 journeys; see the testing log                                         |
-| App against a local API (demo data over HTTP) | Verified                                          | `HopReadyLiveApiTests`; see the testing log                                       |
-| Expo project health                           | Verified                                          | `npx expo-doctor`: 20 of 20 checks                                                |
-| CI workflows on GitHub                        | Not verified                                      | Nothing pushed. YAML parsed locally; actions pinned to full SHAs                  |
-| Live TfNSW and Apple calls                    | Not verified                                      | No keys. Live tests skip without them                                             |
-| API deployment, TestFlight                    | Not possible yet                                  | Needs the owner's accounts                                                        |
-| Physical iPhone                               | Not verified                                      | Simulator only                                                                    |
+| Claim                                         | Status                                                                      | How                                                                                                    |
+| --------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Core rules, planner and demo scenarios        | Verified                                                                    | `pnpm --filter @hopready/core test`: 223 tests                                                         |
+| API routes, adapters and limits               | Verified against fakes, schema-derived samples and recorded TfNSW responses | `pnpm --filter @hopready/api test`: 321 passed, 8 live tests skipped without keys                      |
+| App screens and flows                         | Verified in Jest                                                            | `pnpm --filter @hopready/mobile test`: 697 tests in 46 suites                                          |
+| Typecheck, lint and format                    | Verified                                                                    | `pnpm check`                                                                                           |
+| iOS Release simulator build                   | Verified                                                                    | `xcodebuild build-for-testing` (docs/testing.md)                                                       |
+| UI journeys on the simulator                  | Verified (demo mode)                                                        | XCUITest, 5 journeys; see the testing log                                                              |
+| App against a local API (demo data over HTTP) | Verified                                                                    | `HopReadyLiveApiTests`; see the testing log                                                            |
+| Expo project health                           | Verified                                                                    | `npx expo-doctor`: 20 of 20 checks                                                                     |
+| CI workflows on GitHub                        | Not verified                                                                | Nothing pushed. YAML parsed locally; actions pinned to full SHAs                                       |
+| Live TfNSW and Apple calls                    | Verified 2026-10-28                                                         | `pnpm --filter @hopready/api exec vitest run live`: 8 passed; real TfNSW responses recorded and parsed |
+| API deployment, TestFlight                    | Not possible yet                                                            | Needs the owner's accounts                                                                             |
+| Physical iPhone                               | Not verified                                                                | Simulator only                                                                                         |
 
 ## Testing log
 
@@ -78,10 +78,11 @@ Fixture and simulator results only. No test has reached the real TfNSW or Apple 
 | 2026-10-26 12:34          | `HopReadyLiveApiTests` on the current code, after the review agents finished                                                  | Passed (89 s), no step over 4 s                                                                                                                                                                                                                                                                                             |
 | 2026-10-26 13:05          | `pnpm check` on the final branch                                                                                              | Passed: core 223; API 315 passed, 8 live tests skipped; app 697 in 46 suites; lint and format clean                                                                                                                                                                                                                         |
 | 2026-10-26 13:19          | All UI tests on the final demo build, then `HopReadyLiveApiTests` on a build pointed at the local demo API                    | Demo build: 5 passed, 1 skipped by design, no animation waits. API build: passed (30 s)                                                                                                                                                                                                                                     |
+| 2026-10-28 19:27          | Live provider checks with real keys, then `record-tfnsw-samples.ts`                                                           | 8 passed (TfNSW stop search, trip planning, car park list and occupancy; Apple estimates, routes including an arrive-by peak drive, place search). Recorded trips mapped to 6 journeys each; 41 car parks; occupancy read live                                                                                              |
 
 ## Known limitations
 
-- **Live providers are unverified.** The TfNSW parser is tested against samples built from the published schema, not recorded responses, and no Apple Maps call has been made (docs/testing.md).
+- **Live providers are checked, not exercised at scale.** The live checks pass against real TfNSW and Apple Maps, and the TfNSW parser is tested against two recorded trips, the car park list and one occupancy reading. The deployed API, and the app on live data, have not been tried yet (docs/testing.md).
 - **The demo world** uses real stops but generated timetables. It shows the planner's rules hold, not what TfNSW will return (docs/testing.md).
 - **Station entrances and exits** are never named. TfNSW may send details in fields HopReady does not read yet, so the timeline says they are not provided and to follow the station signs (docs/design/routing.md).
 - **Services already left** cannot be checked again. Once a followed trip has started, only the services still to come are planned, so a delay on the service being ridden, and a connection it then misses, is not seen. The trip screen says so (docs/design/routing.md).

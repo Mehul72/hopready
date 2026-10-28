@@ -17,7 +17,7 @@ Facts below were read from official sources on 2026-10-25. Prices, quotas and te
 
 TfNSW's `/departure_mon` (departure boards) and `/add_info` (all current alerts) are not used. Each `/v1/tp/trip` journey already carries real-time times and the alerts that affect its legs, and v1 has no departure board or network-wide alerts screen.
 
-Station entrances and exits are not read either. The Trip Planner Swagger (`tripplanner_v1_swag_efa11_20251002.yml`, behind the Open Data Hub login) documents in-station steps in `footPathInfo[].footPathElem` (stairs, escalators, lifts and level changes) and turn-by-turn walking steps in `pathDescriptions` (with ENTER and LEAVE manoeuvres), but no field that names an entrance or exit. HopReady keeps only the walking time from `footPathInfo`, so the app says entrance and exit details are not provided (docs/design/routing.md). Check recorded responses before showing any of it.
+Station entrances and exits are not read either. The Trip Planner Swagger (`tripplanner_v1_swag_efa11_20251002.yml`, behind the Open Data Hub login) documents in-station steps in `footPathInfo[].footPathElem` (stairs, escalators, lifts and level changes) and turn-by-turn walking steps in `pathDescriptions` (with ENTER and LEAVE manoeuvres), but no field that names an entrance or exit. HopReady keeps only the walking time from `footPathInfo`, so the app says entrance and exit details are not provided (docs/design/routing.md). The trips recorded on 2026-10-28 (Tallawong P1 to Chatswood, Kellyville to Barangaroo) bear this out: their walking steps name the service boarded and mention escalators and levels, never an entrance or exit.
 
 ## Terms that shape the product
 
