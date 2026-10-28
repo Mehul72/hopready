@@ -65,6 +65,23 @@ function driveLegOf(itinerary: Itinerary): DriveLeg {
 }
 
 describe('itinerary screen', () => {
+  it('opens its map full screen, where it can be moved, and comes back', async () => {
+    const itinerary = firstWithStrategy(await planDemoCommute(), 'park-and-ride');
+    await renderApp(`/itinerary/${itinerary.id}`);
+    expect(screen.getByTestId('map-view')).toHaveProp('scrollEnabled', false);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Bigger map' }));
+
+    expect(await screen.findByTestId('map-screen')).toBeOnTheScreen();
+    const fullMap = within(screen.getByTestId('full-map'));
+    expect(fullMap.getByTestId('map-view')).toHaveProp('scrollEnabled', true);
+    expect(fullMap.getByRole('image', { name: /^Map of the trip from/ })).toBeOnTheScreen();
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Done' }));
+
+    expect(await screen.findByTestId('itinerary-screen')).toBeOnTheScreen();
+  });
+
   it('shows the leave and arrive times, the map, every step and the data sources', async () => {
     const itinerary = firstWithStrategy(await planDemoCommute(), 'park-and-ride');
     await renderApp(`/itinerary/${itinerary.id}`);

@@ -9,6 +9,7 @@ import SavedTab from '@/app/(tabs)/saved';
 import SettingsTab from '@/app/(tabs)/settings';
 import TabsLayout from '@/app/(tabs)/_layout';
 import RootLayout from '@/app/_layout';
+import MapRoute from '@/app/map';
 import ItineraryRoute from '@/app/itinerary/[id]';
 import ConfirmParkingRoute from '@/app/parked-car/confirm';
 import CorrectParkingRoute from '@/app/parked-car/correct';
@@ -36,6 +37,7 @@ export const APP_ROUTES = {
   'parked-car/confirm': ConfirmParkingRoute,
   'parked-car/correct': CorrectParkingRoute,
   'data-use': placeholder('Live data use'),
+  map: MapRoute,
   welcome: placeholder('Welcome'),
 };
 

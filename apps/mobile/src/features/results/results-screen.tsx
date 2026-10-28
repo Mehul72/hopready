@@ -25,6 +25,7 @@ import {
   LoadingState,
   type MapPoint,
   Screen,
+  MapCard,
   TripMap,
 } from '@/components';
 import { turnOnDemoMode } from '@/features/plan/demo-mode';
@@ -287,16 +288,6 @@ export function ResultsScreen() {
 
   return (
     <Screen scroll={false} testID="results-screen">
-      {itineraries.length > 0 ? (
-        <TripMap
-          itineraries={itineraries}
-          selectedItineraryId={highlightedId}
-          style={{ height: mapHeight }}
-          testID="results-map"
-        />
-      ) : (
-        <TripMap points={endpoints} style={{ height: mapHeight }} testID="results-map" />
-      )}
       <ScrollView
         style={styles.fill}
         contentContainerStyle={styles.scrollContent}
@@ -313,6 +304,26 @@ export function ResultsScreen() {
         }
         testID="results-list">
         <View style={styles.readableWidth}>
+          <MapCard
+            onExpand={() => router.navigate({ pathname: '/map', params: { for: 'results' } })}
+            style={{ height: mapHeight }}>
+            {itineraries.length > 0 ? (
+              <TripMap
+                itineraries={itineraries}
+                selectedItineraryId={highlightedId}
+                interactive={false}
+                style={styles.fill}
+                testID="results-map"
+              />
+            ) : (
+              <TripMap
+                points={endpoints}
+                interactive={false}
+                style={styles.fill}
+                testID="results-map"
+              />
+            )}
+          </MapCard>
           <View style={styles.summaryRow}>
             <View accessible style={styles.summary} testID="results-summary">
               <AppText variant="headline">{`${request.origin.name} to ${request.destination.name}`}</AppText>

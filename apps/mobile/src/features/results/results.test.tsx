@@ -413,6 +413,27 @@ describe('the results map', () => {
     expect(fitToCoordinates.mock.calls.length).toBe(framedTimes);
   });
 
+  it('opens a bigger map that can be moved, and comes back', async () => {
+    const user = await planFromPlanTab();
+    await screen.findAllByTestId(/^route-card-/);
+    // The map on the page keeps still so a swipe scrolls the page.
+    expect(within(screen.getByTestId('results-map')).getByTestId('map-view')).toHaveProp(
+      'scrollEnabled',
+      false,
+    );
+
+    await user.press(screen.getByRole('button', { name: 'Bigger map' }));
+
+    expect(await screen.findByTestId('map-screen')).toBeOnTheScreen();
+    const fullMap = within(screen.getByTestId('full-map'));
+    expect(fullMap.getByTestId('map-view')).toHaveProp('scrollEnabled', true);
+    expect(fullMap.getAllByTestId('map-polyline').length).toBeGreaterThan(0);
+
+    await user.press(screen.getByRole('button', { name: 'Done' }));
+
+    expect(await screen.findByTestId('results-screen')).toBeOnTheScreen();
+  });
+
   it('shows every option on an Apple map, with the highlighted one drawn on top', async () => {
     await planFromPlanTab();
     await screen.findAllByTestId(/^route-card-/);

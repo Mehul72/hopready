@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import { AccessibilityInfo, Alert, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { AppText, Banner, Button, EmptyState, Screen, TripMap } from '@/components';
+import { AppText, Banner, Button, EmptyState, MapCard, Screen, TripMap } from '@/components';
 import { planSession } from '@/state';
 import { appStorage, isSamePlace, useFavouriteRoutes } from '@/storage';
-import { RADII, SPACING } from '@/theme';
+import { SPACING } from '@/theme';
 import { useTripHomeOutOfDate } from '@/trip';
 
 import { routeLabelFor } from '../saved/place-labels';
@@ -228,11 +228,13 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
       {itinerary.notes.map((note, index) => (
         <Banner key={`${index}:${note}`} tone="info" message={note} />
       ))}
-      <TripMap
-        itinerary={itinerary}
-        interactive={false}
-        style={[styles.map, { height: mapHeight }]}
-      />
+      <MapCard
+        onExpand={() =>
+          router.navigate({ pathname: '/map', params: { for: 'trip', id: itineraryId } })
+        }
+        style={{ height: mapHeight }}>
+        <TripMap itinerary={itinerary} interactive={false} style={styles.fill} />
+      </MapCard>
       <TripShortcuts trip={trip} />
       <AppText variant="title3" accessibilityRole="header" style={styles.heading}>
         Steps
@@ -267,8 +269,8 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
 }
 
 const styles = StyleSheet.create({
-  map: {
-    borderRadius: RADII.lg,
+  fill: {
+    flex: 1,
   },
   heading: {
     paddingTop: SPACING.md,
