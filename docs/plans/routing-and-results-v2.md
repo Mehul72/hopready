@@ -27,12 +27,35 @@ Verifiable by:
 
 ## Steps
 
-Filled in once the research brief and the code map are in (see Log). Until then:
+Server and core first (no app build needed; build 4 keeps working because every schema change is additive and unknown fields are stripped), then the app.
 
 - [ ] 0. Research brief in docs/research/park-and-ride.md with sources; code map read
       done when: the brief exists, every design-relevant fact is marked verified, inferred or unknown
-- [ ] 1. Design: ADRs for the new car park strategy and for preferences as ranking, plus the results screen design note
-      done when: the ADRs are in docs/decisions and the plan steps below are concrete
+- [x] 1. Hub travel-time table: apps/api/scripts/record-hub-times.ts writes packages/core/src/data/park-and-ride-hub-times.ts (34 stations x 10 hubs x 3 periods). Commit a998245
+      done when: the file is generated from TfNSW, committed, and a core test checks every catalogue station has a row
+- [x] 2. TfNSW adapter sends the walking preference (`itOptionsActive=1&trITMOT=100&trITMOTvalue100=N`). Commit 6c5bbd4
+      files: apps/api/src/providers/tfnsw/transit.ts, transit.test.ts
+      done when: the request test asserts the three parameters; a plan on staging still answers (staging check in step 8)
+- [x] 3. Occupancy for every facility in one `/v1/carpark/full-list` call, cached 60 s, per-facility calls only as the fallback; the same list places every car park at its entrance. Commits 2ac2443, 48f39cc
+      files: apps/api/src/providers/tfnsw/car-parks.ts, schemas.ts, recordings.test.ts, car-parks.test.ts
+      done when: a plan makes one occupancy request; the recorded full list parses; a failed full list falls back
+- [x] 4. Car park journeys start at the station stop id, with HopReady's own walk leg from the car park's coordinate to the station. Commit adfb337
+      files: packages/core/src/planner.ts, planner.test.ts
+      done when: a park-and-ride itinerary has drive, park, walk (source hopready), transit; the transit query carries the stopId; tests cover a car park beside the platform and 100 m from it
+- [x] 5. Candidate selection by estimated total time: estimate every facility (rough drive plus hub table), ETA the best 20, check the best 5 exactly, one per station, always including the quickest drive and the preferred car park; report every facility with its station and estimate. Commit (see log)
+      files: packages/core/src/planner.ts, packages/core/src/estimate.ts, model.ts (additive `stationName` and `estimatedMinutes` on checkedCarParks), planner.test.ts, planner-scenarios.test.ts
+      done when: Kellyville (Wrights Rd) to Central with the real catalogue checks Seven Hills (planner test "tries Seven Hills from Kellyville"); call count per plan documented in step 9
+- [ ] 6. Preferences rank and mark, never hide: no `walk-too-long`, `drive-too-long` or `transfer-too-short` rejections; itineraries carry additive `concerns`; options within the preferences sort first
+      files: packages/core/src/planner.ts, model.ts, itinerary.ts, tests
+      done when: Parramatta to Carrington St with an 8 minute walk limit returns the direct T1 trip marked long-walk
+- [x] 7. Dominance only between car parks at the same station; every other option is listed. One car park per station is tried (the one surer of a space, then the nearer the platform); the other is reported not tried with its estimate. Commits adfb337, bcce311
+      done when: Kellyville is listed next to Hills Showground in the Kellyville scenario (planner test "lists both, whatever the better one says about its spaces")
+- [ ] 8. Deploy to staging, re-run the three real trips, record results in docs/research/park-and-ride.md
+      done when: staging answers within 5 s and the Kellyville list includes Seven Hills with an exact time
+- [ ] 9. ADR-0007 (car park choice) and ADR-0008 (preferences), routing.md and providers.md rewritten, PROGRESS updated
+- [ ] 10. Results screen v2 in the app (short option rows, map card, details behind a tap, car parks and reasons in a sheet, no freshness banner, sort in the toolbar), Plan screen trimmed, one trip-options editor
+      done when: 702 or more app tests pass, the XCUITest walk-through passes, screenshots refreshed
+- [ ] 11. TestFlight build 5
 
 ## Open questions
 
@@ -47,3 +70,5 @@ Filled in once the research brief and the code map are in (see Log). Until then:
 - 2026-10-31 TfNSW probes (direct calls): `itOptionsActive=1&trITMOT=100&trITMOTvalue100=5` is honoured (walks fell to 5 min or less, though an 11 minute walk still came back when it was the only way to the station); `trITMOT=104` (car) errors; `useProxFootSearch=1&maxTime=5` changes nothing; a stop-id origin (TSN 2154392, Hills Showground) returns metro departures every 4 to 5 minutes with no walking leg.
 - 2026-10-31 TfNSW car park records carry `tsn` (stop id), facility coordinates and `spots`: Kellyville north 351, south 964 (different coordinates; staging shows one coordinate for both), Hills Showground 584, Seven Hills 1613, North Rocks 139. 46 facilities listed, 5 "historical only", Kiama outside coverage, so 40 in HopReady.
 - 2026-10-31 The walk from a car park to the platform in TfNSW's answer includes station access padding: 139 m shown as 4 min, 342 m as 7 min (Hills Showground, same facility, different times of day).
+- 2026-10-31 Hub table recorded: 34 stations x 10 hubs x 3 periods, 1,020 TfNSW calls, none missing. Seven Hills to Central at peak: 33 min on board every 8; Hills Showground 39 every 4; Kellyville 47 every 4; North Rocks 50 every 3.
+- 2026-10-31 Steps 2 to 5 and 7 landed (commits 6c5bbd4 to edbcdae). Core 242, API 330, app 702 tests pass; typecheck, lint and format clean. Surprises: the fake transit in planner.test.ts keyed journeys on car park names, which no longer reach the provider (journeys are asked for from the station), so the dominance tests were rewritten around twins at one station and separate stations; the demo world's Kellyville (south) is now "not tried" rather than "matched by another", since one car park per station is chosen before any journey is asked for.
