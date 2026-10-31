@@ -143,7 +143,9 @@ export function RouteCard({
   const parking = parkingSummary(itinerary, now);
   const alerts = alertSummary(itinerary);
   const concerns = concernSummaries(itinerary, preferences);
-  const factLine = [optionLabel(itinerary), facts.driving, facts.walking, facts.changes]
+  // "Drive · Drive 52 min" says it twice, and the steps row already shows the drive.
+  const driving = itinerary.strategy === 'drive-only' ? null : facts.driving;
+  const factLine = [optionLabel(itinerary), driving, facts.walking, facts.changes]
     .flatMap((fact) => (fact ? [typeof fact === 'string' ? fact : fact.text] : []))
     .join(' · ');
 
