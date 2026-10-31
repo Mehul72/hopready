@@ -81,9 +81,12 @@ export class TfnswCarParkProvider implements CarParkProvider {
   async listFacilities(signal: AbortSignal): Promise<CarParkFacility[]> {
     const namesById = await this.currentFacilityNames(signal);
     const ids = [...namesById.keys()].filter(isLiveFacilityId);
-    // The catalogue already places every documented car park, so only unknown ones cost a details
-    // call. Catalogued entrances and capacities fill in from the occupancy answers plans ask for,
-    // which keeps a fresh isolate from spending about 40 TfNSW requests on one list.
+    // The full list gives every car park's entrance and capacity in one request, so a plan drives
+    // to the car park itself rather than its station. The catalogue places the rest, so only a car
+    // park neither knows costs a details call.
+    if (ids.length > 0 && !this.hasFullListNewerThan(FACILITY_LIST_TTL_MS)) {
+      await this.refreshFromFullList(signal);
+    }
     const toFetch = ids.filter((id) => !findCataloguedCarPark(id) && !this.hasFreshDetails(id));
     const outcomes = await mapSettled(toFetch, FACILITY_CONCURRENCY, (id) =>
       this.fetchFacility(id, signal),
@@ -146,7 +149,7 @@ export class TfnswCarParkProvider implements CarParkProvider {
     const ids = [...new Set(facilityIds)].filter(isLiveFacilityId);
     if (
       this.withoutFreshOccupancy(ids).length >= MIN_IDS_FOR_FULL_LIST &&
-      !this.hasFreshFullList()
+      !this.hasFullListNewerThan(OCCUPANCY_TTL_MS)
     ) {
       await this.refreshFromFullList(signal);
     }
@@ -200,8 +203,9 @@ export class TfnswCarParkProvider implements CarParkProvider {
     });
   }
 
-  private hasFreshFullList(): boolean {
-    return this.fullList !== null && this.ageMs(this.fullList) < OCCUPANCY_TTL_MS;
+  // A failed attempt counts too, so an endpoint that is down is not asked again by every plan.
+  private hasFullListNewerThan(maxAgeMs: number): boolean {
+    return this.fullList !== null && this.ageMs(this.fullList) < maxAgeMs;
   }
 
   // Reads every car park's details and occupancy in one request. A failure is not an error here:
@@ -219,6 +223,7 @@ export class TfnswCarParkProvider implements CarParkProvider {
       entries = Array.isArray(body) ? body : Object.values(body);
     } catch {
       this.report({ kind: 'full-list-unavailable' });
+      this.fullList = { value: new Set(), storedAtMs: this.nowMs() };
       return;
     }
 

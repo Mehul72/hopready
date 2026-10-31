@@ -60,19 +60,32 @@ function facilityIdsAsked(fetchImpl: FakeFetch): (string | null)[] {
 }
 
 describe('TfNSW car park facilities', () => {
-  it('reads the list and asks for details only for car parks the catalogue cannot place', async () => {
+  it('reads the names and the full list, and asks for nothing else when they place every car park', async () => {
     const fetchImpl = carParkApi();
     const { carParks } = setUp(fetchImpl);
 
     await carParks.listFacilities(neverAborted());
 
-    expect(fetchImpl.requests.every((request) => request.url.pathname === '/v1/carpark')).toBe(
-      true,
-    );
-    expect(facilityIdsAsked(fetchImpl)).toEqual([null, '491']);
+    expect(fetchImpl.requests.map((request) => request.url.pathname)).toEqual([
+      '/v1/carpark',
+      '/v1/carpark/full-list',
+    ]);
+    expect(facilityIdsAsked(fetchImpl)).toEqual([null, null]);
   });
 
-  it('describes a catalogued car park from the list name and the catalogue', async () => {
+  it('asks for details only for a car park neither the catalogue nor the full list knows', async () => {
+    const fetchImpl = carParkApi({
+      'full-list': () => jsonResponse([loadFixture('carpark-facility-26.schema-sample.json')]),
+    });
+    const { carParks } = setUp(fetchImpl);
+
+    const facilities = await carParks.listFacilities(neverAborted());
+
+    expect(facilityIdsAsked(fetchImpl)).toEqual([null, null, '491']);
+    expect(facilities.find((facility) => facility.id === '491')?.totalSpaces).toBe(180);
+  });
+
+  it('describes a catalogued car park from the list name, the full list and the catalogue', async () => {
     const { carParks } = setUp(carParkApi());
 
     const facilities = await carParks.listFacilities(neverAborted());
@@ -84,7 +97,7 @@ describe('TfNSW car park facilities', () => {
       coordinate: { lat: -33.69304704, lon: 150.9052577 },
       kind: 'transport-park-and-ride',
       stationName: 'Tallawong Station',
-      totalSpaces: null,
+      totalSpaces: 121,
       rules: STANDARD_PARK_AND_RIDE_RULES,
       station: {
         name: 'Tallawong Station',
@@ -195,9 +208,23 @@ describe('TfNSW car park facilities', () => {
     expect(fetchImpl.requests).toHaveLength(4);
   });
 
+  it('places car parks at the entrance the full list gives, with its capacity', async () => {
+    const { carParks } = setUp(carParkApi());
+
+    const facilities = await carParks.listFacilities(neverAborted());
+    const ashfield = facilities.find((facility) => facility.id === '486');
+
+    expect(ashfield).toMatchObject({
+      coordinate: { lat: -33.888104, lon: 151.126577 },
+      totalSpaces: 216,
+      station: { name: 'Ashfield Station', stopId: '213110' },
+    });
+  });
+
   it('leaves out an uncatalogued car park while its details are unavailable, then asks only for it', async () => {
     let exampleAnswers = 0;
     const fetchImpl = carParkApi({
+      'full-list': unavailable,
       '491': () => {
         exampleAnswers += 1;
         return exampleAnswers <= 2
@@ -221,7 +248,10 @@ describe('TfNSW car park facilities', () => {
   });
 
   it('does not ask again the same day when TfNSW gives an unusable answer for one car park', async () => {
-    const fetchImpl = carParkApi({ '491': () => jsonResponse({ unexpected: true }) });
+    const fetchImpl = carParkApi({
+      'full-list': unavailable,
+      '491': () => jsonResponse({ unexpected: true }),
+    });
     const { carParks, diagnostics } = setUp(fetchImpl);
 
     const facilities = await carParks.listFacilities(neverAborted());
@@ -233,7 +263,8 @@ describe('TfNSW car park facilities', () => {
       reason: 'no-usable-location',
       facilityIds: ['491'],
     });
-    expect(fetchImpl.requests).toHaveLength(2);
+    // The names, the full list (unavailable, so retried once) and the one car park, then nothing.
+    expect(fetchImpl.requests).toHaveLength(4);
   });
 
   it("serves yesterday's list when the list cannot be refreshed", async () => {
