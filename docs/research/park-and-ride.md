@@ -29,7 +29,7 @@ Walking legs in TfNSW's answers include station access padding: the same Hills S
 - The same trip at 21:15: public transport first (55 min, bus 626 from the doorstep), Hills Showground 59 min with a 7 minute walk from the car park.
 - 41 Hunter St, Parramatta to 50 Carrington St, public transport only, Monday 08:27, walking limit 8: two itineraries (3 min walk, one stop on a bus, 4 min interchange, T1); two rejected as walk-too-long, which are the direct T1 trips with the 11 minute walk. For a Saturday time already in the past: nothing at all.
 
-### 1.3a HopReady staging after the v2 planner (version 726a62c4, 2026-10-31 19:40)
+### 1.3a HopReady staging after the v2 planner (version 726a62c4, 2026-10-31 18:35)
 
 - Kellyville (Wrights Rd after Ardley Ave) to Central, Monday 08:00: 9 itineraries in 3.3 s. Drive and park: Hills Showground 60 min (drive 9, walk 276 m), Cherrybrook 64 (drive 19), Seven Hills 66 (drive 22, T1), Bella Vista 68 (drive 8, walk 531 m), Kellyville (south) 68 (drive 10); four bus-and-metro options 66 to 69. Every facility within the driving limit is listed with an estimate: Hornsby too far (about 90), North Rocks not tried (about 79), Tallawong P1 to P3 (81 to 85), Schofields (84), Mount Druitt (89), Kellyville (north) not tried as the twin of (south) at the same station.
 - Parramatta to Carrington St with the limit at 8, before step 6: every one of the five car parks tried (North Rocks, Ashfield, West Ryde, Gordon, Cherrybrook) ended "no workable connection" because each journey was rejected for a walk over 8 minutes or a change under the 3 minute buffer.
