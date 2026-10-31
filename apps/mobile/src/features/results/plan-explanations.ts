@@ -1,15 +1,21 @@
-import type { PlanResponse, Preferences, RejectionReason } from '@hopready/core';
+import {
+  formatDurationMinutes,
+  type PlanResponse,
+  type Preferences,
+  type RejectionReason,
+} from '@hopready/core';
 
 export { STRATEGY_LABELS } from '../shared/option-labels';
 
-type CarParkOutcome = PlanResponse['checkedCarParks'][number]['outcome'];
+export type CheckedCarPark = PlanResponse['checkedCarParks'][number];
+type CarParkOutcome = CheckedCarPark['outcome'];
 
 export function carParkOutcomeText(outcome: CarParkOutcome, maxDriveMinutes: number): string {
   switch (outcome) {
     case 'used':
-      return 'A connection was found from here';
+      return 'Exact times in the options';
     case 'matched-by-another':
-      return 'A car park shown above gets you there as early, with no more driving';
+      return 'Another car park at this station gets you there as early, with no more driving';
     case 'left-out-for-space':
       return 'Works, but more options were found than fit on the list';
     case 'too-far-to-drive':
@@ -17,7 +23,7 @@ export function carParkOutcomeText(outcome: CarParkOutcome, maxDriveMinutes: num
     case 'not-towards-destination':
       return 'Not on the way to your destination';
     case 'not-tried':
-      return 'Not tried: HopReady checks the five most promising car parks, one per station';
+      return 'Not among the five tried';
     case 'no-workable-connection':
       return 'No public transport connection worked from here';
     case 'provider-error':
@@ -25,6 +31,55 @@ export function carParkOutcomeText(outcome: CarParkOutcome, maxDriveMinutes: num
     case 'not-understood':
       return 'Checked. Update HopReady to see what happened here';
   }
+}
+
+// Tried car parks first, then the ones that could have been, each group by its estimate.
+const OUTCOME_ORDER: readonly CarParkOutcome[] = [
+  'used',
+  'matched-by-another',
+  'left-out-for-space',
+  'not-tried',
+  'no-workable-connection',
+  'provider-error',
+  'too-far-to-drive',
+  'not-towards-destination',
+  'not-understood',
+];
+
+export function orderCheckedCarParks(carParks: readonly CheckedCarPark[]): CheckedCarPark[] {
+  return [...carParks].sort(
+    (a, b) =>
+      OUTCOME_ORDER.indexOf(a.outcome) - OUTCOME_ORDER.indexOf(b.outcome) ||
+      (a.estimatedMinutes ?? Number.POSITIVE_INFINITY) -
+        (b.estimatedMinutes ?? Number.POSITIVE_INFINITY) ||
+      a.name.localeCompare(b.name),
+  );
+}
+
+export interface CheckedCarParkDescription {
+  title: string;
+  // The station and the rough door-to-door estimate, when the planner gave them.
+  detail: string | null;
+  outcome: string;
+  spoken: string;
+}
+
+export function describeCheckedCarPark(
+  carPark: CheckedCarPark,
+  maxDriveMinutes: number,
+): CheckedCarParkDescription {
+  const estimate =
+    carPark.estimatedMinutes === undefined
+      ? null
+      : `about ${formatDurationMinutes(carPark.estimatedMinutes * 60)} door to door`;
+  const station = carPark.stationName ?? null;
+  const outcome = carParkOutcomeText(carPark.outcome, maxDriveMinutes);
+  return {
+    title: carPark.name,
+    detail: [station, estimate].filter(Boolean).join(' · ') || null,
+    outcome,
+    spoken: `${[carPark.name, station, estimate].filter(Boolean).join(', ')}: ${outcome}`,
+  };
 }
 
 // What a person can change to get options back.

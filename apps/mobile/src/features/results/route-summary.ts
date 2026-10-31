@@ -4,13 +4,19 @@ import {
   type Itinerary,
   type Leg,
   legSeconds,
+  type Preferences,
   type ServiceAlert,
 } from '@hopready/core';
 
 import { LEG_VISUALS, type LegVisualKind, legVisualKind } from '@/theme';
 
 import { selfDriveSeconds } from './itinerary-order';
-import { describeOccupancy, SPACES_CAN_FILL_NOTE, type Wording } from '../shared/occupancy-wording';
+import {
+  describeOccupancy,
+  type OccupancyWording,
+  SPACES_CAN_FILL_NOTE,
+  type Wording,
+} from '../shared/occupancy-wording';
 import { optionLabel } from '../shared/option-labels';
 import { isSampleItinerary } from '../shared/sample-data';
 import { shownDurationSeconds } from '../shared/shown-duration';
@@ -200,11 +206,45 @@ export function alertSummary(itinerary: Itinerary): AlertSummary | null {
   };
 }
 
+function longestWalkSeconds(itinerary: Itinerary): number {
+  return itinerary.legs
+    .filter((leg) => leg.kind === 'walk')
+    .reduce((longest, leg) => Math.max(longest, legSeconds(leg)), 0);
+}
+
+// The planner marks an option that goes over a preference instead of hiding it (ADR-0008). Each
+// mark is worded against the person's own limit, so they can see by how much.
+export function concernSummaries(itinerary: Itinerary, preferences: Preferences): Wording[] {
+  return itinerary.concerns.map((concern) => {
+    switch (concern) {
+      case 'long-walk': {
+        const seconds = longestWalkSeconds(itinerary);
+        return {
+          text: `Walk ${formatDurationMinutes(seconds)}, over your ${preferences.maxWalkMinutes} min`,
+          spoken: `A walk of ${spokenDuration(seconds)}, over your ${preferences.maxWalkMinutes} minute walking limit`,
+        };
+      }
+      case 'long-drive': {
+        const seconds = selfDriveSeconds(itinerary);
+        return {
+          text: `Drive ${formatDurationMinutes(seconds)}, over your ${preferences.maxDriveMinutes} min`,
+          spoken: `${spokenDuration(seconds)} driving, over your ${preferences.maxDriveMinutes} minute driving limit`,
+        };
+      }
+      case 'tight-change':
+        return {
+          text: `Change under your ${preferences.transferBufferMinutes} min buffer`,
+          spoken: `A change shorter than your ${preferences.transferBufferMinutes} minute transfer buffer`,
+        };
+    }
+  });
+}
+
 export const UNKNOWN_RULES_NOTE = 'Check signs for parking rules.';
 
 export interface ParkingSummary {
   carParkName: string;
-  occupancy: Wording;
+  occupancy: OccupancyWording;
   note: string;
   // Only when nobody has documented the rules, such as a spot the person saved. Documented rules
   // and their source are on the trip's own screen.
@@ -227,21 +267,25 @@ function capitalise(text: string): string {
 }
 
 // The whole card as one sentence, so VoiceOver users hear an option the way it looks.
-// `staleCheckAt`, from staleCheckOf, words old live times by when they were checked.
+// `staleCheckAt`, from staleCheckOf, words old live times by when they were checked. With the
+// person's preferences, the planner's marks are read against them.
 export function describeItinerary(
   itinerary: Itinerary,
   now: Date,
   staleCheckAt: string | null = null,
+  preferences: Preferences | null = null,
 ): string {
   const facts = tripFacts(itinerary);
   const parking = parkingSummary(itinerary, now);
   const alerts = alertSummary(itinerary);
   const steps = legSteps(itinerary).map((step) => step.spoken);
+  const concerns = preferences ? concernSummaries(itinerary, preferences) : [];
   const sentences = [
     optionLabel(itinerary),
     `Leave ${formatSydneyTime(itinerary.departAt)}, arrive ${formatSydneyTime(itinerary.arriveAt)}, ${facts.total.spoken} in total`,
     steps.length > 0 ? capitalise(steps.join(', then ')) : null,
     facts.changes?.spoken ?? null,
+    ...concerns.map((concern) => concern.spoken),
     parking ? `Parking at ${parking.carParkName}: ${parking.occupancy.spoken}` : null,
     parking ? parking.note.replace(/\.$/, '') : null,
     parking?.rulesNote ? parking.rulesNote.replace(/\.$/, '') : null,

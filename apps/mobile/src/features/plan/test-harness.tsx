@@ -12,6 +12,7 @@ import PlanRoute from '@/app/(tabs)/index';
 import RootLayout from '@/app/_layout';
 import MapRoute from '@/app/map';
 import PlaceSearchRoute from '@/app/place-search';
+import CarParksConsideredRoute from '@/app/car-parks-considered';
 import ResultsRoute from '@/app/results';
 import TripOptionsRoute from '@/app/trip-options';
 
@@ -119,6 +120,7 @@ export const APP_ROUTES = {
   'parked-car/correct': placeholder('Correct parking'),
   'data-use': placeholder('Data use'),
   map: MapRoute,
+  'car-parks-considered': CarParksConsideredRoute,
   welcome: placeholder('Welcome'),
 };
 

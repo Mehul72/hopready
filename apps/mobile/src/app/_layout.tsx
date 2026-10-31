@@ -91,6 +91,10 @@ export default function RootLayout() {
                   options={{ presentation: 'modal', title: 'Live data use' }}
                 />
                 <Stack.Screen name="map" options={{ presentation: 'modal', title: 'Map' }} />
+                <Stack.Screen
+                  name="car-parks-considered"
+                  options={{ presentation: 'modal', title: 'Car parks considered' }}
+                />
               </Stack.Protected>
               <Stack.Protected guard={needsLiveDataConsent} redirectTo="/">
                 <Stack.Screen name="welcome" options={{ headerShown: false }} />

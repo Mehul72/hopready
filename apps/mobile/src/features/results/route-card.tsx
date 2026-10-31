@@ -1,4 +1,9 @@
-import { formatSydneyTime, type Itinerary, type ServiceAlert } from '@hopready/core';
+import {
+  formatSydneyTime,
+  type Itinerary,
+  type Preferences,
+  type ServiceAlert,
+} from '@hopready/core';
 import { type SFSymbol, SymbolView } from 'expo-symbols';
 import { StyleSheet, View } from 'react-native';
 
@@ -13,9 +18,11 @@ import {
 } from '@/components';
 import { COMPACT_MAX_FONT_SCALE, type ColourTokens, RADII, SPACING, useTheme } from '@/theme';
 
+import type { Wording } from '../shared/occupancy-wording';
 import { optionLabel } from '../shared/option-labels';
 import {
   alertSummary,
+  concernSummaries,
   describeItinerary,
   type LegStep,
   legSteps,
@@ -26,13 +33,14 @@ import {
   tripFacts,
 } from './route-summary';
 
+interface PillStyle {
+  background: keyof ColourTokens;
+  tone: TextTone;
+  symbol: SFSymbol;
+}
+
 // The badge takes the look of the most serious alert, with a different symbol for each level.
-const ALERT_STYLES: Readonly<
-  Record<
-    ServiceAlert['severity'],
-    { background: keyof ColourTokens; tone: TextTone; symbol: SFSymbol }
-  >
-> = {
+const ALERT_STYLES: Readonly<Record<ServiceAlert['severity'], PillStyle>> = {
   info: { background: 'infoSoft', tone: 'onInfoSoft', symbol: 'info.circle.fill' },
   warning: {
     background: 'warningSoft',
@@ -42,15 +50,40 @@ const ALERT_STYLES: Readonly<
   severe: { background: 'dangerSoft', tone: 'onDangerSoft', symbol: 'xmark.octagon.fill' },
 };
 
+// A mark against the person's own limit is a caution, never an error: the option still works.
+const CONCERN_STYLE: PillStyle = {
+  background: 'warningSoft',
+  tone: 'onWarningSoft',
+  symbol: 'exclamationmark.triangle.fill',
+};
+
 export interface RouteCardProps {
   itinerary: Itinerary;
   now: Date;
   // When the options were checked, once that is too long ago to call their times live
   // (staleCheckOf).
   staleCheckAt: string | null;
+  // The limits and buffers the trip was planned with, which the planner's marks are read against.
+  preferences: Preferences;
   // The option the person chose to follow, if it is this one.
   selected: boolean;
   onPress: () => void;
+}
+
+function Pill({ style, wording }: { style: PillStyle; wording: Wording }) {
+  const { colours } = useTheme();
+  return (
+    <View style={[styles.pill, { backgroundColor: colours[style.background] }]}>
+      <SymbolView name={style.symbol} tintColor={colourForTone(colours, style.tone)} size={12} />
+      <AppText
+        variant="caption"
+        tone={style.tone}
+        weight="semibold"
+        maxFontSizeMultiplier={COMPACT_MAX_FONT_SCALE}>
+        {wording.text}
+      </AppText>
+    </View>
+  );
 }
 
 function TimingPill({
@@ -60,7 +93,6 @@ function TimingPill({
   summary: TimingSummary;
   staleCheckAt: string | null;
 }) {
-  const { colours } = useTheme();
   if (summary === 'live') return <TimingBadge timing="realtime" staleCheckAt={staleCheckAt} />;
   if (summary === 'sample-live') return <TimingBadge timing="realtime" sample />;
   if (summary === 'timetable') return <TimingBadge timing="scheduled" />;
@@ -68,32 +100,7 @@ function TimingPill({
   // Old partly live times say when they were checked, as old live ones do.
   if (staleCheckAt) return <TimingBadge timing="realtime" staleCheckAt={staleCheckAt} />;
   // Partly live is not a single leg timing, so it borrows the live badge's look with its own words.
-  const style = TIMING_STYLES.realtime;
-  return (
-    <View style={[styles.pill, { backgroundColor: colours[style.background] }]}>
-      <SymbolView name={style.symbol} tintColor={colourForTone(colours, style.tone)} size={12} />
-      <AppText
-        variant="caption"
-        tone={style.tone}
-        weight="semibold"
-        maxFontSizeMultiplier={COMPACT_MAX_FONT_SCALE}>
-        {TIMING_SUMMARY_WORDING[summary].text}
-      </AppText>
-    </View>
-  );
-}
-
-function TimeBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.timeBlock}>
-      <AppText variant="caption" tone="secondary">
-        {label}
-      </AppText>
-      <AppText variant="title2" tabularNumbers>
-        {value}
-      </AppText>
-    </View>
-  );
+  return <Pill style={TIMING_STYLES.realtime} wording={TIMING_SUMMARY_WORDING[summary]} />;
 }
 
 function StepChip({ step }: { step: LegStep }) {
@@ -119,44 +126,42 @@ function StepChip({ step }: { step: LegStep }) {
   );
 }
 
-// One trip option. The whole card is a single button whose spoken label reads the option as one
-// sentence; the pieces inside are for the eye.
-export function RouteCard({ itinerary, now, staleCheckAt, selected, onPress }: RouteCardProps) {
+// One trip option, kept to what decides between options: the times, the steps, one line of facts,
+// the car park's count, and any marks. The steps and map are behind a tap. The whole card is a
+// single button whose spoken label reads the option as one sentence.
+export function RouteCard({
+  itinerary,
+  now,
+  staleCheckAt,
+  preferences,
+  selected,
+  onPress,
+}: RouteCardProps) {
   const { colours } = useTheme();
   const facts = tripFacts(itinerary);
   const steps = legSteps(itinerary);
   const parking = parkingSummary(itinerary, now);
   const alerts = alertSummary(itinerary);
-  const factLine = [facts.driving, facts.walking, facts.changes]
-    .flatMap((fact) => (fact ? [fact.text] : []))
+  const concerns = concernSummaries(itinerary, preferences);
+  const factLine = [optionLabel(itinerary), facts.driving, facts.walking, facts.changes]
+    .flatMap((fact) => (fact ? [typeof fact === 'string' ? fact : fact.text] : []))
     .join(' · ');
 
   return (
     <Card
       onPress={onPress}
       selected={selected}
-      accessibilityLabel={describeItinerary(itinerary, now, staleCheckAt)}
+      accessibilityLabel={describeItinerary(itinerary, now, staleCheckAt, preferences)}
       accessibilityHint="Opens the steps and map for this option"
       testID={`route-card-${itinerary.id}`}>
       <View style={styles.content}>
-        <View style={styles.headerRow}>
-          <AppText variant="subheadline" tone="secondary" weight="semibold" style={styles.shrink}>
-            {optionLabel(itinerary)}
-          </AppText>
-          <TimingPill summary={timingSummary(itinerary)} staleCheckAt={staleCheckAt} />
-        </View>
         <View style={styles.timesRow}>
-          <TimeBlock label="Leave" value={formatSydneyTime(itinerary.departAt)} />
-          <SymbolView name="arrow.right" tintColor={colours.textSecondary} size={16} />
-          <TimeBlock label="Arrive" value={formatSydneyTime(itinerary.arriveAt)} />
-          <View style={styles.total}>
-            <AppText variant="caption" tone="secondary">
-              Total
-            </AppText>
-            <AppText variant="headline" tabularNumbers>
-              {facts.total.text}
-            </AppText>
-          </View>
+          <AppText variant="title2" tabularNumbers style={styles.shrink}>
+            {`${formatSydneyTime(itinerary.departAt)} → ${formatSydneyTime(itinerary.arriveAt)}`}
+          </AppText>
+          <AppText variant="headline" tabularNumbers>
+            {facts.total.text}
+          </AppText>
         </View>
         <View style={styles.steps}>
           {steps.map((step, index) => (
@@ -168,10 +173,19 @@ export function RouteCard({ itinerary, now, staleCheckAt, selected, onPress }: R
             </View>
           ))}
         </View>
-        {factLine ? (
-          <AppText variant="footnote" tone="secondary" tabularNumbers>
+        <View style={styles.factsRow}>
+          <AppText variant="footnote" tone="secondary" tabularNumbers style={styles.shrink}>
             {factLine}
           </AppText>
+          <TimingPill summary={timingSummary(itinerary)} staleCheckAt={staleCheckAt} />
+        </View>
+        {parking ? (
+          <View style={styles.parking}>
+            <ModeIcon mode="park" size={16} />
+            <AppText variant="footnote" style={styles.shrink}>
+              {`${parking.carParkName} · ${parking.occupancy.summary}`}
+            </AppText>
+          </View>
         ) : null}
         {/* Caveats the planner attached, such as a drive time that leaves out parking. */}
         {itinerary.notes.map((note) => (
@@ -179,43 +193,14 @@ export function RouteCard({ itinerary, now, staleCheckAt, selected, onPress }: R
             {note}
           </AppText>
         ))}
-        {parking ? (
-          <View style={[styles.parking, { backgroundColor: colours.surfaceMuted }]}>
-            <ModeIcon mode="park" size={18} />
-            <View style={styles.shrink}>
-              <AppText variant="subheadline" weight="semibold">
-                {parking.carParkName}
-              </AppText>
-              <AppText variant="footnote">{parking.occupancy.text}</AppText>
-              <AppText variant="footnote" tone="secondary">
-                {parking.note}
-              </AppText>
-              {parking.rulesNote ? (
-                <AppText variant="footnote" weight="semibold">
-                  {parking.rulesNote}
-                </AppText>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
-        {alerts ? (
-          <View
-            style={[
-              styles.pill,
-              { backgroundColor: colours[ALERT_STYLES[alerts.severity].background] },
-            ]}>
-            <SymbolView
-              name={ALERT_STYLES[alerts.severity].symbol}
-              tintColor={colourForTone(colours, ALERT_STYLES[alerts.severity].tone)}
-              size={12}
-            />
-            <AppText
-              variant="caption"
-              weight="semibold"
-              tone={ALERT_STYLES[alerts.severity].tone}
-              maxFontSizeMultiplier={COMPACT_MAX_FONT_SCALE}>
-              {alerts.wording.text}
-            </AppText>
+        {concerns.length > 0 || alerts ? (
+          <View style={styles.pills}>
+            {concerns.map((concern) => (
+              <Pill key={concern.text} style={CONCERN_STYLE} wording={concern} />
+            ))}
+            {alerts ? (
+              <Pill style={ALERT_STYLES[alerts.severity]} wording={alerts.wording} />
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -227,30 +212,16 @@ const styles = StyleSheet.create({
   content: {
     gap: SPACING.sm,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
   shrink: {
     flexShrink: 1,
   },
   timesRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
     flexWrap: 'wrap',
     columnGap: SPACING.md,
-    rowGap: SPACING.xs,
-  },
-  timeBlock: {
-    gap: SPACING.xxs,
-  },
-  total: {
-    marginLeft: 'auto',
-    alignItems: 'flex-end',
-    gap: SPACING.xxs,
+    rowGap: SPACING.xxs,
   },
   steps: {
     flexDirection: 'row',
@@ -273,12 +244,23 @@ const styles = StyleSheet.create({
     borderRadius: RADII.sm,
     paddingHorizontal: SPACING.xs,
   },
+  factsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    columnGap: SPACING.sm,
+    rowGap: SPACING.xs,
+  },
   parking: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING.sm,
-    borderRadius: RADII.md,
-    padding: SPACING.sm,
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  pills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
   },
   pill: {
     flexDirection: 'row',

@@ -2,6 +2,7 @@ import { addMinutes, type Itinerary, legSeconds, type ParkedCar } from '@hopread
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
+import { ActionSheetIOS } from 'react-native';
 
 import { ApiError } from '@/api';
 import { planDraft } from '@/features/plan/plan-draft';
@@ -67,30 +68,58 @@ const selfDriving = (itinerary: Itinerary) =>
     .filter((leg) => leg.kind === 'drive')
     .reduce((total, leg) => total + legSeconds(leg), 0);
 
+// The sort menu is the system action sheet, so a test picks an entry by answering the sheet.
+function answerSortSheetWith(label: string) {
+  return jest
+    .spyOn(ActionSheetIOS, 'showActionSheetWithOptions')
+    .mockImplementationOnce((options, callback) => {
+      callback(options.options?.indexOf(label) ?? -1);
+    });
+}
+
 describe('sorting', () => {
   it('starts with the earliest arrival and re-sorts by driving and changes on request', async () => {
     const user = await planFromPlanTab();
     await screen.findAllByTestId(/^route-card-/);
 
-    expect(screen.getByRole('radio', { name: 'Earliest arrival' })).toBeChecked();
-    expect(screen.queryByRole('radio', { name: 'Leave latest' })).not.toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Sort by: Earliest arrival' })).toBeOnTheScreen();
     const byArrival = shownItineraries();
     expect(byArrival.length).toBeGreaterThan(2);
     expect(isSortedBy(byArrival, arrival)).toBe(true);
 
-    await user.press(screen.getByRole('radio', { name: 'Least driving' }));
+    const sheet = answerSortSheetWith('Least driving');
+    await user.press(screen.getByRole('button', { name: 'Sort by: Earliest arrival' }));
+    // "Leave latest" only means something for an arrive-by trip.
+    expect(sheet.mock.calls[0]?.[0].options).toEqual([
+      'Earliest arrival',
+      'Least driving',
+      'Fewest changes',
+      'Cancel',
+    ]);
     const byDriving = shownItineraries();
     expect(isSortedBy(byDriving, selfDriving)).toBe(true);
     expect(byDriving[0]?.strategy).toBe('transit-only');
     // Driving the whole way is listed for comparison, marked as a long drive.
     expect(byDriving.at(-1)?.strategy).toBe('drive-only');
     expect(byDriving.at(-1)?.concerns).toEqual(['long-drive']);
-    expect(screen.getByRole('radio', { name: 'Least driving' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Sort by: Least driving' })).toBeOnTheScreen();
 
-    await user.press(screen.getByRole('radio', { name: 'Fewest changes' }));
+    answerSortSheetWith('Fewest changes');
+    await user.press(screen.getByRole('button', { name: 'Sort by: Least driving' }));
     expect(isSortedBy(shownItineraries(), (itinerary) => itinerary.transfers)).toBe(true);
     // Sorting reorders the same options; it never adds or drops one.
     expect(shownItineraries()).toHaveLength(byArrival.length);
+  });
+
+  it('shows a long drive as a mark on the option, against the limit', async () => {
+    await planFromPlanTab();
+    await screen.findAllByTestId(/^route-card-/);
+    const driveOnly = shownItineraries().find((itinerary) => itinerary.strategy === 'drive-only');
+    expect(driveOnly).toBeDefined();
+    const limit = planSession.getState().request?.preferences.maxDriveMinutes;
+
+    const card = within(screen.getByTestId(`route-card-${driveOnly!.id}`));
+    expect(card.getByText(new RegExp(`^Drive .+, over your ${limit} min$`))).toBeOnTheScreen();
   });
 });
 
@@ -136,54 +165,62 @@ describe('when nothing works', () => {
     ).toBeOnTheScreen();
   });
 
-  it('lists the car parks it checked and what happened at each', async () => {
+  it('lists the car parks it considered, with their estimates, one tap away', async () => {
     const user = await planFromPlanTab();
     await screen.findAllByTestId(/^route-card-/);
-    const disclosure = screen.getByRole('button', { name: /^Car parks checked \(\d+\)$/ });
-    expect(disclosure).toHaveProp(
-      'accessibilityState',
-      expect.objectContaining({ expanded: false }),
+    const checked = planSession.getState().response?.checkedCarParks ?? [];
+    expect(checked.length).toBeGreaterThan(2);
+
+    await user.press(
+      screen.getByRole('button', { name: `Car parks considered, ${checked.length}` }),
     );
 
-    await user.press(disclosure);
-
-    expect(disclosure).toHaveProp(
-      'accessibilityState',
-      expect.objectContaining({ expanded: true }),
-    );
+    expect(screen).toHavePathname('/car-parks-considered');
     expect(
-      screen.getByLabelText('Cherrybrook: Further than your 30 min driving limit'),
-    ).toBeOnTheScreen();
-    expect(
-      screen.getByLabelText('Kellyville (north): A connection was found from here'),
+      await screen.findByLabelText(/^Cherrybrook.*: Further than your 30 min driving limit$/),
     ).toBeOnTheScreen();
     expect(
       screen.getByLabelText(
-        'Kellyville (south): Not tried: HopReady checks the five most promising car parks, one per station',
+        /^Kellyville \(north\), Kellyville Station.*: Exact times in the options$/,
       ),
     ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        /^Kellyville \(south\), Kellyville Station, about .+ door to door: Not among the five tried$/,
+      ),
+    ).toBeOnTheScreen();
+    // Tried car parks come first, then the rest by their estimate.
+    const rows = screen.getAllByTestId(/^considered-car-park-/);
+    const outcomes = rows.map(
+      (row) =>
+        checked.find((carPark) => `considered-car-park-${carPark.id}` === row.props.testID)!
+          .outcome,
+    );
+    expect(outcomes.indexOf('used')).toBeLessThan(outcomes.indexOf('not-tried'));
+    expect(outcomes.indexOf('not-tried')).toBeLessThan(outcomes.indexOf('too-far-to-drive'));
+
+    await user.press(screen.getByRole('button', { name: 'Done' }));
+    expect(screen).toHavePathname('/results');
   });
 
   it('says why a car park at a listed station has no card of its own', async () => {
     const user = await planFromPlanTab(DEMO_PLACES.boxHillHome, DEMO_PLACES.chatswoodOffice);
     await screen.findAllByTestId(/^route-card-/);
-
-    await user.press(screen.getByRole('button', { name: /^Car parks checked \(\d+\)$/ }));
-
-    expect(
-      screen.getByLabelText('Tallawong P2: A connection was found from here'),
-    ).toBeOnTheScreen();
-    // Both Kellyville car parks serve the same station, so only one is checked and listed.
-    expect(
-      screen.getByLabelText(
-        'Kellyville (south): Not tried: HopReady checks the five most promising car parks, one per station',
-      ),
-    ).toBeOnTheScreen();
     const carParksWithCards = shownItineraries().map(
       (itinerary) => itinerary.parking?.carPark.name,
     );
+    // Both Kellyville car parks serve the same station, so only one is checked and listed.
     expect(carParksWithCards).toContain('Kellyville (north)');
     expect(carParksWithCards).not.toContain('Kellyville (south)');
+
+    await user.press(screen.getByRole('button', { name: /^Car parks considered, \d+$/ }));
+
+    expect(
+      await screen.findByLabelText(/^Tallawong P2.*: Exact times in the options$/),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(/^Kellyville \(south\).*: Not among the five tried$/),
+    ).toBeOnTheScreen();
   });
 });
 
@@ -283,11 +320,12 @@ describe('refreshing', () => {
     await screen.findAllByTestId(/^route-card-/);
     const plan = jest.spyOn(tripService, 'planTrip');
 
+    expect(screen.getByTestId('checked-at')).toHaveTextContent('Checked 7:30 am');
     await user.press(screen.getByRole('button', { name: 'Refresh' }));
 
     expect(plan).not.toHaveBeenCalled();
     expect(screen.getByTestId('refresh-too-soon')).toHaveTextContent(
-      /These options are less than 30 seconds old\. You can refresh again in \d+ seconds\./,
+      /^Checked 7:30 am\. Refresh again in \d+ seconds\.$/,
     );
   });
 

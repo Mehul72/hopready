@@ -1,4 +1,4 @@
-import { addMinutes, buildItinerary, type Itinerary } from '@hopready/core';
+import { addMinutes, buildItinerary, DEFAULT_PREFERENCES, type Itinerary } from '@hopready/core';
 
 import {
   parkAndRideItinerary,
@@ -9,6 +9,7 @@ import {
 
 import {
   alertSummary,
+  concernSummaries,
   describeItinerary,
   legDuration,
   legSteps,
@@ -106,6 +107,61 @@ describe('describeItinerary', () => {
     expect(sentence).toMatch(/^Public transport\. /);
     expect(sentence).toContain('Timetable times, not live. 2 service alerts.');
     expect(sentence).not.toContain('Parking');
+  });
+});
+
+describe('concernSummaries', () => {
+  const preferences = {
+    ...DEFAULT_PREFERENCES,
+    maxWalkMinutes: 8,
+    maxDriveMinutes: 30,
+    transferBufferMinutes: 3,
+  };
+
+  it("words each mark against the person's own limit", () => {
+    // The public transport trip's longest walk is the 10 minutes to the station.
+    const longWalk = {
+      ...transitItinerary({ departAt: DEPART }),
+      concerns: ['long-walk' as const],
+    };
+    const longDrive = { ...driveOnly(), concerns: ['long-drive' as const] };
+    const tightChange = {
+      ...transitItinerary({ departAt: DEPART }),
+      concerns: ['tight-change' as const],
+    };
+
+    expect(concernSummaries(longWalk, preferences)).toEqual([
+      {
+        text: 'Walk 10 min, over your 8 min',
+        spoken: 'A walk of 10 minutes, over your 8 minute walking limit',
+      },
+    ]);
+    expect(concernSummaries(longDrive, preferences)).toEqual([
+      {
+        text: 'Drive 47 min, over your 30 min',
+        spoken: '47 minutes driving, over your 30 minute driving limit',
+      },
+    ]);
+    expect(concernSummaries(tightChange, preferences)).toEqual([
+      {
+        text: 'Change under your 3 min buffer',
+        spoken: 'A change shorter than your 3 minute transfer buffer',
+      },
+    ]);
+    expect(concernSummaries(transitItinerary({ departAt: DEPART }), preferences)).toEqual([]);
+  });
+
+  it('is read out as part of the option, after the changes', () => {
+    const longWalk = {
+      ...transitItinerary({ departAt: DEPART }),
+      concerns: ['long-walk' as const],
+    };
+
+    expect(describeItinerary(longWalk, NOW, null, preferences)).toContain(
+      'No changes. A walk of 10 minutes, over your 8 minute walking limit. Timetable times',
+    );
+    // Without the preferences the marks cannot be worded, so they are left out.
+    expect(describeItinerary(longWalk, NOW)).not.toContain('over your');
   });
 });
 

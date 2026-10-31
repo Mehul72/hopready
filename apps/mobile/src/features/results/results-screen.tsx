@@ -20,8 +20,10 @@ import { describeWait } from '@/api';
 import {
   AppText,
   Banner,
-  Button,
+  Card,
   EmptyState,
+  IconButton,
+  ListRow,
   LoadingState,
   type MapPoint,
   Screen,
@@ -38,14 +40,13 @@ import { MANUAL_REFRESH_MIN_INTERVAL_SECONDS, replanRequest, useTripHomeOutOfDat
 
 import { useStaleCheckAt } from '../itinerary/use-stale-check-at';
 import { TripHomeOutOfDate } from '../shared/trip-home-out-of-date';
-import { CarParksChecked } from './car-parks-checked';
 import { optionsChangedSince, withCurrentOptions } from './current-options';
 import { defaultOrderFor, orderItineraries, ordersFor, type ResultOrder } from './itinerary-order';
 import { NoOptions } from './no-options';
-import { OrderPicker } from './order-picker';
 import { STRATEGY_LABELS } from './plan-explanations';
 import { ResultsError } from './results-error';
 import { RouteCard } from './route-card';
+import { SortMenu } from './sort-menu';
 import { useNow } from './use-now';
 
 // Occupancy ages ("updated 3 min ago") stay roughly right while the list is open.
@@ -159,6 +160,9 @@ export function ResultsScreen() {
   // The same limit as the trip screen, so an option is not called live here but not there.
   // Refreshing could only plan back to the car as it was, so the banner asks for Take me home.
   const canRefresh = response !== null && !tripHomeOutOfDate;
+  const checkedAt = plannedAt ? `Checked ${formatSydneyTime(plannedAt)}` : null;
+  const currentRefreshNote =
+    refreshNote && refreshNote.plannedAt === plannedAt ? refreshNote.text : null;
 
   // A "leave at" time that passed meanwhile moves up to now. A trip home that no longer fits the
   // car is not planned at all.
@@ -179,12 +183,13 @@ export function ResultsScreen() {
   async function refresh() {
     setRefreshNote(null);
     const outcome = await planSession.refresh();
-    if (outcome.status === 'too-soon') {
-      setRefreshNote({
-        text: `These options are less than ${MANUAL_REFRESH_MIN_INTERVAL_SECONDS} seconds old. You can refresh again in ${describeWait(outcome.retryInSeconds)}.`,
-        plannedAt: planSession.getState().plannedAt,
-      });
-    }
+    if (outcome.status !== 'too-soon') return;
+    // The caption under the toolbar changes rather than a banner appearing, so it is spoken too.
+    const text = `${checkedAt ?? 'Checked just now'}. Refresh again in ${describeWait(outcome.retryInSeconds)}.`;
+    setRefreshNote({ text, plannedAt: planSession.getState().plannedAt });
+    AccessibilityInfo.announceForAccessibility(
+      `These options are less than ${MANUAL_REFRESH_MIN_INTERVAL_SECONDS} seconds old. ${text}`,
+    );
   }
 
   function switchToDemoMode() {
@@ -218,6 +223,38 @@ export function ResultsScreen() {
   } else {
     body = (
       <>
+        {/* The order and the freshness sit in one small row, out of the list's way. */}
+        <View style={styles.toolbar}>
+          {itineraries.length > 1 ? (
+            <SortMenu orders={orders} value={order} onChange={setChosenOrder} />
+          ) : (
+            <View />
+          )}
+          {canRefresh ? (
+            <View style={styles.refresh}>
+              {(currentRefreshNote ?? checkedAt) ? (
+                <AppText
+                  variant="caption"
+                  tone="secondary"
+                  tabularNumbers
+                  style={styles.shrink}
+                  testID={currentRefreshNote ? 'refresh-too-soon' : 'checked-at'}>
+                  {currentRefreshNote ?? checkedAt}
+                </AppText>
+              ) : null}
+              {/* Pull to refresh is hard to find with VoiceOver or Switch Control; this does the
+                  same. */}
+              <IconButton
+                symbol="arrow.clockwise"
+                accessibilityLabel="Refresh"
+                accessibilityHint="Checks for newer times, at most every 30 seconds"
+                disabled={status === 'refreshing'}
+                onPress={() => void refresh()}
+                testID="refresh-button"
+              />
+            </View>
+          ) : null}
+        </View>
         {status === 'failed' && error ? (
           <Banner
             tone="error"
@@ -240,16 +277,10 @@ export function ResultsScreen() {
             testID="options-changed"
           />
         ) : null}
-        {refreshNote && refreshNote.plannedAt === plannedAt ? (
-          <Banner tone="info" message={refreshNote.text} announce testID="refresh-too-soon" />
-        ) : null}
         {/* Each strategy reports the same provider trouble, so a notice can arrive twice. */}
         {[...new Set(response.notices)].map((notice) => (
           <Banner key={notice} tone="info" message={notice} />
         ))}
-        {itineraries.length > 1 ? (
-          <OrderPicker orders={orders} value={order} onChange={setChosenOrder} />
-        ) : null}
         {itineraries.length === 0 ? (
           <NoOptions
             response={response}
@@ -264,6 +295,7 @@ export function ResultsScreen() {
               itinerary={itinerary}
               now={now}
               staleCheckAt={staleCheckAt}
+              preferences={request.preferences}
               selected={itinerary.id === session.selectedItineraryId}
               onPress={() => openItinerary(itinerary)}
             />
@@ -278,10 +310,19 @@ export function ResultsScreen() {
             testID={`unavailable-${entry.strategy}`}
           />
         ))}
-        <CarParksChecked
-          checkedCarParks={response.checkedCarParks}
-          maxDriveMinutes={request.preferences.maxDriveMinutes}
-        />
+        {/* Which car parks were weighed up, and what happened to each, one tap away. */}
+        {response.checkedCarParks.length > 0 ? (
+          <Card padded={false} style={styles.clipped}>
+            <ListRow
+              title="Car parks considered"
+              value={String(response.checkedCarParks.length)}
+              leadingSymbol="parkingsign.circle.fill"
+              onPress={() => router.navigate('/car-parks-considered')}
+              accessibilityHint="Shows each car park within your driving limit, its estimate and what happened to it"
+              testID="car-parks-considered"
+            />
+          </Card>
+        ) : null}
       </>
     );
   }
@@ -324,29 +365,11 @@ export function ResultsScreen() {
               />
             )}
           </MapCard>
-          <View style={styles.summaryRow}>
-            <View accessible style={styles.summary} testID="results-summary">
-              <AppText variant="headline">{`${request.origin.name} to ${request.destination.name}`}</AppText>
-              <AppText variant="subheadline" tone="secondary">
-                {[
-                  describeRequestTime(request.time, now),
-                  plannedAt ? `checked ${formatSydneyTime(plannedAt)}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </AppText>
-            </View>
-            {/* Pull to refresh is hard to find with VoiceOver or Switch Control; this does the same. */}
-            {canRefresh ? (
-              <Button
-                variant="plain"
-                label="Refresh"
-                symbol="arrow.clockwise"
-                loading={status === 'refreshing'}
-                onPress={() => void refresh()}
-                accessibilityHint="Checks for newer times, at most every 30 seconds"
-              />
-            ) : null}
+          <View accessible style={styles.summary} testID="results-summary">
+            <AppText variant="headline">{`${request.origin.name} to ${request.destination.name}`}</AppText>
+            <AppText variant="subheadline" tone="secondary">
+              {describeRequestTime(request.time, now)}
+            </AppText>
           </View>
           {tripHomeOutOfDate ? <TripHomeOutOfDate /> : null}
           {body}
@@ -360,6 +383,9 @@ const styles = StyleSheet.create({
   fill: {
     flex: 1,
   },
+  shrink: {
+    flexShrink: 1,
+  },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.lg,
@@ -370,15 +396,24 @@ const styles = StyleSheet.create({
     maxWidth: MAX_CONTENT_WIDTH,
     gap: SPACING.md,
   },
-  summaryRow: {
+  summary: {
+    gap: SPACING.xxs,
+  },
+  toolbar: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: SPACING.sm,
   },
-  summary: {
-    flex: 1,
-    minWidth: '60%',
-    gap: SPACING.xxs,
+  refresh: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginLeft: 'auto',
+    flexShrink: 1,
+  },
+  clipped: {
+    overflow: 'hidden',
   },
 });

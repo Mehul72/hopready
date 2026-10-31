@@ -1,6 +1,12 @@
 import { DEFAULT_PREFERENCES, REJECTION_REASONS } from '@hopready/core';
 
-import { carParkOutcomeText, explainRejections } from './plan-explanations';
+import {
+  carParkOutcomeText,
+  type CheckedCarPark,
+  describeCheckedCarPark,
+  explainRejections,
+  orderCheckedCarParks,
+} from './plan-explanations';
 
 const PREFERENCES = { ...DEFAULT_PREFERENCES, transferBufferMinutes: 3, maxWalkMinutes: 12 };
 
@@ -60,9 +66,7 @@ describe('carParkOutcomeText', () => {
     expect(carParkOutcomeText('not-towards-destination', 25)).toBe(
       'Not on the way to your destination',
     );
-    expect(carParkOutcomeText('not-tried', 25)).toBe(
-      'Not tried: HopReady checks the five most promising car parks, one per station',
-    );
+    expect(carParkOutcomeText('not-tried', 25)).toBe('Not among the five tried');
     expect(carParkOutcomeText('not-understood', 25)).toBe(
       'Checked. Update HopReady to see what happened here',
     );
@@ -70,12 +74,54 @@ describe('carParkOutcomeText', () => {
       'No public transport connection worked from here',
     );
     expect(carParkOutcomeText('provider-error', 25)).toBe("Couldn't be checked just now");
-    expect(carParkOutcomeText('used', 25)).toBe('A connection was found from here');
+    expect(carParkOutcomeText('used', 25)).toBe('Exact times in the options');
     expect(carParkOutcomeText('matched-by-another', 25)).toBe(
-      'A car park shown above gets you there as early, with no more driving',
+      'Another car park at this station gets you there as early, with no more driving',
     );
     expect(carParkOutcomeText('left-out-for-space', 25)).toBe(
       'Works, but more options were found than fit on the list',
     );
+  });
+});
+
+const SEVEN_HILLS: CheckedCarPark = {
+  id: '488',
+  name: 'Seven Hills',
+  outcome: 'not-tried',
+  stationName: 'Seven Hills Station',
+  estimatedMinutes: 66,
+};
+
+describe('describeCheckedCarPark', () => {
+  it('names the station and the rough door-to-door estimate, then the outcome', () => {
+    expect(describeCheckedCarPark(SEVEN_HILLS, 30)).toEqual({
+      title: 'Seven Hills',
+      detail: 'Seven Hills Station · about 1 h 6 min door to door',
+      outcome: 'Not among the five tried',
+      spoken:
+        'Seven Hills, Seven Hills Station, about 1 h 6 min door to door: Not among the five tried',
+    });
+  });
+
+  it('leaves out what the planner did not give', () => {
+    const described = describeCheckedCarPark(
+      { id: '1', name: 'Hornsby', outcome: 'too-far-to-drive' },
+      30,
+    );
+    expect(described.detail).toBeNull();
+    expect(described.spoken).toBe('Hornsby: Further than your 30 min driving limit');
+  });
+});
+
+describe('orderCheckedCarParks', () => {
+  it('puts tried car parks first, then the rest by estimate', () => {
+    const ordered = orderCheckedCarParks([
+      { id: 'far', name: 'Hornsby', outcome: 'too-far-to-drive', estimatedMinutes: 50 },
+      SEVEN_HILLS,
+      { id: 'near', name: 'Bella Vista', outcome: 'not-tried', estimatedMinutes: 60 },
+      { id: 'used', name: 'Hills Showground', outcome: 'used', estimatedMinutes: 70 },
+      { id: 'unknown', name: 'Ashfield', outcome: 'not-tried' },
+    ]);
+    expect(ordered.map((carPark) => carPark.id)).toEqual(['used', 'near', '488', 'unknown', 'far']);
   });
 });

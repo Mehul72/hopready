@@ -67,10 +67,11 @@ describe('planning a trip from the Plan tab', () => {
     expect(cards).toHaveLength(response?.itineraries.length ?? -1);
     expect(cards.length).toBeGreaterThan(1);
     // Both ways the demo world offers for this trip are listed, each with big leave and arrive times.
-    expect(screen.getAllByText('Public transport').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Drive and park').length).toBeGreaterThan(0);
-    expect(within(cards[0]!).getByText('Leave')).toBeOnTheScreen();
-    expect(within(cards[0]!).getByText('Arrive')).toBeOnTheScreen();
+    expect(screen.getAllByText(/^Public transport · /).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^Drive and park · /).length).toBeGreaterThan(0);
+    expect(
+      within(cards[0]!).getByText(/^\d{1,2}:\d{2} [ap]m → \d{1,2}:\d{2} [ap]m$/),
+    ).toBeOnTheScreen();
     expect(screen.getByTestId('results-map')).toBeOnTheScreen();
     expect(
       screen.getByText('12 Example Street, Rouse Hill to 200 Example Avenue, Barangaroo'),
@@ -194,7 +195,7 @@ describe('planning a trip from the Plan tab', () => {
     });
     expect(await screen.findAllByTestId(/^route-card-/)).not.toHaveLength(0);
     // Arrive-by results start sorted by the latest departure.
-    expect(screen.getByRole('radio', { name: 'Leave latest' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Sort by: Leave latest' })).toBeOnTheScreen();
   });
 
   it('says when the chosen time has passed instead of planning a trip in the past', async () => {
@@ -272,7 +273,7 @@ describe('one-tap routes', () => {
     expect(isMomentsAfter(planSession.getState().request?.time.at, TUESDAY_0730)).toBe(true);
     const cards = await screen.findAllByTestId(/^route-card-/);
     expect(cards.length).toBeGreaterThan(0);
-    expect(screen.queryByText('Drive and park')).not.toBeOnTheScreen();
+    expect(screen.queryByText(/^Drive and park/)).not.toBeOnTheScreen();
   });
 
   it('removes recent trips when asked', async () => {
