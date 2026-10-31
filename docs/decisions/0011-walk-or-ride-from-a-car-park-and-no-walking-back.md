@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Supersedes decision 3 of ADR-0010 and amends its decision 5; the rest of ADR-0010 stands.
+Accepted. Supersedes decision 3 of ADR-0010 and amends its decision 5; the rest of ADR-0010 stands. Decision 2 is superseded, and decisions 1, 4 and 7 refined, by ADR-0012: walking back is limited to 300 m, and the ways on from a car park are refined.
 
 ## Date
 
