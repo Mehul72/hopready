@@ -68,11 +68,11 @@ npx jest
 
 ### Interface
 
-The Plan tab starts with From and To, quick picks and Plan trip. Tap **Leave now** to choose a departure or arrival time, **Travel modes** to choose public transport, driving or drop-off, and **Trip options** for limits, buffers, walking speed, modes to avoid and preferred stops. The collapsed rows show the current timing and travel choices.
+The Plan tab starts with a compact heading, From and To, quick picks and Plan trip. Tap **Leave now** to choose a departure or arrival time, **Travel modes** to choose public transport, driving or drop-off, and **Trip options** for limits, buffers, walking speed, modes to avoid and preferred stops. The collapsed rows show the current timing and travel choices.
 
 Saved keeps Home and Work visible and groups favourite places, routes, recent searches and parking spots into expandable lists. Settings groups navigation app choices, About and Your data into expandable rows. The four native tabs remain Plan, Car, Saved and Settings.
 
-The cobalt route mark, launch screen and fallback icon are generated together with `node apps/mobile/scripts/generate-brand-assets.mjs`. UI colours are in `src/theme/colours.ts`; both appearances have automated contrast checks.
+The muted-green route mark, neutral launch screens and off-white icon are generated together with `node apps/mobile/scripts/generate-brand-assets.mjs`. UI colours are in `src/theme/colours.ts`: white and soft grey in light mode, neutral charcoal in dark mode, with green reserved for actions and selection. Both appearances follow the phone and have automated contrast checks.
 
 ### Components
 

@@ -48,11 +48,11 @@ export function ListRow({
         <View
           style={[
             styles.symbol,
-            { backgroundColor: destructive ? colours.dangerSoft : colours.brandSoft },
+            { backgroundColor: destructive ? colours.dangerSoft : colours.surfaceMuted },
           ]}>
           <SymbolView
             name={leadingSymbol}
-            tintColor={destructive ? colours.danger : colours.brand}
+            tintColor={destructive ? colours.danger : colours.textSecondary}
             size={18}
           />
         </View>

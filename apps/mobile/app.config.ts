@@ -7,8 +7,8 @@ const LOCATION_PURPOSE =
   'HopReady uses your location to start trips from where you are, to show where you are on its maps, and to list nearby places first when you search.';
 
 // Matches the continuous-route icon and the in-app brand tokens.
-const SPLASH_BACKGROUND = '#2557D6';
-const SPLASH_BACKGROUND_DARK = '#13285B';
+const SPLASH_BACKGROUND = '#F6F6F4';
+const SPLASH_BACKGROUND_DARK = '#151614';
 
 const DEFAULT_PRIVACY_POLICY_URL = 'https://mehul72.github.io/hopready/privacy/';
 const DEFAULT_SUPPORT_URL = 'https://mehul72.github.io/hopready/support/';
@@ -106,7 +106,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         backgroundColor: SPLASH_BACKGROUND,
         image: './assets/brand/splash-mark.png',
         imageWidth: 160,
-        dark: { backgroundColor: SPLASH_BACKGROUND_DARK },
+        dark: {
+          backgroundColor: SPLASH_BACKGROUND_DARK,
+          image: './assets/brand/splash-mark-dark.png',
+        },
       },
     ],
     'expo-sqlite',

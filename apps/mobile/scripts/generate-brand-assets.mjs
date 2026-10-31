@@ -41,11 +41,14 @@ const ROUTE = [
   }),
 ];
 
-const GRADIENT_TOP = [55, 114, 241];
-const GRADIENT_BOTTOM = [28, 65, 181];
-export const BRAND_COLOUR_HEX = '#2557D6';
+const GRADIENT_TOP = [248, 249, 245];
+const GRADIENT_BOTTOM = [226, 231, 222];
+export const BRAND_COLOUR_HEX = '#3D6650';
+const ICON_BACKGROUND_HEX = '#F3F5EF';
+const MARK_COLOUR = [61, 102, 80];
+const DARK_MARK_COLOUR = [218, 229, 214];
 
-function glyphSvg(colour = '#FFFFFF') {
+function glyphSvg(colour = BRAND_COLOUR_HEX) {
   return `<svg width="${CANVAS}" height="${CANVAS}" viewBox="0 0 ${CANVAS} ${CANVAS}" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M ${ORIGIN.x} ${ORIGIN.y} V ${CURVE.start.y} C ${CURVE.firstControl.x} ${CURVE.firstControl.y} ${CURVE.secondControl.x} ${CURVE.secondControl.y} ${CURVE.end.x} ${CURVE.end.y}" stroke="${colour}" stroke-width="${STROKE_WIDTH}" stroke-linecap="round" fill="none"/>
   <circle cx="${ORIGIN.x}" cy="${ORIGIN.y}" r="${ORIGIN.radius}" fill="${colour}"/>
@@ -146,22 +149,22 @@ function opaqueIcon(size) {
   return encodePng(size, size, 3, (x, y) => {
     const background = gradientAt(x, y, size);
     const coverage = glyphCoverage(x, y, scale);
-    return background.map((channel) => Math.round(channel + (255 - channel) * coverage));
+    return background.map((channel, index) =>
+      Math.round(channel + (MARK_COLOUR[index] - channel) * coverage),
+    );
   });
 }
 
-function transparentGlyph(size) {
+function transparentGlyph(size, colour = MARK_COLOUR) {
   const scale = size / CANVAS;
   return encodePng(size, size, 4, (x, y) => [
-    255,
-    255,
-    255,
+    ...colour,
     Math.round(255 * glyphCoverage(x, y, scale)),
   ]);
 }
 
 function iconComposerManifest() {
-  const [red, green, blue] = BRAND_COLOUR_HEX.match(/[0-9A-F]{2}/gi).map(
+  const [red, green, blue] = ICON_BACKGROUND_HEX.match(/[0-9A-F]{2}/gi).map(
     (hex) => parseInt(hex, 16) / 255,
   );
   return {
@@ -171,8 +174,8 @@ function iconComposerManifest() {
     groups: [
       {
         layers: [{ 'image-name': 'hop-mark.svg', name: 'hop-mark' }],
-        shadow: { kind: 'neutral', opacity: 0.5 },
-        translucency: { enabled: true, value: 0.4 },
+        shadow: { kind: 'neutral', opacity: 0.12 },
+        translucency: { enabled: false, value: 0 },
       },
     ],
     'supported-platforms': { squares: 'shared' },
@@ -191,3 +194,4 @@ write('hopready.icon/Assets/hop-mark.svg', glyphSvg());
 write('hopready.icon/icon.json', `${JSON.stringify(iconComposerManifest(), null, 2)}\n`);
 write('icon-1024.png', opaqueIcon(1024));
 write('splash-mark.png', transparentGlyph(512));
+write('splash-mark-dark.png', transparentGlyph(512, DARK_MARK_COLOUR));

@@ -6,7 +6,6 @@ import { AccessibilityInfo, Alert, StyleSheet, View } from 'react-native';
 import {
   AppText,
   Banner,
-  BrandSignature,
   Button,
   Card,
   Disclosure,
@@ -196,8 +195,7 @@ export function PlanScreen() {
 
   return (
     <Screen testID="plan-screen">
-      <BrandSignature />
-      <PageHeading title="Where to?" subtitle="Your journey, from door to door." />
+      <PageHeading title="Where to?" />
       <FollowedTripCard now={now} />
       <PlaceFields
         origin={draft.origin}

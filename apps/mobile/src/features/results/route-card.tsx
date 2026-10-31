@@ -165,7 +165,7 @@ export function RouteCard({
           <AppText variant="title2" tabularNumbers style={styles.shrink}>
             {`${times.leave.text} → ${times.arrive.text}`}
           </AppText>
-          <AppText variant="title2" tone="brand" tabularNumbers>
+          <AppText variant="headline" tabularNumbers>
             {facts.total.text}
           </AppText>
         </View>

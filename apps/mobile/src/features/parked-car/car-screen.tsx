@@ -115,7 +115,7 @@ export function CarScreen() {
   const parkedCar = useParkedCar();
   return (
     <Screen testID="car-screen">
-      <PageHeading title="Your car" subtitle="A place to park. A way back home." />
+      <PageHeading title="Your car" />
       {parkedCar.status === 'parked' ? <ParkedCarView state={parkedCar} /> : null}
       {parkedCar.status === 'dropped-off' ? <DroppedOffView state={parkedCar} /> : null}
       {parkedCar.status === 'none' ? (

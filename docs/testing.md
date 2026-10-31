@@ -32,7 +32,7 @@ They run against a Release simulator build, so the JavaScript is bundled in and 
 
 ```sh
 cd apps/mobile
-HOPREADY_IOS_UI_TESTS=1 CI=1 npx expo prebuild --platform ios
+HOPREADY_IOS_UI_TESTS=1 CI=1 npx expo prebuild --platform ios --no-clean
 cd ios
 xcrun simctl boot "iPhone 18 Pro" || true
 xcodebuild build-for-testing -workspace HopReady.xcworkspace -scheme HopReady \
@@ -62,7 +62,7 @@ It agrees to the live data agreement, then plans the drive-and-park trip with ev
 
 Notes:
 
-- `--clean` regenerates the project from scratch and deletes `ios/build`, which holds several gigabytes of build cache. Leave it off unless the native configuration changed.
+- SDK 58 prebuild recreates native folders by default. Use `--no-clean` for local updates to preserve `ios/build` and its native compilation cache; omit it when a fresh native project is needed.
 - Timing and travel mode controls expand from the Plan tab’s Leave now and Travel modes rows. Saved categories and the Navigation app, About and Your data sections in Settings expand the same way. The UI tests open these controls before using them.
 - The demo timetable has no services between about 1.30 am and 4.30 am Sydney time, so runs before 10 am set "Depart at" 10:00 am, and later runs leave now (the picker never goes earlier than now).
 - One XCUITest wheel adjustment can stop a few rows short on the iOS 27 simulator, so the helper repeats it until the wheel shows the wanted value, then checks the time the picker shows.

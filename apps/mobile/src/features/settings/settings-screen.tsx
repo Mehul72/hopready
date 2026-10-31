@@ -10,7 +10,7 @@ import { TripOptionsSection } from './trip-options-section';
 export function SettingsScreen() {
   return (
     <Screen testID="settings-screen">
-      <PageHeading title="Settings" subtitle="Make the journey yours." />
+      <PageHeading title="Settings" />
       <TripOptionsSection />
       <NavigationAppSection />
       <DemoModeSection />

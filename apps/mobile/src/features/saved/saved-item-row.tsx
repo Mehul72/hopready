@@ -36,8 +36,8 @@ export function SavedItemRow({
   const label = [title, subtitle].filter(Boolean).join(', ');
   const content = (
     <>
-      <View style={[styles.symbol, { backgroundColor: colours.brandSoft }]}>
-        <SymbolView name={symbol} tintColor={colours.brand} size={20} />
+      <View style={[styles.symbol, { backgroundColor: colours.surfaceMuted }]}>
+        <SymbolView name={symbol} tintColor={colours.textSecondary} size={20} />
       </View>
       <View style={styles.texts}>
         <AppText>{title}</AppText>

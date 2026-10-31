@@ -34,8 +34,8 @@ export function Disclosure({
           styles.row,
           pressed ? { backgroundColor: colours.surfaceMuted } : null,
         ]}>
-        <View style={[styles.symbol, { backgroundColor: colours.brandSoft }]}>
-          <SymbolView name={symbol} tintColor={colours.brand} size={18} />
+        <View style={[styles.symbol, { backgroundColor: colours.surfaceMuted }]}>
+          <SymbolView name={symbol} tintColor={colours.textSecondary} size={18} />
         </View>
         <View style={styles.texts}>
           <AppText variant="callout" weight="semibold">

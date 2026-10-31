@@ -187,7 +187,7 @@ export function SavedScreen() {
 
   return (
     <Screen testID="saved-screen">
-      <PageHeading title="Saved" subtitle="Your places. Ready when you are." />
+      <PageHeading title="Saved" />
       {noticeFor('home', 'work')}
       {planner.locating ? <Banner tone="info" message="Finding your location…" /> : null}
 
