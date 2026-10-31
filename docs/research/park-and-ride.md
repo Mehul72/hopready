@@ -32,7 +32,8 @@ Walking legs in TfNSW's answers include station access padding: the same Hills S
 ### 1.3a HopReady staging after the v2 planner (version 726a62c4, 2026-10-31 19:40)
 
 - Kellyville (Wrights Rd after Ardley Ave) to Central, Monday 08:00: 9 itineraries in 3.3 s. Drive and park: Hills Showground 60 min (drive 9, walk 276 m), Cherrybrook 64 (drive 19), Seven Hills 66 (drive 22, T1), Bella Vista 68 (drive 8, walk 531 m), Kellyville (south) 68 (drive 10); four bus-and-metro options 66 to 69. Every facility within the driving limit is listed with an estimate: Hornsby too far (about 90), North Rocks not tried (about 79), Tallawong P1 to P3 (81 to 85), Schofields (84), Mount Druitt (89), Kellyville (north) not tried as the twin of (south) at the same station.
-- The same request with the walking limit left at 15 and Parramatta to Carrington St with the limit at 8: every one of the five car parks tried (North Rocks, Ashfield, West Ryde, Gordon, Cherrybrook) ended "no workable connection" because each journey was rejected for a walk over 8 minutes or a change under the 3 minute buffer. Step 6 of the plan turns those rejections into labels.
+- Parramatta to Carrington St with the limit at 8, before step 6: every one of the five car parks tried (North Rocks, Ashfield, West Ryde, Gordon, Cherrybrook) ended "no workable connection" because each journey was rejected for a walk over 8 minutes or a change under the 3 minute buffer.
+- After step 6 (version 6d48416d): public transport only, Monday 08:27, four options, including the direct T1 trips with their 632 m walk marked `long-walk`; nothing rejected. With driving allowed (Saturday evening): ten options, led by driving the whole way (27 min, marked `long-drive`), North Rocks 52 min and Ashfield 55 min; fifteen car parks listed with estimates.
 
 ### 1.4 What this settles
 

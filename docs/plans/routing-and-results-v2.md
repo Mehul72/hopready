@@ -1,6 +1,6 @@
 # Plan: car park choice, route choice and a simpler results screen (v2)
 
-Status: in progress (research and design)
+Status: in progress (server done; app and docs next)
 Branch: feat/hopready-v1
 
 ## Goal
@@ -45,12 +45,12 @@ Server and core first (no app build needed; build 4 keeps working because every 
 - [x] 5. Candidate selection by estimated total time: estimate every facility (rough drive plus hub table), ETA the best 20, check the best 5 exactly, one per station, always including the quickest drive and the preferred car park; report every facility with its station and estimate. Commit (see log)
       files: packages/core/src/planner.ts, packages/core/src/estimate.ts, model.ts (additive `stationName` and `estimatedMinutes` on checkedCarParks), planner.test.ts, planner-scenarios.test.ts
       done when: Kellyville (Wrights Rd) to Central with the real catalogue checks Seven Hills (planner test "tries Seven Hills from Kellyville"); call count per plan documented in step 9
-- [ ] 6. Preferences rank and mark, never hide: no `walk-too-long`, `drive-too-long` or `transfer-too-short` rejections; itineraries carry additive `concerns`; options within the preferences sort first
+- [x] 6. Preferences mark, never hide: no `walk-too-long` or `drive-too-long` rejections, and `transfer-too-short` only for a change that cannot be made at all; itineraries carry additive `concerns` (long-walk, long-drive, tight-change); from a car park, journeys within the preferences are preferred. Commits 3cdf8cb, 917ec52
       files: packages/core/src/planner.ts, model.ts, itinerary.ts, tests
       done when: Parramatta to Carrington St with an 8 minute walk limit returns the direct T1 trip marked long-walk
 - [x] 7. Dominance only between car parks at the same station; every other option is listed. One car park per station is tried (the one surer of a space, then the nearer the platform); the other is reported not tried with its estimate. Commits adfb337, bcce311
       done when: Kellyville is listed next to Hills Showground in the Kellyville scenario (planner test "lists both, whatever the better one says about its spaces")
-- [ ] 8. Deploy to staging, re-run the three real trips, record results in docs/research/park-and-ride.md
+- [x] 8. Deploy to staging, re-run the real trips, record results in docs/research/park-and-ride.md (versions 726a62c4 and 6d48416d)
       done when: staging answers within 5 s and the Kellyville list includes Seven Hills with an exact time
 - [ ] 9. ADR-0007 (car park choice) and ADR-0008 (preferences), routing.md and providers.md rewritten, PROGRESS updated
 - [ ] 10. Results screen v2 in the app (short option rows, map card, details behind a tap, car parks and reasons in a sheet, no freshness banner, sort in the toolbar), Plan screen trimmed, one trip-options editor
@@ -72,3 +72,4 @@ Server and core first (no app build needed; build 4 keeps working because every 
 - 2026-10-31 The walk from a car park to the platform in TfNSW's answer includes station access padding: 139 m shown as 4 min, 342 m as 7 min (Hills Showground, same facility, different times of day).
 - 2026-10-31 Hub table recorded: 34 stations x 10 hubs x 3 periods, 1,020 TfNSW calls, none missing. Seven Hills to Central at peak: 33 min on board every 8; Hills Showground 39 every 4; Kellyville 47 every 4; North Rocks 50 every 3.
 - 2026-10-31 Steps 2 to 5 and 7 landed (commits 6c5bbd4 to edbcdae). Core 242, API 330, app 702 tests pass; typecheck, lint and format clean. Surprises: the fake transit in planner.test.ts keyed journeys on car park names, which no longer reach the provider (journeys are asked for from the station), so the dominance tests were rewritten around twins at one station and separate stations; the demo world's Kellyville (south) is now "not tried" rather than "matched by another", since one car park per station is chosen before any journey is asked for.
+- 2026-10-31 Step 6 on staging (version 6d48416d): Parramatta to Carrington St, public transport only, Monday 08:27, walk limit 8: four options, the direct T1 trips back and marked long-walk, nothing rejected. With driving: ten options led by driving the whole way (27 min, marked long-drive), North Rocks 52 and Ashfield 55.
