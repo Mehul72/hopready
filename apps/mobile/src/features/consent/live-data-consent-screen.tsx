@@ -1,7 +1,7 @@
 import { Alert, Linking, StyleSheet, View } from 'react-native';
 
 import { readSupportLinks } from '@/api';
-import { AppText, Button, Card, Screen } from '@/components';
+import { AppText, BrandSignature, Button, Card, Screen } from '@/components';
 import { appStorage, hasLiveDataConsent, useSettings } from '@/storage';
 import { SPACING } from '@/theme';
 
@@ -122,6 +122,7 @@ export function LiveDataConsentScreen({
 
   return (
     <Screen footer={footer} safeAreaEdges={firstRun ? ['top'] : []} testID="live-data-consent">
+      {firstRun ? <BrandSignature /> : null}
       <View style={styles.intro}>
         <AppText variant={firstRun ? 'largeTitle' : 'title2'} accessibilityRole="header">
           {firstRun ? 'Before your first live trip' : 'Live data use'}

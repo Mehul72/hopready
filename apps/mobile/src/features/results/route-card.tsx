@@ -165,7 +165,7 @@ export function RouteCard({
           <AppText variant="title2" tabularNumbers style={styles.shrink}>
             {`${times.leave.text} → ${times.arrive.text}`}
           </AppText>
-          <AppText variant="headline" tabularNumbers>
+          <AppText variant="title2" tone="brand" tabularNumbers>
             {facts.total.text}
           </AppText>
         </View>
@@ -186,7 +186,7 @@ export function RouteCard({
           <TimingPill summary={timingSummary(itinerary)} staleCheckAt={staleCheckAt} now={now} />
         </View>
         {parking ? (
-          <View style={styles.parking}>
+          <View style={[styles.parking, { backgroundColor: colours.surfaceMuted }]}>
             <ModeIcon mode="park" size={16} />
             <AppText variant="footnote" style={styles.shrink}>
               {`${parking.carParkName} · ${parking.occupancy.summary}`}
@@ -216,7 +216,7 @@ export function RouteCard({
 
 const styles = StyleSheet.create({
   content: {
-    gap: SPACING.sm,
+    gap: SPACING.md,
   },
   shrink: {
     flexShrink: 1,
@@ -259,6 +259,8 @@ const styles = StyleSheet.create({
     rowGap: SPACING.xs,
   },
   parking: {
+    padding: SPACING.sm,
+    borderRadius: RADII.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,

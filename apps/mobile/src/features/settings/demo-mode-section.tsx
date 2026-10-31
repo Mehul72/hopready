@@ -48,7 +48,7 @@ export function DemoModeSection() {
   const selectedScenario = demoScenario ?? 'normal';
 
   return (
-    <SettingsSection title="Demo mode" testID="demo-mode">
+    <SettingsSection title="Demo mode" showTitle={false} testID="demo-mode">
       <View style={[styles.switchRow, { backgroundColor: colours.surface }]}>
         <AppText
           style={styles.switchLabel}
@@ -64,7 +64,11 @@ export function DemoModeSection() {
           trackColor={{ true: colours.brand }}
         />
       </View>
-      <AppText tone="secondary">{DEMO_MODE_EXPLANATION}</AppText>
+      {!demoMode ? (
+        <AppText variant="footnote" tone="secondary">
+          {DEMO_MODE_EXPLANATION}
+        </AppText>
+      ) : null}
       {demoMode ? (
         <>
           <Banner
@@ -113,7 +117,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.md,
     borderRadius: RADII.lg,
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: 0,
     paddingVertical: SPACING.sm,
   },
   switchLabel: {

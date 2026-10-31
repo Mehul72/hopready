@@ -39,7 +39,7 @@ export function ActionChip({
       testID={testID}
       style={({ pressed }) => [
         styles.chip,
-        { backgroundColor: colours.surface, borderColor: colours.border },
+        { backgroundColor: colours.surface },
         pressed ? styles.pressed : null,
         disabled ? styles.disabled : null,
       ]}>
@@ -63,7 +63,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.xs,
     borderRadius: RADII.pill,
-    borderWidth: 1,
     paddingHorizontal: SPACING.md,
     // Long names wrap at large text sizes, so the chip needs room above and below them.
     paddingVertical: SPACING.xs,

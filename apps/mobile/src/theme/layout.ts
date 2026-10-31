@@ -11,16 +11,18 @@ export const SPACING = {
 } as const;
 
 export const RADII = {
-  sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 20,
+  sm: 8,
+  md: 14,
+  lg: 22,
+  xl: 28,
   pill: 999,
 } as const;
 
 // Apple's minimum comfortable target. Every interactive component is at least this big, and
 // grows past it when Dynamic Type makes its text larger.
 export const MIN_TOUCH_TARGET = 44;
+
+export const PAGE_GUTTER = 20;
 
 // Readable line length on wide windows (iPhone Mirroring and resizable windows on iOS 27).
 export const MAX_CONTENT_WIDTH = 640;

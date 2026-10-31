@@ -21,7 +21,9 @@ class HopReadyTestCase: XCTestCase {
     tapWhenReady(element("place-field-destination"))
     chooseInPlaceSheet(search: "Chatswood")
     // "I'll drive and park" is on by default, and every test starts from deleted data.
+    tapWhenReady(element("plan-travel-toggle"))
     XCTAssertTrue(element("access-drive").waitForExistence(timeout: 5))
+    tapWhenReady(element("plan-travel-toggle"))
     departAtMidMorning()
     tapWhenReady(element("plan-button"))
     XCTAssertTrue(element("results-screen").waitForExistence(timeout: 10))
@@ -37,6 +39,7 @@ class HopReadyTestCase: XCTestCase {
     var sydneyCalendar = Calendar(identifier: .gregorian)
     sydneyCalendar.timeZone = TimeZone(identifier: "Australia/Sydney")!
     guard sydneyCalendar.component(.hour, from: Date()) < 10 else { return }
+    tapWhenReady(element("plan-time-toggle"))
     tapWhenReady(labelled("Depart at"))
     // React Native puts the test ID on a wrapper; the compact picker inside has a date button and
     // a time button such as "1:35 am".
@@ -87,10 +90,17 @@ class HopReadyTestCase: XCTestCase {
 
   func deleteAllData() {
     openTab("Settings")
+    let dataSection = element("delete-data-toggle")
+    scrollTo(dataSection)
+    dataSection.tap()
     let delete = app.buttons["Delete all HopReady data"]
     scrollTo(delete)
     delete.tap()
     tapWhenReady(app.alerts.buttons["Delete everything"])
+    // Removing the demo strip while the alert closes can leave iOS 27's animation waiter busy.
+    // Relaunch from the reset state before the next journey starts.
+    app.terminate()
+    app.launch()
   }
 
   func turnOnDemoMode() {

@@ -3,7 +3,17 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { AccessibilityInfo, Alert, StyleSheet, View } from 'react-native';
 
-import { AppText, Banner, Button, Card, ListRow, Screen } from '@/components';
+import {
+  AppText,
+  Banner,
+  BrandSignature,
+  Button,
+  Card,
+  Disclosure,
+  ListRow,
+  PageHeading,
+  Screen,
+} from '@/components';
 import { FollowedTripCard } from '@/features/itinerary';
 import { useNow } from '@/features/results/use-now';
 import { planSession } from '@/state';
@@ -15,7 +25,7 @@ import {
   useSavedParkingSpots,
   useSavedPlaces,
 } from '@/storage';
-import { SPACING } from '@/theme';
+import { SPACING, useTheme } from '@/theme';
 
 import { AccessChoices } from './access-choices';
 import { ActionChip } from './action-chip';
@@ -39,6 +49,7 @@ import {
 } from './place-labels';
 import { RouteShortcuts } from './route-shortcuts';
 import { TimeChoiceControl } from './time-choice-control';
+import { describeRequestTime } from './time-choice';
 import { tripOptionsSummary } from './trip-option-settings';
 import { useCurrentPlace } from './use-current-place';
 
@@ -65,6 +76,7 @@ function spokenProblems(problems: readonly PlanProblem[]): string {
 
 export function PlanScreen() {
   const router = useRouter();
+  const { colours } = useTheme();
   const draft = usePlanDraft();
   const choices = usePlanChoices();
   const preferences = usePreferences();
@@ -92,6 +104,14 @@ export function PlanScreen() {
   const pickField: PlaceField = draft.origin ? 'destination' : 'origin';
   const quickPicks = buildQuickPicks(saved, recents, { includeCurrentLocation: true });
   const locating = location.attempt.status === 'locating';
+  const travelSummary =
+    [
+      choices.access.transit ? 'Public transport' : null,
+      choices.access.drive ? 'Drive & park' : null,
+      choices.access.dropOff ? 'Drop-off' : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || 'Choose how you travel';
 
   function openSearch(field: PlaceField) {
     // Typing a place replaces any location lookup still running or any notice about one.
@@ -176,9 +196,8 @@ export function PlanScreen() {
 
   return (
     <Screen testID="plan-screen">
-      <AppText variant="largeTitle" accessibilityRole="header">
-        Plan a trip
-      </AppText>
+      <BrandSignature />
+      <PageHeading title="Where to?" subtitle="Your journey, from door to door." />
       <FollowedTripCard now={now} />
       <PlaceFields
         origin={draft.origin}
@@ -213,17 +232,32 @@ export function PlanScreen() {
         onEnterPlace={() => openSearch(locationField)}
         onTryAgain={() => void fillWithCurrentPlace(locationField)}
       />
-      <TimeChoiceControl
-        choice={draft.time}
-        now={now}
-        onChangeType={(type) => planDraft.setTimeType(type, new Date())}
-        onChangeTime={(at) => planDraft.setChosenTime(at)}
-      />
-      <AccessChoices access={choices.access} onChange={rememberAccess} />
       <Card padded={false} style={styles.optionsCard}>
+        <Disclosure
+          title={draft.time.type === 'now' ? 'Leave now' : describeRequestTime(draft.time, now)}
+          summary="Departure or arrival time"
+          symbol="clock"
+          testID="plan-time">
+          <TimeChoiceControl
+            choice={draft.time}
+            now={now}
+            onChangeType={(type) => planDraft.setTimeType(type, new Date())}
+            onChangeTime={(at) => planDraft.setChosenTime(at)}
+          />
+        </Disclosure>
+        <View style={[styles.separator, { backgroundColor: colours.separator }]} />
+        <Disclosure
+          title="Travel modes"
+          summary={travelSummary}
+          symbol="car.side"
+          testID="plan-travel">
+          <AccessChoices access={choices.access} onChange={rememberAccess} />
+        </Disclosure>
+        <View style={[styles.separator, { backgroundColor: colours.separator }]} />
         <ListRow
           title="Trip options"
-          subtitle={tripOptionsSummary(preferences, choices)}
+          subtitle="Limits, walking, buffers & preferred stops"
+          accessibilityLabel={`Trip options, ${tripOptionsSummary(preferences, choices)}`}
           leadingSymbol="slider.horizontal.3"
           onPress={() => router.navigate('/trip-options')}
           accessibilityHint="Opens driving and walking limits, buffers and preferred stops"
@@ -276,5 +310,10 @@ const styles = StyleSheet.create({
   },
   optionsCard: {
     overflow: 'hidden',
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: SPACING.lg,
+    marginRight: SPACING.lg,
   },
 });

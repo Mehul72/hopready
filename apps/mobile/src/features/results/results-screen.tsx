@@ -29,7 +29,7 @@ import { usePlanChoices } from '@/features/plan/plan-choices';
 import { describeRequestTime } from '@/features/plan/time-choice';
 import { planSession, usePlanSession } from '@/state';
 import { appStorage, usePreferences } from '@/storage';
-import { MAX_CONTENT_WIDTH, SPACING, useTheme } from '@/theme';
+import { MAX_CONTENT_WIDTH, PAGE_GUTTER, SPACING, useTheme } from '@/theme';
 import { MANUAL_REFRESH_MIN_INTERVAL_SECONDS, replanRequest, useTripHomeOutOfDate } from '@/trip';
 
 import { useStaleCheckAt } from '../itinerary/use-stale-check-at';
@@ -404,14 +404,14 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   scrollContent: {
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: PAGE_GUTTER,
     paddingVertical: SPACING.lg,
     alignItems: 'center',
   },
   readableWidth: {
     width: '100%',
     maxWidth: MAX_CONTENT_WIDTH,
-    gap: SPACING.md,
+    gap: SPACING.lg,
   },
   summary: {
     gap: SPACING.xxs,

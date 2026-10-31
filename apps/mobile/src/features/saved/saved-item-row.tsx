@@ -36,7 +36,9 @@ export function SavedItemRow({
   const label = [title, subtitle].filter(Boolean).join(', ');
   const content = (
     <>
-      <SymbolView name={symbol} tintColor={colours.brand} size={22} />
+      <View style={[styles.symbol, { backgroundColor: colours.brandSoft }]}>
+        <SymbolView name={symbol} tintColor={colours.brand} size={20} />
+      </View>
       <View style={styles.texts}>
         <AppText>{title}</AppText>
         {subtitle ? (
@@ -96,6 +98,13 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
+  },
+  symbol: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   texts: {
     flex: 1,

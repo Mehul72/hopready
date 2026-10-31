@@ -2,7 +2,15 @@ import type { Place, PlanRequest } from '@hopready/core';
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { AppText, Banner, type BannerTone, Button, Screen } from '@/components';
+import {
+  AppText,
+  Banner,
+  type BannerTone,
+  Button,
+  Disclosure,
+  PageHeading,
+  Screen,
+} from '@/components';
 import { CURRENT_LOCATION_LABEL } from '@/location';
 import {
   type AddResult,
@@ -179,9 +187,7 @@ export function SavedScreen() {
 
   return (
     <Screen testID="saved-screen">
-      <AppText variant="largeTitle" accessibilityRole="header">
-        Saved
-      </AppText>
+      <PageHeading title="Saved" subtitle="Your places. Ready when you are." />
       {noticeFor('home', 'work')}
       {planner.locating ? <Banner tone="info" message="Finding your location…" /> : null}
 
@@ -219,124 +225,148 @@ export function SavedScreen() {
         );
       })}
 
-      <SectionTitle>Favourite places</SectionTitle>
-      {places.favourites.length === 0 ? (
-        <AppText tone="secondary">Add places you go often to plan trips there in one tap.</AppText>
-      ) : (
-        places.favourites.map((favourite) => (
-          <SavedItemRow
-            key={favourite.id}
-            title={favourite.label}
-            subtitle={favourite.label === favourite.place.name ? undefined : favourite.place.name}
-            symbol="star.fill"
-            accessibilityHint="Plans a trip there from where you are, leaving now"
-            disabled={planner.locating}
-            onPress={() => {
-              void planner.planToPlace(favourite.place);
-            }}
-            onDelete={() =>
-              confirmDelete(favourite.label, () => {
-                writeOrAlert(
-                  () => appStorage.places.removeFavourite(favourite.id),
-                  "Couldn't delete this favourite",
-                );
-              })
-            }
-          />
-        ))
-      )}
-      {noticeFor('favourite')}
-      <Button
-        variant="secondary"
-        symbol="plus"
-        label="Add a favourite place"
-        onPress={() => setPicker('favourite')}
-      />
-
-      <SectionTitle>Favourite routes</SectionTitle>
-      {routes.length === 0 ? (
-        <AppText tone="secondary">
-          Tap Save route on a trip to plan it again from here in one tap.
-        </AppText>
-      ) : (
-        routes.map((route) => (
-          <SavedItemRow
-            key={route.id}
-            title={route.label}
-            subtitle={`${placeLabel(route.origin)} to ${placeLabel(route.destination)}`}
-            symbol="arrow.triangle.turn.up.right.diamond.fill"
-            accessibilityHint="Plans this route, leaving now"
-            disabled={planner.locating}
-            onPress={() => {
-              void planner.planRoute(route);
-            }}
-            onDelete={() =>
-              confirmDelete(route.label, () => {
-                writeOrAlert(
-                  () => appStorage.favouriteRoutes.remove(route.id),
-                  "Couldn't delete this route",
-                );
-              })
-            }
-          />
-        ))
-      )}
-
-      <View style={styles.sectionWithAction}>
-        <SectionTitle>Recent searches</SectionTitle>
-        {recents.length > 0 ? (
-          <Button variant="plain" label="Clear all" onPress={clearRecents} />
-        ) : null}
-      </View>
-      {recents.length === 0 ? (
-        <AppText tone="secondary">Trips you plan appear here.</AppText>
-      ) : (
-        recents.map((recent) => {
-          const { title, subtitle } = describeRecentRequest(recent);
-          return (
+      <Disclosure
+        title="Favourite places"
+        summary={
+          places.favourites.length ? `${places.favourites.length} saved` : 'Places you go often'
+        }
+        symbol="star"
+        testID="saved-places">
+        {places.favourites.length === 0 ? (
+          <AppText tone="secondary">
+            Add places you go often to plan trips there in one tap.
+          </AppText>
+        ) : (
+          places.favourites.map((favourite) => (
             <SavedItemRow
-              key={recentRequestKey(recent)}
-              title={title}
-              subtitle={subtitle}
-              symbol="clock.arrow.circlepath"
-              accessibilityHint="Plans this trip again, leaving now"
+              key={favourite.id}
+              title={favourite.label}
+              subtitle={favourite.label === favourite.place.name ? undefined : favourite.place.name}
+              symbol="star.fill"
+              accessibilityHint="Plans a trip there from where you are, leaving now"
               disabled={planner.locating}
               onPress={() => {
-                void planner.planRecent(recent);
+                void planner.planToPlace(favourite.place);
               }}
-              onDelete={() => confirmDelete(title, () => deleteRecent(recent))}
+              onDelete={() =>
+                confirmDelete(favourite.label, () => {
+                  writeOrAlert(
+                    () => appStorage.places.removeFavourite(favourite.id),
+                    "Couldn't delete this favourite",
+                  );
+                })
+              }
             />
-          );
-        })
-      )}
-
-      <SectionTitle>Parking spots</SectionTitle>
-      <AppText tone="secondary">
-        Places you park that aren&apos;t Park&amp;Ride car parks. HopReady considers them when you
-        drive and park, but can&apos;t know their rules or free spaces, so check the signs.
-      </AppText>
-      {spots.map((spot) => (
-        <SavedItemRow
-          key={spot.id}
-          title={spot.name}
-          symbol="parkingsign"
-          onDelete={() =>
-            confirmDelete(spot.name, () => {
-              writeOrAlert(
-                () => appStorage.parkingSpots.remove(spot.id),
-                "Couldn't delete this parking spot",
-              );
-            })
-          }
+          ))
+        )}
+        {noticeFor('favourite')}
+        <Button
+          variant="secondary"
+          symbol="plus"
+          label="Add a favourite place"
+          onPress={() => setPicker('favourite')}
         />
-      ))}
-      {noticeFor('parking-spot')}
-      <Button
-        variant="secondary"
-        symbol="plus"
-        label="Add a parking spot"
-        onPress={() => setPicker('parking-spot')}
-      />
+      </Disclosure>
+
+      <Disclosure
+        title="Favourite routes"
+        summary={routes.length ? `${routes.length} saved` : 'Your regular journeys'}
+        symbol="arrow.triangle.turn.up.right.diamond"
+        testID="saved-routes">
+        {routes.length === 0 ? (
+          <AppText tone="secondary">
+            Tap Save route on a trip to plan it again from here in one tap.
+          </AppText>
+        ) : (
+          routes.map((route) => (
+            <SavedItemRow
+              key={route.id}
+              title={route.label}
+              subtitle={`${placeLabel(route.origin)} to ${placeLabel(route.destination)}`}
+              symbol="arrow.triangle.turn.up.right.diamond.fill"
+              accessibilityHint="Plans this route, leaving now"
+              disabled={planner.locating}
+              onPress={() => {
+                void planner.planRoute(route);
+              }}
+              onDelete={() =>
+                confirmDelete(route.label, () => {
+                  writeOrAlert(
+                    () => appStorage.favouriteRoutes.remove(route.id),
+                    "Couldn't delete this route",
+                  );
+                })
+              }
+            />
+          ))
+        )}
+      </Disclosure>
+
+      <Disclosure
+        title="Recent searches"
+        summary={recents.length ? `${recents.length} recent` : 'Find a trip again'}
+        symbol="clock.arrow.circlepath"
+        testID="saved-recents">
+        <View style={styles.sectionWithAction}>
+          {recents.length > 0 ? (
+            <Button variant="plain" label="Clear all" onPress={clearRecents} />
+          ) : null}
+        </View>
+        {recents.length === 0 ? (
+          <AppText tone="secondary">Trips you plan appear here.</AppText>
+        ) : (
+          recents.map((recent) => {
+            const { title, subtitle } = describeRecentRequest(recent);
+            return (
+              <SavedItemRow
+                key={recentRequestKey(recent)}
+                title={title}
+                subtitle={subtitle}
+                symbol="clock.arrow.circlepath"
+                accessibilityHint="Plans this trip again, leaving now"
+                disabled={planner.locating}
+                onPress={() => {
+                  void planner.planRecent(recent);
+                }}
+                onDelete={() => confirmDelete(title, () => deleteRecent(recent))}
+              />
+            );
+          })
+        )}
+      </Disclosure>
+
+      <Disclosure
+        title="Parking spots"
+        summary={spots.length ? `${spots.length} saved` : 'Your own places to park'}
+        symbol="parkingsign"
+        testID="saved-parking">
+        <AppText tone="secondary">
+          Places you park that aren&apos;t Park&amp;Ride car parks. HopReady considers them when you
+          drive and park, but can&apos;t know their rules or free spaces, so check the signs.
+        </AppText>
+        {spots.map((spot) => (
+          <SavedItemRow
+            key={spot.id}
+            title={spot.name}
+            symbol="parkingsign"
+            onDelete={() =>
+              confirmDelete(spot.name, () => {
+                writeOrAlert(
+                  () => appStorage.parkingSpots.remove(spot.id),
+                  "Couldn't delete this parking spot",
+                );
+              })
+            }
+          />
+        ))}
+        {noticeFor('parking-spot')}
+        <Button
+          variant="secondary"
+          symbol="plus"
+          label="Add a parking spot"
+          onPress={() => setPicker('parking-spot')}
+        />
+      </Disclosure>
 
       <PlacePickerSheet
         visible={picker !== null}

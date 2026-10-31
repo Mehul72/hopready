@@ -20,7 +20,9 @@ export function EmptyState({ title, message, symbol = 'tray', action, testID }: 
   const { colours } = useTheme();
   return (
     <View style={styles.container} testID={testID}>
-      <SymbolView name={symbol} tintColor={colours.textSecondary} size={36} />
+      <View style={[styles.symbol, { backgroundColor: colours.brandSoft }]}>
+        <SymbolView name={symbol} tintColor={colours.brand} size={34} />
+      </View>
       <View style={styles.texts}>
         <AppText variant="title3" align="center" accessibilityRole="header">
           {title}
@@ -53,5 +55,13 @@ const styles = StyleSheet.create({
   texts: {
     alignItems: 'center',
     gap: SPACING.xs,
+  },
+  symbol: {
+    width: 80,
+    height: 80,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
   },
 });

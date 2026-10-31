@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, Card, EmptyState, Screen, TripMap } from '@/components';
+import { AppText, Button, Card, EmptyState, PageHeading, Screen, TripMap } from '@/components';
 import { appStorage, type ParkedCarState, useParkedCar } from '@/storage';
 import { RADII, SPACING } from '@/theme';
 
@@ -115,9 +115,7 @@ export function CarScreen() {
   const parkedCar = useParkedCar();
   return (
     <Screen testID="car-screen">
-      <AppText variant="largeTitle" accessibilityRole="header">
-        Car
-      </AppText>
+      <PageHeading title="Your car" subtitle="A place to park. A way back home." />
       {parkedCar.status === 'parked' ? <ParkedCarView state={parkedCar} /> : null}
       {parkedCar.status === 'dropped-off' ? <DroppedOffView state={parkedCar} /> : null}
       {parkedCar.status === 'none' ? (

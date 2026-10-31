@@ -10,6 +10,7 @@ import { MIN_TOUCH_TARGET } from '@/theme';
 import { Banner } from './banner';
 import { Button } from './button';
 import { Chip } from './chip';
+import { Disclosure } from './disclosure';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { IconButton } from './icon-button';
@@ -20,6 +21,30 @@ import { SegmentedControl } from './segmented-control';
 import { Stepper } from './stepper';
 import { TimingBadge } from './timing-badge';
 import { TripMap } from './trip-map';
+
+describe('Disclosure', () => {
+  it('announces its state and only exposes its controls while expanded', async () => {
+    const onPress = jest.fn();
+    await render(
+      <Disclosure title="Travel modes" summary="Public transport" symbol="tram">
+        <Button label="Change modes" onPress={onPress} />
+      </Disclosure>,
+    );
+    const user = userEvent.setup();
+    const toggle = screen.getByRole('button', { name: 'Travel modes, Public transport' });
+    expect(toggle).toHaveProp('accessibilityState', { expanded: false });
+    expect(screen.queryByRole('button', { name: 'Change modes' })).not.toBeOnTheScreen();
+
+    await user.press(toggle);
+    expect(toggle).toHaveProp('accessibilityState', { expanded: true });
+    await user.press(screen.getByRole('button', { name: 'Change modes' }));
+    expect(onPress).toHaveBeenCalledTimes(1);
+
+    await user.press(toggle);
+    expect(toggle).toHaveProp('accessibilityState', { expanded: false });
+    expect(screen.queryByRole('button', { name: 'Change modes' })).not.toBeOnTheScreen();
+  });
+});
 
 describe('Button', () => {
   it('is a button named by its label', async () => {

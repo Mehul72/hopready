@@ -19,7 +19,7 @@ export interface MapCardProps {
 export function MapCard({ children, onExpand, style, testID }: MapCardProps) {
   const { colours } = useTheme();
   return (
-    <View style={[styles.card, { borderColor: colours.border }, style]} testID={testID}>
+    <View style={[styles.card, { borderColor: colours.separator }, style]} testID={testID}>
       {children}
       <View style={styles.expand}>
         <IconButton

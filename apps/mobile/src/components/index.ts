@@ -2,6 +2,9 @@ export { AppText, type AppTextProps, colourForTone, type TextTone } from './app-
 export { Banner, bannerAccessibilityLabel, type BannerProps, type BannerTone } from './banner';
 export { Button, type ButtonProps, type ButtonVariant } from './button';
 export { Card, type CardProps } from './card';
+export { BrandSignature } from './brand-signature';
+export { Disclosure } from './disclosure';
+export { PageHeading } from './page-heading';
 export { Chip, type ChipProps } from './chip';
 export {
   DEMO_BANNER_MESSAGE,

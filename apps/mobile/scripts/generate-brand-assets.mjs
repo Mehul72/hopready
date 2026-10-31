@@ -9,58 +9,70 @@ import { deflateSync } from 'node:zlib';
 const BRAND_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'assets', 'brand');
 const CANVAS = 1024;
 
-// The mark: an origin, a transfer and a destination on one baseline, joined by two hops.
-const BASELINE_Y = 560;
-const STROKE_WIDTH = 44;
-const STOPS = [
-  { x: 224, radius: 44 },
-  { x: 560, radius: 38 },
-  { x: 800, radius: 60 },
-];
-const HOP_HEIGHTS = [160, 110];
-
-const GRADIENT_TOP = [14, 124, 123];
-const GRADIENT_BOTTOM = [22, 75, 102];
-export const BRAND_COLOUR_HEX = '#0E6F6E';
-
-function hopArcs() {
-  return HOP_HEIGHTS.map((height, index) => {
-    const from = STOPS[index];
-    const to = STOPS[index + 1];
-    const halfChord = (to.x - from.x) / 2;
-    const radius = (halfChord ** 2 + height ** 2) / (2 * height);
+// A rising route joins an origin to a destination. A single broad curve stays legible at 32px.
+const STROKE_WIDTH = 64;
+const ORIGIN = { x: 296, y: 700, radius: 55 };
+const DESTINATION = { x: 728, y: 320, radius: 76 };
+const CURVE = {
+  start: { x: 296, y: 580 },
+  firstControl: { x: 296, y: 320 },
+  secondControl: { x: 728, y: 580 },
+  end: { x: 728, y: 396 },
+};
+const CURVE_SEGMENTS = 80;
+const ROUTE = [
+  ORIGIN,
+  CURVE.start,
+  ...Array.from({ length: CURVE_SEGMENTS + 1 }, (_, index) => {
+    const t = index / CURVE_SEGMENTS;
+    const u = 1 - t;
     return {
-      fromX: from.x,
-      toX: to.x,
-      radius,
-      centreX: from.x + halfChord,
-      centreY: BASELINE_Y - height + radius,
+      x:
+        u ** 3 * CURVE.start.x +
+        3 * u ** 2 * t * CURVE.firstControl.x +
+        3 * u * t ** 2 * CURVE.secondControl.x +
+        t ** 3 * CURVE.end.x,
+      y:
+        u ** 3 * CURVE.start.y +
+        3 * u ** 2 * t * CURVE.firstControl.y +
+        3 * u * t ** 2 * CURVE.secondControl.y +
+        t ** 3 * CURVE.end.y,
     };
-  });
-}
+  }),
+];
+
+const GRADIENT_TOP = [55, 114, 241];
+const GRADIENT_BOTTOM = [28, 65, 181];
+export const BRAND_COLOUR_HEX = '#2557D6';
 
 function glyphSvg(colour = '#FFFFFF') {
-  const arcs = hopArcs()
-    .map(
-      (arc) =>
-        `<path d="M ${arc.fromX} ${BASELINE_Y} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 0 1 ${arc.toX} ${BASELINE_Y}" stroke="${colour}" stroke-width="${STROKE_WIDTH}" fill="none"/>`,
-    )
-    .join('\n  ');
-  const stops = STOPS.map(
-    (stop) => `<circle cx="${stop.x}" cy="${BASELINE_Y}" r="${stop.radius}" fill="${colour}"/>`,
-  ).join('\n  ');
-  return `<svg width="${CANVAS}" height="${CANVAS}" viewBox="0 0 ${CANVAS} ${CANVAS}" fill="none" xmlns="http://www.w3.org/2000/svg">\n  ${arcs}\n  ${stops}\n</svg>\n`;
+  return `<svg width="${CANVAS}" height="${CANVAS}" viewBox="0 0 ${CANVAS} ${CANVAS}" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M ${ORIGIN.x} ${ORIGIN.y} V ${CURVE.start.y} C ${CURVE.firstControl.x} ${CURVE.firstControl.y} ${CURVE.secondControl.x} ${CURVE.secondControl.y} ${CURVE.end.x} ${CURVE.end.y}" stroke="${colour}" stroke-width="${STROKE_WIDTH}" stroke-linecap="round" fill="none"/>
+  <circle cx="${ORIGIN.x}" cy="${ORIGIN.y}" r="${ORIGIN.radius}" fill="${colour}"/>
+  <circle cx="${DESTINATION.x}" cy="${DESTINATION.y}" r="${DESTINATION.radius}" stroke="${colour}" stroke-width="${STROKE_WIDTH}" fill="none"/>
+</svg>\n`;
+}
+
+function distanceToSegment(x, y, from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const t =
+    lengthSquared === 0
+      ? 0
+      : Math.max(0, Math.min(1, ((x - from.x) * dx + (y - from.y) * dy) / lengthSquared));
+  return Math.hypot(x - from.x - t * dx, y - from.y - t * dy);
 }
 
 function insideGlyph(x, y) {
-  for (const stop of STOPS) {
-    if (Math.hypot(x - stop.x, y - BASELINE_Y) <= stop.radius) return true;
-  }
-  for (const arc of hopArcs()) {
-    // Only the half above the baseline is drawn; the stops cover where each hop lands.
-    if (y > BASELINE_Y) continue;
-    const distanceFromCentre = Math.hypot(x - arc.centreX, y - arc.centreY);
-    if (Math.abs(distanceFromCentre - arc.radius) <= STROKE_WIDTH / 2) return true;
+  if (Math.hypot(x - ORIGIN.x, y - ORIGIN.y) <= ORIGIN.radius) return true;
+  if (
+    Math.abs(Math.hypot(x - DESTINATION.x, y - DESTINATION.y) - DESTINATION.radius) <=
+    STROKE_WIDTH / 2
+  )
+    return true;
+  for (let index = 1; index < ROUTE.length; index++) {
+    if (distanceToSegment(x, y, ROUTE[index - 1], ROUTE[index]) <= STROKE_WIDTH / 2) return true;
   }
   return false;
 }

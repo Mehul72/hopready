@@ -39,22 +39,22 @@ export interface ColourTokens {
   markerRing: string;
 }
 
-// The calm deep teal of the HopReady icon (apps/mobile/scripts/generate-brand-assets.mjs).
-export const BRAND_COLOUR = '#0E6F6E';
-export const BRAND_COLOUR_DARK_BACKGROUND = '#0B3B3A';
+// Shared with the icon and launch screen (scripts/generate-brand-assets.mjs).
+export const BRAND_COLOUR = '#2557D6';
+export const BRAND_COLOUR_DARK_BACKGROUND = '#13285B';
 
 export const lightColours: ColourTokens = {
-  background: '#F3F4F7',
+  background: '#F4F6FA',
   surface: '#FFFFFF',
-  surfaceMuted: '#E9ECF1',
-  separator: '#DDE1E7',
-  border: '#7D8594',
-  text: '#14171C',
-  textSecondary: '#4B5260',
+  surfaceMuted: '#EBEFF5',
+  separator: '#DFE5EE',
+  border: '#7C879B',
+  text: '#172234',
+  textSecondary: '#526078',
   brand: BRAND_COLOUR,
   onBrand: '#FFFFFF',
-  brandSoft: '#DDF0EF',
-  onBrandSoft: '#0A4F4E',
+  brandSoft: '#EAF0FF',
+  onBrandSoft: '#2048AD',
   danger: '#B42318',
   onDanger: '#FFFFFF',
   dangerSoft: '#FDECEA',
@@ -65,26 +65,26 @@ export const lightColours: ColourTokens = {
   onInfoSoft: '#0D4377',
   successSoft: '#E2F2E6',
   onSuccessSoft: '#1C5E31',
-  demo: '#2B2840',
+  demo: '#29354C',
   onDemo: '#FFFFFF',
   skeleton: '#E4E7EC',
-  markerFill: '#14171C',
+  markerFill: BRAND_COLOUR,
   onMarker: '#FFFFFF',
   markerRing: '#FFFFFF',
 };
 
 export const darkColours: ColourTokens = {
-  background: '#0E1013',
-  surface: '#181B20',
-  surfaceMuted: '#23272E',
-  separator: '#2E333C',
-  border: '#7A8291',
-  text: '#F1F3F6',
-  textSecondary: '#B3B9C4',
-  brand: '#5FCFC9',
-  onBrand: '#04302F',
-  brandSoft: '#173B3A',
-  onBrandSoft: '#BDEBE8',
+  background: '#0D1421',
+  surface: '#172235',
+  surfaceMuted: '#223047',
+  separator: '#2D3C54',
+  border: '#8190A8',
+  text: '#F1F5FC',
+  textSecondary: '#B4C1D5',
+  brand: '#A8C1FF',
+  onBrand: '#112652',
+  brandSoft: '#233960',
+  onBrandSoft: '#CCDCFF',
   danger: '#FFB4A9',
   onDanger: '#5C120B',
   dangerSoft: '#3D1714',
@@ -95,10 +95,10 @@ export const darkColours: ColourTokens = {
   onInfoSoft: '#B5D6F7',
   successSoft: '#15321F',
   onSuccessSoft: '#AEE3BC',
-  demo: '#E6E1FF',
-  onDemo: '#1D1838',
+  demo: '#D8E4FC',
+  onDemo: '#172744',
   skeleton: '#2A2F37',
-  markerFill: '#F1F3F6',
-  onMarker: '#14171C',
-  markerRing: '#14171C',
+  markerFill: '#A8C1FF',
+  onMarker: '#112652',
+  markerRing: '#172235',
 };

@@ -63,6 +63,11 @@ export function NavigationAppSection() {
   return (
     <SettingsSection
       title="Navigation app"
+      disclosure={{
+        symbol: 'arrow.triangle.turn.up.right.diamond',
+        summary:
+          CHOICES.find((choice) => choice.value === navigationApp)?.title ?? 'Ask every time',
+      }}
       description="Start driving on a trip hands the drive to this app for turn-by-turn directions."
       testID="navigation-app">
       {CHOICES.map((choice) => (

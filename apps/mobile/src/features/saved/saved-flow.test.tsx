@@ -47,6 +47,17 @@ afterEach(() => {
 });
 
 describe('Home and Work', () => {
+  it('keeps every saved category discoverable while its contents are collapsed', async () => {
+    await renderApp('/saved');
+    for (const section of ['places', 'routes', 'recents', 'parking']) {
+      expect(screen.getByTestId(`saved-${section}-toggle`)).toHaveProp('accessibilityState', {
+        expanded: false,
+      });
+    }
+    expect(screen.getByRole('button', { name: 'Home, Not set' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Add a parking spot' })).not.toBeOnTheScreen();
+  });
+
   it('sets Home through place search, with an Apple map beside the results', async () => {
     await renderApp('/saved');
     const user = userEvent.setup();
@@ -145,6 +156,7 @@ describe('favourite places', () => {
       city: 'Rouse Hill',
     });
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-places-toggle'));
     const user = userEvent.setup();
 
     await user.press(screen.getByRole('button', { name: 'Add a favourite place' }));
@@ -178,6 +190,7 @@ describe('favourite places', () => {
     appStorage.places.addFavourite('Uni', DEMO_PLACES.macquarieUniversity);
     denyLocation(true);
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-places-toggle'));
     const alert = answerNextAlert('Plan from Home');
 
     await userEvent
@@ -199,6 +212,7 @@ describe('favourite places', () => {
   it('deletes a favourite after confirming', async () => {
     appStorage.places.addFavourite('Uni', DEMO_PLACES.macquarieUniversity);
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-places-toggle'));
     answerNextAlert('Delete');
 
     await userEvent.setup().press(screen.getByRole('button', { name: 'Delete Uni' }));
@@ -219,6 +233,7 @@ describe('favourite routes', () => {
       destination: DEMO_PLACES.chatswoodOffice,
     });
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-routes-toggle'));
 
     await userEvent
       .setup()
@@ -242,6 +257,7 @@ describe('favourite routes', () => {
       destination: DEMO_PLACES.chatswoodOffice,
     });
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-routes-toggle'));
 
     await userEvent
       .setup()
@@ -264,9 +280,11 @@ describe('favourite routes', () => {
       destination: DEMO_PLACES.chatswoodOffice,
     });
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-routes-toggle'));
     const user = userEvent.setup();
 
     answerNextAlert('Delete');
+    await user.press(screen.getByTestId('saved-parking-toggle'));
     await user.press(screen.getByRole('button', { name: 'Delete Street spot' }));
     await user.press(screen.getByRole('button', { name: 'Commute, Rouse Hill to Chatswood' }));
 
@@ -281,6 +299,7 @@ describe('favourite routes', () => {
       destination: DEMO_PLACES.chatswoodOffice,
     });
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-routes-toggle'));
     answerNextAlert('Delete');
 
     await userEvent.setup().press(screen.getByRole('button', { name: 'Delete Commute' }));
@@ -294,6 +313,7 @@ describe('recent searches', () => {
     const recent = demoCommuteRequest({ time: { type: 'arrive', at: '2026-10-25T22:00:00.000Z' } });
     appStorage.recentRequests.record(recent);
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-recents-toggle'));
     const { title, subtitle } = describeRecentRequest(recent);
     expect(title).toBe('Rouse Hill to Chatswood');
     expect(subtitle).toBe('By public transport, driving, drop-off');
@@ -320,6 +340,7 @@ describe('recent searches', () => {
     appStorage.recentRequests.record(recent);
     appStorage.parkingSpots.remove(added.item.id);
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-recents-toggle'));
     const { title, subtitle } = describeRecentRequest(recent);
 
     await userEvent.setup().press(screen.getByRole('button', { name: `${title}, ${subtitle}` }));
@@ -335,6 +356,7 @@ describe('recent searches', () => {
     });
     appStorage.recentRequests.record(recent);
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-recents-toggle'));
     const { title, subtitle } = describeRecentRequest(recent);
 
     await userEvent.setup().press(screen.getByRole('button', { name: `${title}, ${subtitle}` }));
@@ -365,6 +387,7 @@ describe('recent searches', () => {
       'Kellyville (north)',
     );
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-recents-toggle'));
 
     await userEvent
       .setup()
@@ -385,6 +408,7 @@ describe('recent searches', () => {
       demoCommuteRequest({ destination: DEMO_PLACES.macquarieUniversity }),
     );
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-recents-toggle'));
     const user = userEvent.setup();
 
     answerNextAlert('Delete');
@@ -406,6 +430,7 @@ describe('parking spots', () => {
     appStorage.parkingSpots.add('Pinned location', { lat: -33.7, lon: 150.94 });
     grantLocationAt({ lat: -33.7, lon: 150.94 });
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-parking-toggle'));
     const user = userEvent.setup();
 
     await user.press(screen.getByRole('button', { name: 'Add a parking spot' }));
@@ -420,6 +445,7 @@ describe('parking spots', () => {
   it('adds a spot from the current location and deletes it after confirming', async () => {
     grantLocationAt({ lat: -33.7, lon: 150.94 }, { name: '9 Example Road', city: 'Kellyville' });
     await renderApp('/saved');
+    await userEvent.setup().press(screen.getByTestId('saved-parking-toggle'));
     const user = userEvent.setup();
 
     await user.press(screen.getByRole('button', { name: 'Add a parking spot' }));

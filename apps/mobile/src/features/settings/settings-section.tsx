@@ -1,27 +1,55 @@
 import type { ReactNode } from 'react';
+import { type SFSymbol } from 'expo-symbols';
 import { StyleSheet, View } from 'react-native';
 
-import { AppText } from '@/components';
-import { SPACING } from '@/theme';
+import { AppText, Disclosure } from '@/components';
+import { RADII, SPACING, useTheme } from '@/theme';
 
-// A titled group of settings. The title is a heading, so VoiceOver users can jump between groups.
+// Related settings share one surface; longer groups can disclose their details.
 export function SettingsSection({
   title,
   description,
   children,
   testID,
+  disclosure,
+  showTitle = true,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
   testID?: string;
+  disclosure?: { symbol: SFSymbol; summary: string };
+  showTitle?: boolean;
 }) {
+  const { colours } = useTheme();
+  if (disclosure) {
+    return (
+      <Disclosure
+        title={title}
+        summary={disclosure.summary}
+        symbol={disclosure.symbol}
+        testID={testID}>
+        {description ? (
+          <AppText variant="footnote" tone="secondary">
+            {description}
+          </AppText>
+        ) : null}
+        {children}
+      </Disclosure>
+    );
+  }
   return (
-    <View style={styles.section} testID={testID}>
-      <AppText variant="title3" accessibilityRole="header">
-        {title}
-      </AppText>
-      {description ? <AppText tone="secondary">{description}</AppText> : null}
+    <View style={[styles.section, { backgroundColor: colours.surface }]} testID={testID}>
+      {showTitle ? (
+        <AppText variant="headline" accessibilityRole="header">
+          {title}
+        </AppText>
+      ) : null}
+      {description ? (
+        <AppText variant="footnote" tone="secondary">
+          {description}
+        </AppText>
+      ) : null}
       {children}
     </View>
   );
@@ -30,6 +58,7 @@ export function SettingsSection({
 const styles = StyleSheet.create({
   section: {
     gap: SPACING.sm,
-    paddingTop: SPACING.xl,
+    padding: SPACING.lg,
+    borderRadius: RADII.lg,
   },
 });

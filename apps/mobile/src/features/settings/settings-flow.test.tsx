@@ -100,6 +100,7 @@ describe('delete all data', () => {
     await renderApp('/settings');
     const alert = answerNextAlert('Delete everything');
 
+    await userEvent.setup().press(screen.getByTestId('delete-data-toggle'));
     await userEvent.setup().press(screen.getByRole('button', { name: 'Delete all HopReady data' }));
 
     expect(alert).toHaveBeenCalledWith(
@@ -120,6 +121,7 @@ describe('delete all data', () => {
     await renderApp('/settings');
     answerNextAlert('Cancel');
 
+    await userEvent.setup().press(screen.getByTestId('delete-data-toggle'));
     await userEvent.setup().press(screen.getByRole('button', { name: 'Delete all HopReady data' }));
 
     expect(appStorage.places.get().home).toEqual(DEMO_PLACES.rouseHillHome);
@@ -131,6 +133,7 @@ describe('navigation app', () => {
   it('saves the preferred app and marks apps that are not installed', async () => {
     jest.spyOn(Linking, 'canOpenURL').mockImplementation(async (url) => url === 'comgooglemaps://');
     await renderApp('/settings');
+    await userEvent.setup().press(screen.getByTestId('navigation-app-toggle'));
     const section = screen.getByTestId('navigation-app');
 
     expect(within(section).getByRole('radio', { name: /^Ask every time/ })).toBeChecked();
@@ -169,6 +172,7 @@ describe('trip options', () => {
 describe('about', () => {
   it('shows the data sources and Apple’s route guidance notice', async () => {
     await renderApp('/settings');
+    await userEvent.setup().press(screen.getByTestId('about-toggle'));
     const about = screen.getByTestId('about');
 
     expect(

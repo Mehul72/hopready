@@ -126,7 +126,7 @@ park and ride,commuter parking,metro,train,bus,transfer,trip planner,door to doo
 >
 > Live results only exist for Greater Sydney. If you are testing elsewhere:
 >
-> 1. Plan tab: tap From and type "Box Hill NSW", then tap To and type "1 Help Street, Chatswood". Choose Arrive by, a weekday, 9:00 am (times are Sydney time). "Public transport" and "I'll drive and park" are already ticked: leave them on and tap Plan trip.
+> 1. Plan tab: tap From and type "Box Hill NSW", then tap To and type "1 Help Street, Chatswood". Tap Leave now, then choose Arrive by, a weekday, 9:00 am (times are Sydney time). Public transport and driving are on by default (open Travel modes to change them). Tap Plan trip.
 > 2. Open an option labelled "Drive and park" (not "Drive") to see the timeline and map. Tap "I parked here", choose the suggested car park, then tap "Save where I parked".
 > 3. Car tab: tap "Take me home". Outside Sydney it asks "Where are you now?": type "1 Help Street, Chatswood". Then "Where's home?": type "Box Hill NSW". It plans public transport back to the car, then the drive home.
 > 4. Location access is optional. When it is off, or you are outside Sydney, the app asks you to type a place.
@@ -165,5 +165,6 @@ Also confirm in App Store Connect:
 - **Sizes:** 6.9" (1320 × 2868, from the iPhone 17 Pro Max or 18 Pro Max simulator) and 6.3" (1206 × 2622, from the iPhone 17 Pro or 18 Pro simulator).
 - **Format:** JPEG with no alpha channel. Use `xcrun simctl io booted screenshot --type=jpeg file.jpg`.
 - **Live data:** capture them in live mode once the production API is up. Demo-mode captures show the demo banner and are for internal review only.
-- **Review set:** `docs/screenshots/` holds the main screens from the XCUITest walk-through (`testCapturesTheMainScreens`, iPhone 18 Pro simulator, demo mode, 2026-10-31), reduced to JPEG for the repository. They show the demo banner, so they are not for the store.
+- **Review set:** `docs/screenshots/` holds the main screens from the XCUITest walk-through (`testCapturesTheMainScreens`, iPhone 18 Pro simulator, demo mode, 2026-11-01), reduced to JPEG for the repository. They show the demo banner, so they are not for the store.
+- **Accessibility review:** `docs/screenshots/accessibility/` holds the planner at the largest Dynamic Type size in dark mode (2026-11-01). Timing choices stack and travel chips wrap; the main action remains reachable.
 - **April 2027:** Apple's iOS 27 SDK requirement also brings iPhone Duo screenshots. Those need Xcode 27.1 or later.

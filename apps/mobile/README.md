@@ -66,9 +66,17 @@ npx jest
 | `src/location`     | `requestCurrentPlace()` and the location permission hook.                                                                                                                                                         |
 | `src/test-support` | Jest mocks for native modules, and builders for places, requests and itineraries.                                                                                                                                 |
 
+### Interface
+
+The Plan tab starts with From and To, quick picks and Plan trip. Tap **Leave now** to choose a departure or arrival time, **Travel modes** to choose public transport, driving or drop-off, and **Trip options** for limits, buffers, walking speed, modes to avoid and preferred stops. The collapsed rows show the current timing and travel choices.
+
+Saved keeps Home and Work visible and groups favourite places, routes, recent searches and parking spots into expandable lists. Settings groups navigation app choices, About and Your data into expandable rows. The four native tabs remain Plan, Car, Saved and Settings.
+
+The cobalt route mark, launch screen and fallback icon are generated together with `node apps/mobile/scripts/generate-brand-assets.mjs`. UI colours are in `src/theme/colours.ts`; both appearances have automated contrast checks.
+
 ### Components
 
-`Screen`, `AppText`, `Button`, `IconButton`, `Card`, `Chip`, `SegmentedControl`, `ListRow`, `SectionHeader`, `Banner`, `EmptyState`, `ErrorState`, `LoadingState`, `ModeIcon`, `TimingBadge`, `Stepper`, `TripMap`, `MapCard` and `DemoModeBanner`, all exported from `@/components`. Each one has a role and a spoken label, a touch target of at least 44 points, scales with Dynamic Type, and follows light and dark mode.
+`BrandSignature`, `PageHeading`, `Disclosure`, `Screen`, `AppText`, `Button`, `IconButton`, `Card`, `Chip`, `SegmentedControl`, `ListRow`, `SectionHeader`, `Banner`, `EmptyState`, `ErrorState`, `LoadingState`, `ModeIcon`, `TimingBadge`, `Stepper`, `TripMap`, `MapCard` and `DemoModeBanner`, all exported from `@/components`. Each one has a role and a spoken label, a touch target of at least 44 points, scales with Dynamic Type, and follows light and dark mode.
 
 ## Rules for screens
 

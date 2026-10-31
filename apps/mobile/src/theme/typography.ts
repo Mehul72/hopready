@@ -24,7 +24,7 @@ export interface TextVariantStyle {
 }
 
 export const TEXT_VARIANTS: Readonly<Record<TextVariant, TextVariantStyle>> = {
-  largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: '700', dynamicTypeRamp: 'largeTitle' },
+  largeTitle: { fontSize: 34, lineHeight: 40, fontWeight: '700', dynamicTypeRamp: 'largeTitle' },
   title1: { fontSize: 28, lineHeight: 34, fontWeight: '700', dynamicTypeRamp: 'title1' },
   title2: { fontSize: 22, lineHeight: 28, fontWeight: '700', dynamicTypeRamp: 'title2' },
   title3: { fontSize: 20, lineHeight: 25, fontWeight: '600', dynamicTypeRamp: 'title3' },

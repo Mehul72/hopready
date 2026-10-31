@@ -35,7 +35,10 @@ export function DeleteDataSection() {
   };
 
   return (
-    <SettingsSection title="Your data" testID="delete-data">
+    <SettingsSection
+      title="Your data"
+      testID="delete-data"
+      disclosure={{ symbol: 'internaldrive', summary: 'Manage data saved on this iPhone' }}>
       <AppText tone="secondary">{DELETE_ALL_EXPLANATION}</AppText>
       {result === 'deleted' ? (
         <Banner tone="info" message="All HopReady data was deleted from this iPhone." />

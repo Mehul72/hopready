@@ -45,7 +45,10 @@ export function AboutSection() {
   const { privacyPolicyUrl, supportUrl } = readSupportLinks();
 
   return (
-    <SettingsSection title="About" testID="about">
+    <SettingsSection
+      title="About"
+      testID="about"
+      disclosure={{ symbol: 'info.circle', summary: 'Version, data sources & support' }}>
       <AppText>
         {version ? `HopReady version ${version}` : 'HopReady (version not available)'}
       </AppText>

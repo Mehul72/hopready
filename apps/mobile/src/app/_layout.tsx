@@ -51,7 +51,13 @@ export default function RootLayout() {
               for a status bar the strip already covers. */}
           <SafeAreaProvider style={styles.fill}>
             <Stack
-              screenOptions={{ contentStyle: { backgroundColor: colours.background } }}
+              screenOptions={{
+                contentStyle: { backgroundColor: colours.background },
+                headerShadowVisible: false,
+                headerTintColor: colours.brand,
+                headerTitleStyle: { color: colours.text },
+                headerBackButtonDisplayMode: 'minimal',
+              }}
               screenLayout={({ children, options }) => (
                 <ScreenPresentationProvider
                   presentation={

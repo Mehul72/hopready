@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { type Edge, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MAX_CONTENT_WIDTH, SPACING, useTheme } from '@/theme';
+import { MAX_CONTENT_WIDTH, PAGE_GUTTER, SPACING, useTheme } from '@/theme';
 
 import { DemoModeBanner } from './demo-mode-banner';
 import { useScreenPresentation } from './screen-presentation';
@@ -124,14 +124,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: PAGE_GUTTER,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.xxl,
     alignItems: 'center',
   },
   readableWidth: {
     width: '100%',
     maxWidth: MAX_CONTENT_WIDTH,
-    gap: SPACING.md,
+    gap: SPACING.lg,
     alignSelf: 'center',
   },
   fixedBanner: {

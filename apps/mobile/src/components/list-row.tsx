@@ -45,11 +45,17 @@ export function ListRow({
     <View style={styles.row}>
       {leading ?? null}
       {!leading && leadingSymbol ? (
-        <SymbolView
-          name={leadingSymbol}
-          tintColor={destructive ? colours.danger : colours.brand}
-          size={22}
-        />
+        <View
+          style={[
+            styles.symbol,
+            { backgroundColor: destructive ? colours.dangerSoft : colours.brandSoft },
+          ]}>
+          <SymbolView
+            name={leadingSymbol}
+            tintColor={destructive ? colours.danger : colours.brand}
+            size={18}
+          />
+        </View>
       ) : null}
       <View style={styles.texts}>
         <AppText tone={destructive ? 'danger' : 'primary'}>{title}</AppText>
@@ -121,6 +127,13 @@ const styles = StyleSheet.create({
   texts: {
     flex: 1,
     gap: SPACING.xxs,
+  },
+  symbol: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   value: {
     flexShrink: 0,

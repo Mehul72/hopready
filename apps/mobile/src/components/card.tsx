@@ -33,7 +33,7 @@ export function Card({
       backgroundColor: colours.surface,
       // A selected card gets a thicker brand outline, not just a colour change.
       borderColor: selected ? colours.brand : colours.separator,
-      borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
+      borderWidth: selected ? 2 : 0,
     },
     style,
   ];

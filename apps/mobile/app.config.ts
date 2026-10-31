@@ -6,9 +6,9 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 const LOCATION_PURPOSE =
   'HopReady uses your location to start trips from where you are, to show where you are on its maps, and to list nearby places first when you search.';
 
-// Calm deep teal from the HopReady icon (src/theme/colours.ts), and its dark counterpart.
-const SPLASH_BACKGROUND = '#0E6F6E';
-const SPLASH_BACKGROUND_DARK = '#0B3B3A';
+// Matches the continuous-route icon and the in-app brand tokens.
+const SPLASH_BACKGROUND = '#2557D6';
+const SPLASH_BACKGROUND_DARK = '#13285B';
 
 const DEFAULT_PRIVACY_POLICY_URL = 'https://mehul72.github.io/hopready/privacy/';
 const DEFAULT_SUPPORT_URL = 'https://mehul72.github.io/hopready/support/';

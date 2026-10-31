@@ -30,6 +30,34 @@ afterEach(() => {
 });
 
 describe('planning a trip from the Plan tab', () => {
+  it('starts with a compact planner and keeps changed travel choices in the collapsed summary', async () => {
+    const user = userEvent.setup();
+    await renderApp('/');
+    expect(screen.queryByRole('radio', { name: 'Arrive by' })).not.toBeOnTheScreen();
+    expect(
+      screen.queryByRole('togglebutton', { name: 'Someone will drop me off' }),
+    ).not.toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Plan trip' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: /^Trip options,/ })).toBeOnTheScreen();
+
+    await user.press(screen.getByTestId('plan-travel-toggle'));
+    await user.press(screen.getByRole('togglebutton', { name: 'Someone will drop me off' }));
+    await user.press(screen.getByTestId('plan-travel-toggle'));
+    expect(screen.getByTestId('plan-travel-toggle')).toHaveProp('accessibilityState', {
+      expanded: false,
+    });
+    expect(screen.getByTestId('plan-travel-toggle')).toHaveProp(
+      'accessibilityLabel',
+      'Travel modes, Public transport · Drive & park · Drop-off',
+    );
+
+    await user.press(screen.getByTestId('plan-travel-toggle'));
+    expect(screen.getByRole('togglebutton', { name: 'Someone will drop me off' })).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ checked: true }),
+    );
+  });
+
   it('plans a demo trip from quick picks and lists the options on the results screen', async () => {
     appStorage.places.setHome(DEMO_PLACES.rouseHillHome);
     appStorage.places.setWork(DEMO_PLACES.barangarooOffice);
@@ -145,6 +173,7 @@ describe('planning a trip from the Plan tab', () => {
     });
     await renderApp('/');
 
+    await user.press(screen.getByTestId('plan-travel-toggle'));
     await user.press(screen.getByRole('togglebutton', { name: 'Public transport' }));
     await user.press(screen.getByRole('togglebutton', { name: "I'll drive and park" }));
     await user.press(screen.getByRole('togglebutton', { name: 'Someone will drop me off' }));
@@ -178,15 +207,16 @@ describe('planning a trip from the Plan tab', () => {
     });
     await renderApp('/');
 
+    await user.press(screen.getByTestId('plan-time-toggle'));
     await user.press(screen.getByRole('radio', { name: 'Arrive by' }));
     // The first suggestion is an hour away, rounded up to five minutes: 8:30 am.
-    expect(screen.getByText(/^Arrive by 8:30\sam/)).toBeOnTheScreen();
+    expect(screen.getAllByText(/^Arrive by 8:30\sam/)).toHaveLength(2);
     await act(async () => {
       screen.getByTestId('time-picker').props.onChange({
         nativeEvent: { timestamp: Date.parse('2026-10-26T22:00:00.000Z'), utcOffset: 660 },
       });
     });
-    expect(screen.getByText(/^Arrive by 9:00\sam/)).toBeOnTheScreen();
+    expect(screen.getAllByText(/^Arrive by 9:00\sam/)).toHaveLength(2);
     await user.press(screen.getByRole('button', { name: 'Plan trip' }));
 
     expect(planSession.getState().request?.time).toEqual({
@@ -204,6 +234,7 @@ describe('planning a trip from the Plan tab', () => {
       planDraft.setRoute(DEMO_PLACES.rouseHillHome, DEMO_PLACES.barangarooOffice);
     });
     await renderApp('/');
+    await user.press(screen.getByTestId('plan-time-toggle'));
     await user.press(screen.getByRole('radio', { name: 'Depart at' }));
     await act(async () => {
       screen.getByTestId('time-picker').props.onChange({

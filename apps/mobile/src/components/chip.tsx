@@ -57,7 +57,11 @@ export function Chip({
         {symbol ? (
           <SymbolView name={symbol} tintColor={symbolTint ?? foreground} size={16} />
         ) : null}
-        <AppText variant="subheadline" tone={textTone} weight={selected ? 'semibold' : 'regular'}>
+        <AppText
+          variant="subheadline"
+          tone={textTone}
+          weight={selected ? 'semibold' : 'regular'}
+          style={styles.label}>
           {label}
         </AppText>
       </View>
@@ -68,14 +72,19 @@ export function Chip({
 const styles = StyleSheet.create({
   chip: {
     minHeight: MIN_TOUCH_TARGET,
+    maxWidth: '100%',
     borderRadius: RADII.pill,
     paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
     justifyContent: 'center',
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
+  },
+  label: {
+    flexShrink: 1,
   },
   pressed: {
     opacity: 0.75,
