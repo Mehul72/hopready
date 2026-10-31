@@ -1,4 +1,3 @@
-import { DEFAULT_PREFERENCES } from '@hopready/core';
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { fireEvent, render, userEvent } from '@testing-library/react-native';
 import { screen, within } from 'expo-router/testing-library';
@@ -149,58 +148,21 @@ describe('navigation app', () => {
   });
 });
 
-describe('trip defaults', () => {
-  it('saves each change as the default for every plan', async () => {
+describe('trip options', () => {
+  it('opens the one trip options editor, shared with the Plan tab', async () => {
+    appStorage.preferences.change({ maxDriveMinutes: 25 });
     await renderApp('/settings');
-    const section = screen.getByTestId('trip-defaults');
+    const section = screen.getByTestId('trip-options-section');
     const user = userEvent.setup();
+    expect(within(section).getByText(/^Drive up to 25 min, walk up to 15 min/)).toBeOnTheScreen();
 
-    expect(within(section).getByRole('adjustable', { name: 'Parking buffer' })).toHaveProp(
-      'accessibilityHint',
-      'Time from reaching the car park to walking out of it: finding a space, parking and getting to the exit.',
+    await user.press(
+      within(section).getByRole('button', { name: /^Trip options, Drive up to 25 min/ }),
     );
-    await user.press(within(section).getByRole('button', { name: 'Increase Parking buffer' }));
-    await user.press(within(section).getByRole('button', { name: 'Decrease Longest drive' }));
-    await user.press(within(section).getByRole('radio', { name: 'Fast' }));
-    await user.press(within(section).getByRole('togglebutton', { name: 'Bus' }));
 
-    expect(appStorage.preferences.get()).toMatchObject({
-      parkingBufferMinutes: DEFAULT_PREFERENCES.parkingBufferMinutes + 1,
-      maxDriveMinutes: DEFAULT_PREFERENCES.maxDriveMinutes - 5,
-      walkingSpeed: 'fast',
-      excludedTransitModes: ['bus'],
-    });
-    expect(
-      within(section).getByRole('adjustable', { name: 'Parking buffer' }),
-    ).toHaveAccessibilityValue({
-      now: DEFAULT_PREFERENCES.parkingBufferMinutes + 1,
-    });
-  });
-
-  it('offers only modes that can be avoided, and always leaves one allowed', async () => {
-    appStorage.preferences.change({
-      excludedTransitModes: ['train', 'metro', 'light-rail', 'bus', 'coach', 'ferry', 'school-bus'],
-    });
-    await renderApp('/settings');
-    const section = screen.getByTestId('trip-defaults');
-
-    expect(within(section).queryByRole('togglebutton', { name: 'Other service' })).toBeNull();
-    expect(within(section).getByRole('togglebutton', { name: 'On demand' })).toBeDisabled();
-    expect(within(section).getByRole('togglebutton', { name: 'Bus' })).toBeEnabled();
-  });
-
-  it('resets to the defaults after confirming, keeping the navigation app', async () => {
-    appStorage.preferences.change({
-      transferBufferMinutes: 9,
-      walkingSpeed: 'slow',
-      navigationApp: 'waze',
-    });
-    await renderApp('/settings');
-    answerNextAlert('Reset');
-
-    await userEvent.setup().press(screen.getByRole('button', { name: 'Reset to defaults' }));
-
-    expect(appStorage.preferences.get()).toEqual({ ...DEFAULT_PREFERENCES, navigationApp: 'waze' });
+    expect(screen).toHavePathname('/trip-options');
+    await user.press(await screen.findByRole('button', { name: 'Increase Longest drive' }));
+    expect(appStorage.preferences.get().maxDriveMinutes).toBe(30);
   });
 });
 

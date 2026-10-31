@@ -50,13 +50,13 @@ export const LIMIT_SETTINGS: readonly MinutesSetting[] = [
   setting(
     'maxDriveMinutes',
     'Longest drive',
-    'Car parks further than this, and longer drives, are left out.',
+    'Car parks further than this are not tried. A longer drive is shown with a note, not hidden.',
     5,
   ),
   setting(
     'maxWalkMinutes',
     'Longest walk',
-    'Options with any single walk longer than this are left out.',
+    'Sent to Transport for NSW as a preference. An option with a longer single walk is shown with a note, not hidden.',
   ),
 ];
 

@@ -13,9 +13,11 @@ import MapRoute from '@/app/map';
 import ItineraryRoute from '@/app/itinerary/[id]';
 import ConfirmParkingRoute from '@/app/parked-car/confirm';
 import CorrectParkingRoute from '@/app/parked-car/correct';
+import TripOptionsRoute from '@/app/trip-options';
 
 // Test support for this folder and the other trip, car, saved and settings features: the real
 // root and tab layouts with these screens, and placeholders for the screens other features own.
+// Trip options is real because Settings opens it as its one preferences editor.
 
 function placeholder(name: string) {
   return function PlaceholderScreen() {
@@ -33,7 +35,7 @@ export const APP_ROUTES = {
   results: placeholder('Results'),
   'itinerary/[id]': ItineraryRoute,
   'place-search': placeholder('Place search'),
-  'trip-options': placeholder('Trip options'),
+  'trip-options': TripOptionsRoute,
   'parked-car/confirm': ConfirmParkingRoute,
   'parked-car/correct': CorrectParkingRoute,
   'data-use': placeholder('Live data use'),
