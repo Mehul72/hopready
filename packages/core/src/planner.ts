@@ -559,25 +559,40 @@ async function planThroughPoint(
     if (byTransit.status === 'rejected') throw byTransit.reason;
     return { options: [options[0]!], transitFailure };
   }
-  const best = preferredOption(workable, context.request.time.type, (option) => ({
-    start: option.departAt,
-    end: option.arriveAt,
-    concernCount: marksForChoice(option),
-  }))!;
-  const others = point.preferred ? workable.filter((option) => option !== best) : [];
-  return { options: [best, ...others], transitFailure };
+  const walking = workable.find((option) => transitLegsOf(option.legs).length === 0);
+  const riding = workable.find((option) => transitLegsOf(option.legs).length > 0);
+  if (!walking || !riding) return { options: workable, transitFailure };
+  return {
+    options: waysOnWorthListing(context, walking, riding, point.preferred),
+    transitFailure,
+  };
 }
 
-// What weighs against a way on from a car park when choosing between its ways on. The drive is the
-// same either way, so a long one decides nothing. Walking from a Transport Park&Ride car park gives
-// up free parking, so it counts as a mark: a free public transport option at most 10 minutes later
-// is used instead.
-function marksForChoice(option: Itinerary): number {
-  const marks = option.concerns.filter((concern) => concern !== 'long-drive').length;
-  const paysToPark =
-    option.parking?.carPark.kind === 'transport-park-and-ride' &&
-    transitLegsOf(option.legs).length === 0;
-  return paysToPark ? marks + 1 : marks;
+// From a car park a short walk from the destination, walking and public transport are both listed
+// when they get there within 10 minutes of each other, so the free parking that comes with public
+// transport can be weighed against the walk. Public transport with a change is not listed when
+// walking gets there first: two buses to save a walk is the clutter the owner reported. Otherwise
+// the quicker one alone. The car park the traveller asked for keeps both, so a check of a followed
+// trip still finds it.
+function waysOnWorthListing(
+  context: PlanContext,
+  walking: Itinerary,
+  riding: Itinerary,
+  keepBoth: boolean,
+): Itinerary[] {
+  // How far riding is behind walking: later to arrive, or arriving by a time, earlier to leave.
+  const ridingBehindSeconds =
+    context.request.time.type === 'depart'
+      ? secondsBetween(walking.arriveAt, riding.arriveAt)
+      : secondsBetween(riding.departAt, walking.departAt);
+  const ridingFirst = ridingBehindSeconds < 0;
+  const both = ridingFirst ? [riding, walking] : [walking, riding];
+  if (keepBoth) return both;
+  const ridingWorthListing =
+    ridingFirst || (ridingBehindSeconds <= PREFERENCE_TOLERANCE_SECONDS && riding.transfers === 0);
+  const walkingWorthListing = !ridingFirst || -ridingBehindSeconds <= PREFERENCE_TOLERANCE_SECONDS;
+  if (ridingWorthListing && walkingWorthListing) return both;
+  return ridingWorthListing ? [riding] : [walking];
 }
 
 async function planTransitThroughPoint(
