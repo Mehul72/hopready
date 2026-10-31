@@ -587,16 +587,18 @@ function waysOnWorthListing(
   riding: Itinerary,
   keepBoth: boolean,
 ): Itinerary[] {
-  // How far riding is behind walking: later to arrive, or arriving by a time, earlier to leave.
+  // How far riding is behind walking, in the minutes the cards show: later to arrive, or arriving
+  // by a time, earlier to leave.
   const ridingBehindSeconds =
     context.request.time.type === 'depart'
-      ? secondsBetween(walking.arriveAt, riding.arriveAt)
-      : secondsBetween(riding.departAt, walking.departAt);
+      ? shownSecondsBetween(walking.arriveAt, riding.arriveAt)
+      : shownSecondsBetween(riding.departAt, walking.departAt);
   const ridingFirst = ridingBehindSeconds < 0;
   const both = ridingFirst ? [riding, walking] : [walking, riding];
   if (keepBoth) return both;
   const ridingWorthListing =
-    ridingFirst || (ridingBehindSeconds <= PREFERENCE_TOLERANCE_SECONDS && riding.transfers === 0);
+    ridingBehindSeconds <= 0 ||
+    (ridingBehindSeconds <= PREFERENCE_TOLERANCE_SECONDS && riding.transfers === 0);
   const walkingWorthListing = !ridingFirst || -ridingBehindSeconds <= PREFERENCE_TOLERANCE_SECONDS;
   if (ridingWorthListing && walkingWorthListing) return both;
   return ridingWorthListing ? [riding] : [walking];
@@ -638,15 +640,17 @@ async function planTransitThroughPoint(
   // estimate, which both share. The car park the traveller asked for keeps every way on.
   const walkingGetsThereFirst = (candidate: TransitJourney): boolean => {
     if (!walkRest || point.preferred) return false;
-    return time.type === 'depart'
-      ? isBefore(
-          addSeconds(time.at, rankedDriveSeconds + bufferSeconds + walkRest.durationSeconds),
-          journeyEnd(candidate),
-        )
-      : isBefore(
-          addSeconds(journeyStart(candidate), -toBoarding.durationSeconds),
-          addSeconds(time.at, -walkRest.durationSeconds),
-        );
+    const walkingBySeconds =
+      time.type === 'depart'
+        ? shownSecondsBetween(
+            addSeconds(time.at, rankedDriveSeconds + bufferSeconds + walkRest.durationSeconds),
+            journeyEnd(candidate),
+          )
+        : shownSecondsBetween(
+            addSeconds(journeyStart(candidate), -toBoarding.durationSeconds),
+            addSeconds(time.at, -walkRest.durationSeconds),
+          );
+    return walkingBySeconds > 0;
   };
   const listable = journeys.filter(
     (candidate) => transitLegsOf(candidate.legs).length < 2 || !walkingGetsThereFirst(candidate),

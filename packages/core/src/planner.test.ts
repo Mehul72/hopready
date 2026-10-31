@@ -1515,6 +1515,15 @@ describe('walking the rest from a car park near the destination', () => {
       expect(waysOn(response)).toEqual(['walk']);
     });
 
+    it('lists buses with a change that get there in the same minute as walking', async () => {
+      const response = await planTrip(
+        request({ destination: NEAR_BELLA_VISTA }),
+        deps({ transit: twoBuses(NEAR_BELLA_VISTA, 0) }),
+      );
+
+      expect(waysOn(response)).toEqual(['walk', '5642+6627']);
+    });
+
     it('lists buses with a change when they get there sooner than walking', async () => {
       const response = await planTrip(
         request({ destination: farther }),
