@@ -43,7 +43,7 @@ function explain(
   switch (reason) {
     case 'transfer-too-short':
       return {
-        text: `Some connections were shorter than your ${preferences.transferBufferMinutes} min transfer buffer.`,
+        text: 'Some connections could not be made in time at your walking speed.',
         remedy: 'trip-options',
       };
     case 'walk-too-long':

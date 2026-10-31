@@ -82,7 +82,9 @@ describe('sorting', () => {
     const byDriving = shownItineraries();
     expect(isSortedBy(byDriving, selfDriving)).toBe(true);
     expect(byDriving[0]?.strategy).toBe('transit-only');
-    expect(byDriving.at(-1)?.strategy).toBe('park-and-ride');
+    // Driving the whole way is listed for comparison, marked as a long drive.
+    expect(byDriving.at(-1)?.strategy).toBe('drive-only');
+    expect(byDriving.at(-1)?.concerns).toEqual(['long-drive']);
     expect(screen.getByRole('radio', { name: 'Least driving' })).toBeChecked();
 
     await user.press(screen.getByRole('radio', { name: 'Fewest changes' }));
@@ -93,26 +95,23 @@ describe('sorting', () => {
 });
 
 describe('when nothing works', () => {
-  it("explains the rejection reasons in the person's own settings and suggests a change", async () => {
+  it('keeps options whose changes are shorter than the transfer buffer, marked rather than hidden', async () => {
     appStorage.preferences.change({ transferBufferMinutes: 20 });
     planChoices.setAccess({ drive: false });
-    const user = await planFromPlanTab(DEMO_PLACES.warringahMall, DEMO_PLACES.macquarieParkOffice);
+    await planFromPlanTab(DEMO_PLACES.warringahMall, DEMO_PLACES.macquarieParkOffice);
+    await screen.findAllByTestId(/^route-card-/);
 
-    expect(await screen.findByText('No trip options found')).toBeOnTheScreen();
+    expect(screen.queryByText('No trip options found')).not.toBeOnTheScreen();
     expect(
-      screen.getByText('Some connections were shorter than your 20 min transfer buffer.'),
-    ).toBeOnTheScreen();
-    expect(screen.queryAllByTestId(/^route-card-/)).toHaveLength(0);
-
-    await user.press(screen.getByRole('button', { name: 'Change trip options' }));
-    expect(screen).toHavePathname('/trip-options');
+      shownItineraries().some((itinerary) => itinerary.concerns.includes('tight-change')),
+    ).toBe(true);
   });
 
   it('offers to plan again once the trip options have changed', async () => {
     appStorage.preferences.change({ transferBufferMinutes: 20 });
     planChoices.setAccess({ drive: false });
     const user = await planFromPlanTab(DEMO_PLACES.warringahMall, DEMO_PLACES.macquarieParkOffice);
-    expect(await screen.findByText('No trip options found')).toBeOnTheScreen();
+    await screen.findAllByTestId(/^route-card-/);
     expect(screen.queryByTestId('options-changed')).not.toBeOnTheScreen();
 
     await act(async () => {

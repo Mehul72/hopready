@@ -17,7 +17,7 @@ describe('explainRejections', () => {
     ).toEqual([
       {
         reason: 'transfer-too-short',
-        text: 'Some connections were shorter than your 3 min transfer buffer.',
+        text: 'Some connections could not be made in time at your walking speed.',
         remedy: 'trip-options',
       },
       {
