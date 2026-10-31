@@ -82,10 +82,13 @@ function uniqueUnavailable(entries: PlanResponse['unavailable']): PlanResponse['
 }
 
 interface RefreshNote {
-  text: string;
-  spoken: string;
+  // "Refresh again in 20 seconds." The check time before it is worded with the caption, so it
+  // keeps its day.
+  wait: string;
   // The note describes these results; newer results make it out of date.
   plannedAt: string | null;
+  // Once a refresh is allowed again, the note has nothing left to say.
+  untilMs: number;
 }
 
 export function ResultsScreen() {
@@ -160,7 +163,15 @@ export function ResultsScreen() {
   const checkedAt = checked ? `Checked ${checked.text}` : null;
   const checkedAtSpoken = checked ? `Checked ${checked.spoken}` : null;
   const currentRefreshNote =
-    refreshNote && refreshNote.plannedAt === plannedAt ? refreshNote : null;
+    refreshNote && refreshNote.plannedAt === plannedAt && now.getTime() < refreshNote.untilMs
+      ? refreshNote
+      : null;
+  const caption = currentRefreshNote
+    ? `${checkedAt ?? 'Checked just now'}. ${currentRefreshNote.wait}`
+    : checkedAt;
+  const captionSpoken = currentRefreshNote
+    ? `${checkedAtSpoken ?? 'Checked just now'}. ${currentRefreshNote.wait}`
+    : checkedAtSpoken;
 
   // A "leave at" time that passed meanwhile moves up to now. A trip home that no longer fits the
   // car is not planned at all.
@@ -184,11 +195,13 @@ export function ResultsScreen() {
     if (outcome.status !== 'too-soon') return;
     // The caption under the toolbar changes rather than a banner appearing, so it is spoken too.
     const wait = `Refresh again in ${describeWait(outcome.retryInSeconds)}.`;
-    const text = `${checkedAt ?? 'Checked just now'}. ${wait}`;
-    const spoken = `${checkedAtSpoken ?? 'Checked just now'}. ${wait}`;
-    setRefreshNote({ text, spoken, plannedAt: planSession.getState().plannedAt });
+    setRefreshNote({
+      wait,
+      plannedAt: planSession.getState().plannedAt,
+      untilMs: Date.now() + outcome.retryInSeconds * 1000,
+    });
     AccessibilityInfo.announceForAccessibility(
-      `These options are less than ${MANUAL_REFRESH_MIN_INTERVAL_SECONDS} seconds old. ${spoken}`,
+      `These options are less than ${MANUAL_REFRESH_MIN_INTERVAL_SECONDS} seconds old. ${checkedAtSpoken ?? 'Checked just now'}. ${wait}`,
     );
   }
 
@@ -232,15 +245,15 @@ export function ResultsScreen() {
           )}
           {canRefresh ? (
             <View style={styles.refresh}>
-              {(currentRefreshNote?.text ?? checkedAt) ? (
+              {caption ? (
                 <AppText
                   variant="caption"
                   tone="secondary"
                   tabularNumbers
-                  accessibilityLabel={currentRefreshNote?.spoken ?? checkedAtSpoken ?? undefined}
+                  accessibilityLabel={captionSpoken ?? undefined}
                   style={styles.shrink}
                   testID={currentRefreshNote ? 'refresh-too-soon' : 'checked-at'}>
-                  {currentRefreshNote?.text ?? checkedAt}
+                  {caption}
                 </AppText>
               ) : null}
               {/* Pull to refresh is hard to find with VoiceOver or Switch Control; this does the
@@ -263,6 +276,7 @@ export function ResultsScreen() {
             message={`${error.message} These options are from ${checked?.text ?? 'earlier'}.`}
             spokenMessage={`${error.message} These options are from ${checked?.spoken ?? 'earlier'}.`}
             announce
+            announceKey={error}
             testID="refresh-failed"
           />
         ) : null}

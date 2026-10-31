@@ -1,5 +1,5 @@
 import { type SFSymbol, SymbolView } from 'expo-symbols';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AccessibilityInfo, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { type ColourTokens, RADII, SPACING, useTheme } from '@/theme';
@@ -19,6 +19,10 @@ export interface BannerProps {
   // Speaks the banner when it appears, for news that arrives without the person asking, such as
   // a failed refresh. Leave off for banners that are part of the screen from the start.
   announce?: boolean;
+  // With `announce`, speaks it again only when this changes, such as a new error, so wording that
+  // follows the clock (a day added at midnight) is not spoken as news. Without it, any new wording
+  // is spoken.
+  announceKey?: unknown;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
@@ -78,6 +82,7 @@ export function Banner({
   spokenMessage,
   action,
   announce = false,
+  announceKey,
   style: containerStyle,
   testID,
 }: BannerProps) {
@@ -85,9 +90,14 @@ export function Banner({
   const style = TONES[tone];
   const spoken = bannerAccessibilityLabel(tone, title, spokenMessage ?? message);
 
+  const latestSpoken = useRef(spoken);
   useEffect(() => {
-    if (announce) AccessibilityInfo.announceForAccessibility(spoken);
-  }, [announce, spoken]);
+    latestSpoken.current = spoken;
+  });
+  const news = announceKey === undefined ? spoken : announceKey;
+  useEffect(() => {
+    if (announce) AccessibilityInfo.announceForAccessibility(latestSpoken.current);
+  }, [announce, news]);
 
   return (
     <View

@@ -2,7 +2,7 @@ import { addMinutes, type Itinerary, legSeconds, type ParkedCar } from '@hopread
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
-import { ActionSheetIOS } from 'react-native';
+import { AccessibilityInfo, ActionSheetIOS } from 'react-native';
 
 import { ApiError } from '@/api';
 import { planDraft } from '@/features/plan/plan-draft';
@@ -318,7 +318,7 @@ describe('options checked before midnight', () => {
   // 11:58 pm on Monday 26 October 2026 in Sydney.
   const lateMonday = new Date('2026-10-26T12:58:00.000Z');
 
-  async function showLateResults() {
+  async function openLateResults() {
     freezeClockAt(lateMonday);
     appStorage.settings.setDemoMode(false);
     jest
@@ -329,9 +329,18 @@ describe('options checked before midnight', () => {
     await planSession.plan(planRequest({ time: { type: 'depart', at: lateMonday.toISOString() } }));
     await renderApp('/results');
     await screen.findAllByTestId(/^route-card-/);
+  }
+
+  async function showLateResults() {
+    await openLateResults();
     // Ten minutes on, it is Tuesday.
     await act(() => jest.advanceTimersByTime(10 * 60_000));
   }
+
+  const pullToRefresh = () =>
+    act(async () => {
+      screen.getByTestId('results-list').props.refreshControl.props.onRefresh();
+    });
 
   it('says the day of the check, in full for VoiceOver', async () => {
     await showLateResults();
@@ -344,10 +353,9 @@ describe('options checked before midnight', () => {
   it('says how old the options are when a refresh fails, in full for VoiceOver', async () => {
     await showLateResults();
     jest.spyOn(tripService, 'planTrip').mockRejectedValueOnce(new ApiError('timeout'));
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
 
-    await act(async () => {
-      screen.getByTestId('results-list').props.refreshControl.props.onRefresh();
-    });
+    await pullToRefresh();
 
     expect(await screen.findByText(/These options are from Mon 11:58\spm\.$/)).toBeOnTheScreen();
     expect(
@@ -355,6 +363,42 @@ describe('options checked before midnight', () => {
         /^Error\. Couldn't refresh\. .*These options are from Monday 11:58\spm\.$/,
       ),
     ).toBeOnTheScreen();
+    expect(announce).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^Error\. Couldn't refresh\. .*These options are from Monday 11:58\spm\.$/,
+      ),
+    );
+  });
+
+  it('says a failed refresh once, though its wording gains the day at midnight', async () => {
+    await openLateResults();
+    // 40 seconds on, past the 30 second limit, the refresh fails; ten minutes on, it is Tuesday.
+    jest.setSystemTime(new Date(lateMonday.getTime() + 40_000));
+    jest.spyOn(tripService, 'planTrip').mockRejectedValueOnce(new ApiError('timeout'));
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+
+    await pullToRefresh();
+    expect(await screen.findByText("Couldn't refresh")).toBeOnTheScreen();
+    await act(() => jest.advanceTimersByTime(10 * 60_000));
+
+    expect(screen.getByText(/These options are from Mon 11:58\spm\.$/)).toBeOnTheScreen();
+    const failures = announce.mock.calls.filter(([text]) => text.includes("Couldn't refresh"));
+    expect(failures).toHaveLength(1);
+  });
+
+  it('clears the note about refreshing too soon once a refresh is allowed again', async () => {
+    await openLateResults();
+    jest.setSystemTime(new Date(lateMonday.getTime() + 10_000));
+    const user = userEvent.setup();
+
+    await user.press(screen.getByRole('button', { name: 'Refresh' }));
+    expect(screen.getByTestId('refresh-too-soon')).toHaveTextContent(
+      /^Checked 11:58\spm\. Refresh again in \d+ seconds\.$/,
+    );
+    await act(() => jest.advanceTimersByTime(10 * 60_000));
+
+    expect(screen.queryByTestId('refresh-too-soon')).not.toBeOnTheScreen();
+    expect(screen.getByTestId('checked-at')).toHaveTextContent('Checked Mon 11:58\u00a0pm');
   });
 });
 
@@ -370,6 +414,11 @@ describe('refreshing', () => {
     expect(plan).not.toHaveBeenCalled();
     expect(screen.getByTestId('refresh-too-soon')).toHaveTextContent(
       /^Checked 7:30 am\. Refresh again in \d+ seconds\.$/,
+    );
+    // VoiceOver hears the whole note, not just the check time.
+    expect(screen.getByTestId('refresh-too-soon')).toHaveProp(
+      'accessibilityLabel',
+      expect.stringMatching(/^Checked 7:30\sam\. Refresh again in \d+ seconds\.$/),
     );
   });
 
