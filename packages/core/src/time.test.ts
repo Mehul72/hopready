@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatSydneyDayAndTime,
+  formatSydneyTimeOnDay,
   addMinutes,
   formatDurationMinutes,
   formatSydneyTime,
@@ -111,6 +113,30 @@ describe('formatting', () => {
     expect(formatDurationMinutes(59 * 60)).toBe('59 min');
     expect(formatDurationMinutes(60 * 60)).toBe('1 h');
     expect(formatDurationMinutes(95 * 60)).toBe('1 h 35 min');
+  });
+});
+
+describe('times with their day', () => {
+  // 10:30 pm on Monday 26 October 2026 in Sydney.
+  const mondayNight = '2026-10-26T11:30:00.000Z';
+
+  it('adds the weekday on another Sydney day and the date from six days away', () => {
+    expect(formatSydneyTimeOnDay('2026-10-26T12:20:00.000Z', mondayNight)).toBe('11:20\u00a0pm');
+    expect(formatSydneyTimeOnDay('2026-10-26T13:40:00.000Z', mondayNight)).toBe(
+      'Tue 12:40\u00a0am',
+    );
+    expect(formatSydneyTimeOnDay('2026-10-30T22:00:00.000Z', mondayNight)).toBe('Sat 9:00\u00a0am');
+    expect(formatSydneyTimeOnDay('2026-11-06T22:00:00.000Z', mondayNight)).toBe(
+      'Sat 7 Nov 9:00\u00a0am',
+    );
+    expect(formatSydneyTimeOnDay('2026-11-06T22:00:00.000Z', mondayNight, 'long')).toBe(
+      'Saturday 7 November 9:00\u00a0am',
+    );
+    expect(formatSydneyTimeOnDay('2026-10-26T13:40:00.000Z', null)).toBe('12:40\u00a0am');
+  });
+
+  it('words a time days away for messages', () => {
+    expect(formatSydneyDayAndTime('2026-11-01T20:07:00.000Z')).toBe('Mon 2 Nov 7:07\u00a0am');
   });
 });
 

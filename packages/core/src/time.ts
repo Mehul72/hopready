@@ -147,6 +147,63 @@ export function formatSydneyTime(value: string | Date): string {
   return sydneyTimeFormatter.format(toInstant(value)).replace(/\u202f|\s/g, '\u00a0');
 }
 
+const sydneyDayFormatter = new Intl.DateTimeFormat('en-AU', {
+  timeZone: SYDNEY_TIME_ZONE,
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+
+// "Mon 2 Nov 7:07 am" in Sydney time, for a message about a time that may be days away.
+export function formatSydneyDayAndTime(value: string | Date): string {
+  const parts = sydneyDayFormatter.formatToParts(toInstant(value));
+  const read = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  return `${read('weekday')} ${read('day')} ${read('month')} ${formatSydneyTime(value)}`;
+}
+
+const sydneyWeekdays = {
+  short: new Intl.DateTimeFormat('en-AU', { timeZone: SYDNEY_TIME_ZONE, weekday: 'short' }),
+  long: new Intl.DateTimeFormat('en-AU', { timeZone: SYDNEY_TIME_ZONE, weekday: 'long' }),
+} as const;
+const sydneyDayAndMonth = {
+  short: new Intl.DateTimeFormat('en-AU', {
+    timeZone: SYDNEY_TIME_ZONE,
+    day: 'numeric',
+    month: 'short',
+  }),
+  long: new Intl.DateTimeFormat('en-AU', {
+    timeZone: SYDNEY_TIME_ZONE,
+    day: 'numeric',
+    month: 'long',
+  }),
+} as const;
+// From this many days apart, a weekday alone could be read as this week's, so the date is added.
+const DAYS_APART_THAT_NEED_A_DATE = 6;
+
+function sydneyDayNumber(value: string | Date): number {
+  const clock = sydneyWallClock(value);
+  return Date.UTC(clock.year, clock.month - 1, clock.day) / 86_400_000;
+}
+
+// "2:32 pm" on the same Sydney day as `sameDayAs` (the time asked for, the trip's start, or now),
+// "Mon 2:32 pm" on another day, and "Sat 7 Nov 9:00 am" six or more days away. 'long' spells the
+// day and month out, for VoiceOver.
+export function formatSydneyTimeOnDay(
+  value: string | Date,
+  sameDayAs: string | Date | null,
+  style: 'short' | 'long' = 'short',
+): string {
+  const time = formatSydneyTime(value);
+  if (sameDayAs === null) return time;
+  const daysApart = Math.abs(sydneyDayNumber(value) - sydneyDayNumber(sameDayAs));
+  if (daysApart === 0) return time;
+  const at = toInstant(value);
+  const weekday = sydneyWeekdays[style].format(at);
+  if (daysApart < DAYS_APART_THAT_NEED_A_DATE) return `${weekday} ${time}`;
+  return `${weekday} ${sydneyDayAndMonth[style].format(at)} ${time}`;
+}
+
 export function sydneyDateKey(value: string | Date): string {
   const clock = sydneyWallClock(value);
   return `${clock.year}-${pad(clock.month)}-${pad(clock.day)}`;

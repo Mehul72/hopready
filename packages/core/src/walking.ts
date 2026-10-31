@@ -39,6 +39,22 @@ export function walkingPaceRatio(speed: WalkingSpeed): number {
   return WALKING_METRES_PER_SECOND.normal / WALKING_METRES_PER_SECOND[speed];
 }
 
+// A longer walk through streets, timed the way TfNSW times them: about 1.5 times the straight line
+// at 1.1 m/s at normal pace (Schofields car park to 24 Anson St, 842 m apart: 20 minutes and
+// 1,318 m by TfNSW, 2026-10-31). Used where HopReady's walk competes with TfNSW's own or has to get
+// someone somewhere by a time, so it errs long rather than short.
+export const STREET_WALK_DISTANCE_FACTOR = 1.5;
+const STREET_WALK_METRES_PER_SECOND_AT_NORMAL_PACE = 1.1;
+
+export function streetWalkBetween(from: Coordinate, to: Coordinate, speed: WalkingSpeed): Walk {
+  const straightMetres = haversineMetres(from, to);
+  if (straightMetres < NEGLIGIBLE_WALK_METRES) return NO_WALK;
+  const distanceMetres = straightMetres * STREET_WALK_DISTANCE_FACTOR;
+  const metresPerSecond = STREET_WALK_METRES_PER_SECOND_AT_NORMAL_PACE / walkingPaceRatio(speed);
+  const minutes = Math.ceil(distanceMetres / metresPerSecond / SECONDS_PER_MINUTE);
+  return { distanceMetres, durationSeconds: minutes * SECONDS_PER_MINUTE };
+}
+
 // The furthest straight-line distance that can still be walked within the time limit.
 export function maxStraightLineMetres(maxWalkMinutes: number, speed: WalkingSpeed): number {
   return (
