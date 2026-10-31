@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. The candidate rule in the Decision (straight-line direction bounds, 4 car parks) is superseded by ADR-0007; the rest stands.
 
 ## Date
 

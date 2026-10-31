@@ -106,7 +106,7 @@ park and ride,commuter parking,metro,train,bus,transfer,trip planner,door to doo
 >
 > After you park, confirm where your car actually is. Take me home then plans public transport back to your car and the drive home from there. Dropped off instead? HopReady plans public transport home.
 >
-> Set your own limits: how far you are willing to drive and walk, and how much time to allow for parking and making connections.
+> Set your own preferences: how far you would rather drive and walk, and how much time to allow for parking and making connections. An option that goes over a limit is shown with a note, not hidden.
 >
 > Good to know:
 > • Covers Greater Sydney, including the Central Coast and Blue Mountains.

@@ -97,8 +97,8 @@ Fixture and simulator results only. No test has reached the real TfNSW or Apple 
 - **Station entrances and exits** are never named. TfNSW may send details in fields HopReady does not read yet, so the timeline says they are not provided and to follow the station signs (docs/design/routing.md).
 - **Services already left** cannot be checked again. Once a followed trip has started, only the services still to come are planned, so a delay on the service being ridden, and a connection it then misses, is not seen. The trip screen says so (docs/design/routing.md).
 - **Fares and accessibility** are always shown as unknown. TfNSW removed Opal fares from the Trip Planner API in October 2023 (docs/design/routing.md).
-- **Only the three best car parks** by drive time are checked per plan (docs/decisions/0001).
-- **Walking speed** is not sent to TfNSW, because no parameter for it has been verified; slow walkers get TfNSW's walking times stretched instead (docs/design/routing.md).
+- **Only five car parks per plan** get exact journeys, one per station. The rest are listed with an estimate from a hub table that is a timetable snapshot, re-recorded by hand, and rough for destinations far from any hub (docs/decisions/0007).
+- **Walking speed** is not sent to TfNSW, because no parameter for it has been verified; slow walkers get TfNSW's walking times stretched instead. The walking limit is sent as a preference, and marks options rather than hiding them (docs/decisions/0008).
 - **Apple's drive times** have no published accuracy for Sydney; compare them with real drives before a public release (docs/release.md).
 - **Apple-sourced places** (saved places, recent trips, the followed trip) are kept on the phone until deleted, which a strict reading of Apple's terms does not allow (owner decision 22).
 - **Hermes** ships without its own privacy manifest, so App Store Connect may reject the first upload (docs/release.md).
