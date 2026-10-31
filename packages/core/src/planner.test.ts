@@ -2158,6 +2158,19 @@ describe('getting home', () => {
       }
     });
 
+    it('reports the failure when walking to the car can no longer get home in time', async () => {
+      // Home 20 minutes from now: the 19 minute walk, 5 minutes at the car and the 12 minute
+      // drive would already have had to start.
+      const tooSoon = homeThroughCar({
+        origin: nearTheCar,
+        time: { type: 'arrive', at: addMinutes(evening, 20) },
+      });
+
+      await expect(planTrip(tooSoon, atEvening({ transit: busy }))).rejects.toMatchObject({
+        failure: 'rate-limited',
+      });
+    });
+
     it('still fails when the car is too far to walk to', async () => {
       await expect(planTrip(homeThroughCar(), atEvening({ transit: busy }))).rejects.toMatchObject({
         failure: 'rate-limited',

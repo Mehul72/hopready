@@ -962,17 +962,25 @@ async function planReturnViaCar(
     });
   // A car within a walk does not need TfNSW to get back to it: when TfNSW fails, the walk is shown
   // and the failure said, rather than no way home at all.
+  let transitFailure: ProviderError | undefined;
   const journeysToCar = async (when: { type: 'depart' | 'arrive'; at: string }) => {
     try {
       return await queryTransit(context, origin, car, when);
     } catch (error) {
       if (!isWalkableToCar) throw error;
-      const failure = asProviderError(error, context.deps.transit.name);
-      context.notices.push(
-        `${describeFailure(failure, 'Public transport times')} Your car is close enough to walk to, so the walk is shown.`,
-      );
+      transitFailure = asProviderError(error, context.deps.transit.name);
       return [];
     }
+  };
+  // The walk stands in for TfNSW only when it can be taken; otherwise the failure is the answer.
+  const walkInsteadOfTfnsw = (itineraries: readonly Itinerary[]) => {
+    if (!transitFailure) return;
+    if (!itineraries.some((itinerary) => itineraryProblem(context, itinerary) === null)) {
+      throw transitFailure;
+    }
+    context.notices.push(
+      `${describeFailure(transitFailure, 'Public transport times')} Your car is close enough to walk to, so the walk is shown.`,
+    );
   };
 
   try {
@@ -1002,6 +1010,7 @@ async function planReturnViaCar(
           return returnItinerary(context, driving, car, toCar, leaveCarAt, route);
         }),
       );
+      walkInsteadOfTfnsw(itineraries);
       explainFarOffOptions(context, 'return-via-car', itineraries, 'way back to your car');
       return { itineraries };
     }
@@ -1028,6 +1037,7 @@ async function planReturnViaCar(
       return { itineraries: [] };
     }
     const itineraries = [returnItinerary(context, driving, car, toCar, leaveCarAt, route)];
+    walkInsteadOfTfnsw(itineraries);
     explainFarOffOptions(context, 'return-via-car', itineraries, 'way back to your car');
     return { itineraries };
   } catch (error) {
