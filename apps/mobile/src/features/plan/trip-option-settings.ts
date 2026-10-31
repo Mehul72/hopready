@@ -56,7 +56,7 @@ export const LIMIT_SETTINGS: readonly MinutesSetting[] = [
   setting(
     'maxWalkMinutes',
     'Longest walk',
-    'Sent to Transport for NSW as a preference. An option with a longer single walk is shown with a note, not hidden.',
+    'An option with a longer single walk is shown with a note, not hidden.',
   ),
 ];
 
