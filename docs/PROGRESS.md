@@ -105,7 +105,7 @@ Fixture and simulator results only. No test has reached the real TfNSW or Apple 
 - **Only five car parks per plan** get exact journeys, one per station. The rest are listed with an estimate from a hub table that is a timetable snapshot, re-recorded by hand, and rough for destinations far from any hub (docs/decisions/0007).
 - **Walking the rest from a car park** is HopReady's estimate, timed like TfNSW's street walks (1.5 times the straight line at 1.1 m/s), not a routed path: a river or motorway between the car park and the destination makes it optimistic. It also ignores Dee Why's overnight closing (docs/decisions/0010).
 - **On Demand services** that TfNSW returns as product class 10 are dropped by the adapter, so journeys using them are not offered (docs/research/park-and-ride.md 1.5).
-- **Walking speed** is not sent to TfNSW, because no parameter for it has been verified; slow walkers get TfNSW's walking times stretched instead. The walking limit is sent as a preference, and marks options rather than hiding them (docs/decisions/0008).
+- **Walking speed and the walking limit** are not sent to TfNSW: both send TfNSW days ahead to satisfy them (docs/decisions/0009, 0010). Slow walkers get TfNSW's walking times stretched instead, and the limit only marks options.
 - **Apple's drive times** have no published accuracy for Sydney; compare them with real drives before a public release (docs/release.md).
 - **Apple-sourced places** (saved places, recent trips, the followed trip) are kept on the phone until deleted, which a strict reading of Apple's terms does not allow (owner decision 22).
 - **Hermes** ships without its own privacy manifest, so App Store Connect may reject the first upload (docs/release.md).
