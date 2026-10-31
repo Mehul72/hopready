@@ -160,12 +160,12 @@ describe('when nothing works', () => {
     ).toBeOnTheScreen();
     expect(
       screen.getByLabelText(
-        'Kellyville (south): A car park shown above gets you there as early, with no more driving',
+        'Kellyville (south): Not tried: HopReady checks the five most promising car parks, one per station',
       ),
     ).toBeOnTheScreen();
   });
 
-  it('says why a car park that worked has no card of its own', async () => {
+  it('says why a car park at a listed station has no card of its own', async () => {
     const user = await planFromPlanTab(DEMO_PLACES.boxHillHome, DEMO_PLACES.chatswoodOffice);
     await screen.findAllByTestId(/^route-card-/);
 
@@ -174,10 +174,10 @@ describe('when nothing works', () => {
     expect(
       screen.getByLabelText('Tallawong P2: A connection was found from here'),
     ).toBeOnTheScreen();
-    // Both Kellyville car parks serve the same station, so one card stands for both.
+    // Both Kellyville car parks serve the same station, so only one is checked and listed.
     expect(
       screen.getByLabelText(
-        'Kellyville (south): A car park shown above gets you there as early, with no more driving',
+        'Kellyville (south): Not tried: HopReady checks the five most promising car parks, one per station',
       ),
     ).toBeOnTheScreen();
     const carParksWithCards = shownItineraries().map(
