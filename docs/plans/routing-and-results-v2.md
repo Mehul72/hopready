@@ -53,7 +53,7 @@ Server and core first (no app build needed; build 4 keeps working because every 
 - [x] 8. Deploy to staging, re-run the real trips, record results in docs/research/park-and-ride.md (versions 726a62c4 and 6d48416d)
       done when: staging answers within 5 s and the Kellyville list includes Seven Hills with an exact time
 - [x] 9. ADR-0007 (car park choice) and ADR-0008 (preferences), routing.md and providers.md rewritten, PROGRESS updated. Commit 5b688a8; research brief part 2 and the extended hub table follow in their own commits
-- [ ] 10. Results screen v2 in the app (short option rows, map card, details behind a tap, car parks and reasons in a sheet, no freshness banner, sort in the toolbar), one trip-options editor; the Plan tab stays as it is (see log). Commits d04bbd8, 223f05c
+- [x] 10. Results screen v2 in the app (short option rows, map card, details behind a tap, car parks and reasons in a sheet, no freshness banner, sort in the toolbar), one trip-options editor; the Plan tab stays as it is (see log). Commits d04bbd8, 223f05c, 9b3e5db; XCUITest 6 tests passed (1 skipped by design) on 2026-10-31 19:45, screenshots refreshed
       done when: 702 or more app tests pass, the XCUITest walk-through passes, screenshots refreshed
 - [ ] 11. TestFlight build 5
 
