@@ -979,8 +979,10 @@ async function planReturnViaCar(
     if (time.type === 'depart') {
       let waysToCar = isNearCar
         ? [walkToNearbyCar(context, car, time)]
-        : (await journeysToCar(time))
-            .filter((journey) => keepJourney(context, journey))
+        : withinReachFirst(
+            context,
+            (await journeysToCar(time)).filter((journey) => keepJourney(context, journey)),
+          )
             .sort(byArrival)
             .slice(0, 2);
       // TfNSW may answer a short trip with no journey at all; a car parked for a walk is walked to.
@@ -1010,9 +1012,12 @@ async function planReturnViaCar(
     const toCar = isNearCar
       ? walkToNearbyCar(context, car, { type: 'arrive', at: reachCarBy })
       : (latestJourney(
-          (await journeysToCar({ type: 'arrive', at: reachCarBy })).filter(
-            // A journey that reaches the car any later would cut into the retrieval buffer.
-            (journey) => arrivesBy(journey, reachCarBy) && keepJourney(context, journey),
+          withinReachFirst(
+            context,
+            (await journeysToCar({ type: 'arrive', at: reachCarBy })).filter(
+              // A journey that reaches the car any later would cut into the retrieval buffer.
+              (journey) => arrivesBy(journey, reachCarBy) && keepJourney(context, journey),
+            ),
           ),
         ) ??
         (isWalkableToCar
@@ -1658,6 +1663,13 @@ function farFromTimeAskedFor(
   return secondsBetween(measured, time.at) > MAX_SECONDS_FROM_TIME_ASKED_FOR
     ? 'arrives-long-before-target'
     : null;
+}
+
+// Journeys inside the 12 hour line go first, so one past it never takes the place of one that can
+// be taken. With none inside, the rest are kept, so the trip home is rejected and explained.
+function withinReachFirst(context: PlanContext, journeys: TransitJourney[]): TransitJourney[] {
+  const inReach = journeys.filter((journey) => farFromTimeAskedFor(context, journey.legs) === null);
+  return inReach.length > 0 ? inReach : journeys;
 }
 
 function keepWithinReachOfTimeAskedFor(context: PlanContext, legs: readonly Leg[]): boolean {

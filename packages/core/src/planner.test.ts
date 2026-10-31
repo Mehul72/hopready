@@ -2165,6 +2165,82 @@ describe('getting home', () => {
     });
   });
 
+  it('goes home on a journey inside 12 hours when two past the line get there first', async () => {
+    // A and B take the first service 12 h 10 min and 12 h 12 min after leaving; C takes its first
+    // at 11 h 50 min and, on a longer ride, gets there after both.
+    const nearTheLine = fakeTransit((query) =>
+      query.time.type === 'depart'
+        ? [
+            journeyWithFinalWalk(
+              query.from,
+              query.to,
+              addMinutes(evening, 12 * 60 + 10),
+              5,
+              5,
+              'A',
+            ),
+            journeyWithFinalWalk(
+              query.from,
+              query.to,
+              addMinutes(evening, 12 * 60 + 12),
+              5,
+              5,
+              'B',
+            ),
+            journeyWithFinalWalk(
+              query.from,
+              query.to,
+              addMinutes(evening, 11 * 60 + 50),
+              45,
+              5,
+              'C',
+            ),
+          ]
+        : [],
+    );
+    const response = await planTrip(homeThroughCar(), atEvening({ transit: nearTheLine }));
+
+    expect(
+      response.itineraries.map((it) => transitLegsOf(it.legs).map((leg) => leg.service.name)),
+    ).toEqual([['C']]);
+  });
+
+  it('arriving by a time, goes home on a journey inside 12 hours over a later one past the line', async () => {
+    const arriveBy = addMinutes(evening, 30 * 60);
+    // X starts later but its service gets in 12 h 32 min before the time asked for; Y's longer
+    // ride gets in 11 h 57 min before it.
+    const nearTheLine = fakeTransit((query) =>
+      query.time.type === 'arrive'
+        ? [
+            journeyWithFinalWalk(
+              query.from,
+              query.to,
+              addMinutes(query.time.at, -(12 * 60 + 20)),
+              5,
+              5,
+              'X',
+            ),
+            journeyWithFinalWalk(
+              query.from,
+              query.to,
+              addMinutes(query.time.at, -(12 * 60 + 30)),
+              50,
+              5,
+              'Y',
+            ),
+          ]
+        : [],
+    );
+    const response = await planTrip(
+      homeThroughCar({ time: { type: 'arrive', at: arriveBy } }),
+      atEvening({ transit: nearTheLine }),
+    );
+
+    expect(
+      response.itineraries.map((it) => transitLegsOf(it.legs).map((leg) => leg.service.name)),
+    ).toEqual([['Y']]);
+  });
+
   it('does not reach the car more than 12 hours before an arrive-by time', async () => {
     const arriveBy = addMinutes(evening, 30 * 60);
     // TfNSW's latest journey back to the car gets there 20 hours before it is needed.
