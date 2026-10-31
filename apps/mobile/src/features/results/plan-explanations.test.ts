@@ -59,7 +59,7 @@ describe('explainRejections', () => {
       },
       {
         reason: 'arrives-long-before-target',
-        text: 'Some options would have got you there more than 12 hours before your arrive-by time.',
+        text: 'Some options would have got you there, or back to your car, more than 12 hours before your arrive-by time.',
         remedy: 'time',
       },
     ]);
