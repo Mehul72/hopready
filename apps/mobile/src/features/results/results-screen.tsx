@@ -83,6 +83,7 @@ function uniqueUnavailable(entries: PlanResponse['unavailable']): PlanResponse['
 
 interface RefreshNote {
   text: string;
+  spoken: string;
   // The note describes these results; newer results make it out of date.
   plannedAt: string | null;
 }
@@ -155,9 +156,11 @@ export function ResultsScreen() {
   // The same limit as the trip screen, so an option is not called live here but not there.
   // Refreshing could only plan back to the car as it was, so the banner asks for Take me home.
   const canRefresh = response !== null && !tripHomeOutOfDate;
-  const checkedAt = plannedAt ? `Checked ${describeTripTime(plannedAt, now).text}` : null;
+  const checked = plannedAt ? describeTripTime(plannedAt, now) : null;
+  const checkedAt = checked ? `Checked ${checked.text}` : null;
+  const checkedAtSpoken = checked ? `Checked ${checked.spoken}` : null;
   const currentRefreshNote =
-    refreshNote && refreshNote.plannedAt === plannedAt ? refreshNote.text : null;
+    refreshNote && refreshNote.plannedAt === plannedAt ? refreshNote : null;
 
   // A "leave at" time that passed meanwhile moves up to now. A trip home that no longer fits the
   // car is not planned at all.
@@ -180,10 +183,12 @@ export function ResultsScreen() {
     const outcome = await planSession.refresh();
     if (outcome.status !== 'too-soon') return;
     // The caption under the toolbar changes rather than a banner appearing, so it is spoken too.
-    const text = `${checkedAt ?? 'Checked just now'}. Refresh again in ${describeWait(outcome.retryInSeconds)}.`;
-    setRefreshNote({ text, plannedAt: planSession.getState().plannedAt });
+    const wait = `Refresh again in ${describeWait(outcome.retryInSeconds)}.`;
+    const text = `${checkedAt ?? 'Checked just now'}. ${wait}`;
+    const spoken = `${checkedAtSpoken ?? 'Checked just now'}. ${wait}`;
+    setRefreshNote({ text, spoken, plannedAt: planSession.getState().plannedAt });
     AccessibilityInfo.announceForAccessibility(
-      `These options are less than ${MANUAL_REFRESH_MIN_INTERVAL_SECONDS} seconds old. ${text}`,
+      `These options are less than ${MANUAL_REFRESH_MIN_INTERVAL_SECONDS} seconds old. ${spoken}`,
     );
   }
 
@@ -227,14 +232,15 @@ export function ResultsScreen() {
           )}
           {canRefresh ? (
             <View style={styles.refresh}>
-              {(currentRefreshNote ?? checkedAt) ? (
+              {(currentRefreshNote?.text ?? checkedAt) ? (
                 <AppText
                   variant="caption"
                   tone="secondary"
                   tabularNumbers
+                  accessibilityLabel={currentRefreshNote?.spoken ?? checkedAtSpoken ?? undefined}
                   style={styles.shrink}
                   testID={currentRefreshNote ? 'refresh-too-soon' : 'checked-at'}>
-                  {currentRefreshNote ?? checkedAt}
+                  {currentRefreshNote?.text ?? checkedAt}
                 </AppText>
               ) : null}
               {/* Pull to refresh is hard to find with VoiceOver or Switch Control; this does the
@@ -254,7 +260,8 @@ export function ResultsScreen() {
           <Banner
             tone="error"
             title="Couldn't refresh"
-            message={`${error.message} These options are from ${plannedAt ? describeTripTime(plannedAt, now).text : 'earlier'}.`}
+            message={`${error.message} These options are from ${checked?.text ?? 'earlier'}.`}
+            spokenMessage={`${error.message} These options are from ${checked?.spoken ?? 'earlier'}.`}
             announce
             testID="refresh-failed"
           />

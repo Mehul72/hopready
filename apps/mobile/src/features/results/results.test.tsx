@@ -314,6 +314,50 @@ describe('error states', () => {
   });
 });
 
+describe('options checked before midnight', () => {
+  // 11:58 pm on Monday 26 October 2026 in Sydney.
+  const lateMonday = new Date('2026-10-26T12:58:00.000Z');
+
+  async function showLateResults() {
+    freezeClockAt(lateMonday);
+    appStorage.settings.setDemoMode(false);
+    jest
+      .spyOn(tripService, 'planTrip')
+      .mockResolvedValue(
+        planResponse([transitItinerary({ departAt: '2026-10-26T13:10:00.000Z' })]),
+      );
+    await planSession.plan(planRequest({ time: { type: 'depart', at: lateMonday.toISOString() } }));
+    await renderApp('/results');
+    await screen.findAllByTestId(/^route-card-/);
+    // Ten minutes on, it is Tuesday.
+    await act(() => jest.advanceTimersByTime(10 * 60_000));
+  }
+
+  it('says the day of the check, in full for VoiceOver', async () => {
+    await showLateResults();
+
+    const checked = screen.getByTestId('checked-at');
+    expect(checked).toHaveTextContent('Checked Mon 11:58\u00a0pm');
+    expect(checked).toHaveProp('accessibilityLabel', 'Checked Monday 11:58\u00a0pm');
+  });
+
+  it('says how old the options are when a refresh fails, in full for VoiceOver', async () => {
+    await showLateResults();
+    jest.spyOn(tripService, 'planTrip').mockRejectedValueOnce(new ApiError('timeout'));
+
+    await act(async () => {
+      screen.getByTestId('results-list').props.refreshControl.props.onRefresh();
+    });
+
+    expect(await screen.findByText(/These options are from Mon 11:58\spm\.$/)).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        /^Error\. Couldn't refresh\. .*These options are from Monday 11:58\spm\.$/,
+      ),
+    ).toBeOnTheScreen();
+  });
+});
+
 describe('refreshing', () => {
   it('holds off a refresh within 30 seconds of the last one and says when it can run', async () => {
     const user = await planFromPlanTab();
