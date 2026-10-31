@@ -144,7 +144,29 @@ describe('TfNSW trip request', () => {
       name_destination: '206710',
       calcNumberOfTrips: '4',
       TfNSWTR: 'true',
+      itOptionsActive: '1',
+      trITMOT: '100',
+      trITMOTvalue100: '15',
     });
+  });
+
+  it("gives TfNSW a slow walker's limit in its own walking time", async () => {
+    const { params } = await plan(
+      { journeys: [] },
+      query({ maxWalkMinutes: 15, walkingSpeed: 'slow' }),
+    );
+
+    // 15 minutes at 0.9 m/s covers what TfNSW walks in about 10 at 1.3 m/s.
+    expect(params.trITMOTvalue100).toBe('10');
+  });
+
+  it('never asks TfNSW for a walking limit under a minute', async () => {
+    const { params } = await plan(
+      { journeys: [] },
+      query({ maxWalkMinutes: 1, walkingSpeed: 'slow' }),
+    );
+
+    expect(params.trITMOTvalue100).toBe('1');
   });
 
   it('asks for arrive-by trips in winter with AEST date and time', async () => {
