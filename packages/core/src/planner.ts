@@ -614,13 +614,39 @@ async function planTransitThroughPoint(
   let journey = choose(journeys);
   if (!journey) return null;
 
-  const mustArriveAt = addSeconds(journeyStart(journey), -accessSeconds);
+  let arriveAt = addSeconds(journeyStart(journey), -accessSeconds);
   let route = await routeDrive(context, driving, origin, point.place, {
     type: 'arrive',
-    at: mustArriveAt,
+    at: arriveAt,
   });
-  let leaveAt = addSeconds(mustArriveAt, -route.durationSeconds);
-  let arriveAt = mustArriveAt;
+  let leaveAt = addSeconds(arriveAt, -route.durationSeconds);
+
+  const earliestLeave = addSeconds(context.now, -TIME_GRACE_SECONDS);
+  if (time.type === 'arrive' && isBefore(leaveAt, earliestLeave)) {
+    // The preferred journey needs a drive that would already have left, so another one the drive
+    // can still make is chosen. With none, it is kept, and the car park's reason is counted.
+    const missed = journey;
+    const driveSeconds = route.durationSeconds;
+    const reachable = choose(
+      journeys.filter(
+        (candidate) =>
+          candidate !== missed &&
+          !isBefore(
+            addSeconds(journeyStart(candidate), -(accessSeconds + driveSeconds)),
+            earliestLeave,
+          ),
+      ),
+    );
+    if (reachable) {
+      journey = reachable;
+      arriveAt = addSeconds(journeyStart(journey), -accessSeconds);
+      route = await routeDrive(context, driving, origin, point.place, {
+        type: 'arrive',
+        at: arriveAt,
+      });
+      leaveAt = addSeconds(arriveAt, -route.durationSeconds);
+    }
+  }
 
   if (time.type === 'depart' && isBefore(leaveAt, time.at)) {
     // Traffic at the later time is worse than the first estimate: leave when asked, and take the

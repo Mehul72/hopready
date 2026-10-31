@@ -1506,6 +1506,78 @@ describe('choosing which journey to take from a car park', () => {
     }
   });
 
+  describe('arriving by a time', () => {
+    // LONG boards 20 minutes before the time asked for and ends with an 18 minute walk, over the
+    // limit. SHORT boards 7 minutes earlier and ends with a 5 minute walk, so it is preferred while
+    // its drive can still be made.
+    const longOrShort = fakeTransit((query) =>
+      query.from.stopId
+        ? [
+            journeyWithFinalWalk(
+              query.from,
+              query.to,
+              addMinutes(query.time.at, -20),
+              2,
+              18,
+              'LONG',
+            ),
+            journeyWithFinalWalk(
+              query.from,
+              query.to,
+              addMinutes(query.time.at, -27),
+              17,
+              5,
+              'SHORT',
+            ),
+          ]
+        : [],
+    );
+    const viaTallawong = (response: PlanResponse) =>
+      response.itineraries.find((it) => it.parking?.carPark.id === TALLAWONG.id)!;
+
+    it('takes the journey its drive can still make over a better one it cannot', async () => {
+      // The 15 minute drive to Tallawong, 8 minutes to park and 2 to the platform: LONG's drive
+      // leaves now, SHORT's would have left 7 minutes ago.
+      const response = await planTrip(
+        request({ time: { type: 'arrive', at: addMinutes(NOW, 45) } }),
+        deps({ transit: longOrShort, carParks: fakeCarParks(new Map(), [TALLAWONG]) }),
+      );
+
+      expect(transitLegsOf(viaTallawong(response).legs).map((leg) => leg.service.name)).toEqual([
+        'LONG',
+      ]);
+      expect(viaTallawong(response).concerns).toContain('long-walk');
+    });
+
+    it('chooses again when the drive takes longer than its estimate', async () => {
+      // The estimate catches both, so SHORT is chosen; the route is 5 minutes slower, so SHORT's
+      // drive would have left 5 minutes ago and LONG's leaves in 2.
+      const slowerThanEstimated = fakeDriving({
+        async routeDrive(from, to) {
+          return {
+            durationSeconds: driveSeconds(from, to) + 5 * 60,
+            distanceMetres: haversineMetres(from, to) * 1.35,
+            trafficAware: true,
+            path: [from, to],
+          };
+        },
+      });
+      const response = await planTrip(
+        request({ time: { type: 'arrive', at: addMinutes(NOW, 52) } }),
+        deps({
+          driving: slowerThanEstimated,
+          transit: longOrShort,
+          carParks: fakeCarParks(new Map(), [TALLAWONG]),
+        }),
+      );
+
+      expect(transitLegsOf(viaTallawong(response).legs).map((leg) => leg.service.name)).toEqual([
+        'LONG',
+      ]);
+      expect(secondsBetween(NOW, viaTallawong(response).departAt)).toBe(2 * 60);
+    });
+  });
+
   it('catches a later service when the drive leaving on time misses the first one', async () => {
     // Each route takes a minute longer than the estimate the car park was ranked on.
     const slowerThanEstimated = fakeDriving({
