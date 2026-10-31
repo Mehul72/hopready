@@ -1789,7 +1789,8 @@ function recordUnlistedCarPark(
 
 // At least as good on everything the results can be sorted by, read the way the app shows it, without
 // having the traveller leave more than a minute earlier. It must be as certain too: an alert the
-// other avoids, or fewer live times, leaves the other a real choice.
+// other avoids, or fewer live times, leaves the other a real choice. So does free parking: walking
+// from a Transport Park&Ride car park gives up what public transport from it keeps.
 function dominates(better: Itinerary, other: Itinerary): boolean {
   return (
     shownSecondsBetween(better.arriveAt, other.arriveAt) >= 0 &&
@@ -1797,7 +1798,15 @@ function dominates(better: Itinerary, other: Itinerary): boolean {
     better.transfers <= other.transfers &&
     shownSecondsBetween(other.departAt, better.departAt) >= -LEAVE_EARLIER_SLACK_SECONDS &&
     LIVE_TIMES_RANK[better.realtime] >= LIVE_TIMES_RANK[other.realtime] &&
-    better.alerts.every((alert) => other.alerts.some((same) => same.id === alert.id))
+    better.alerts.every((alert) => other.alerts.some((same) => same.id === alert.id)) &&
+    (!paysToParkWhenWalking(better) || paysToParkWhenWalking(other))
+  );
+}
+
+function paysToParkWhenWalking(itinerary: Itinerary): boolean {
+  return (
+    itinerary.parking?.carPark.kind === 'transport-park-and-ride' &&
+    transitLegsOf(itinerary.legs).length === 0
   );
 }
 

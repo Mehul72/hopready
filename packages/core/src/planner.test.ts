@@ -1497,6 +1497,35 @@ describe('walking the rest from a car park near the destination', () => {
       expect(waysOn(response)).toEqual(['walk', '735']);
     });
 
+    it('does not hide a free bus behind the paid walk from the same car park', async () => {
+      // A timetabled bus that leaves the platform as the traveller reaches it, 12 minutes before
+      // walking would get there, and arrives 6 minutes after: no more live than the walk, and no
+      // earlier to leave, but parking stays free.
+      const timetabledBus = fromBellaVista((from, to) => {
+        const boards = addMinutes(walkingArrives(NEAR_BELLA_VISTA), -12);
+        const alight = place(
+          `${to.name} stop`,
+          to.coordinate.lat,
+          to.coordinate.lon - 0.001,
+          'stop',
+        );
+        return {
+          legs: [
+            transit(from, alight, boards, addMinutes(boards, 15), { name: '735' }),
+            walk(alight, to, addMinutes(boards, 15), addMinutes(boards, 18), `walk-735-${to.name}`),
+          ],
+          fare: { status: 'unknown' },
+          alerts: [],
+        };
+      });
+      const response = await planTrip(
+        request({ destination: NEAR_BELLA_VISTA }),
+        deps({ transit: timetabledBus }),
+      );
+
+      expect(waysOn(response)).toEqual(['walk', '735']);
+    });
+
     it('walks alone when the bus gets there more than 10 minutes later', async () => {
       const response = await planTrip(
         request({ destination: NEAR_BELLA_VISTA }),
