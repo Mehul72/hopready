@@ -1746,6 +1746,41 @@ describe('getting home', () => {
     expect(response.unavailable).toEqual([]);
   });
 
+  describe('when TfNSW fails', () => {
+    const busy = fakeTransit(() => {
+      throw new ProviderError('demo-fixture', 'rate-limited', 'HTTP 429', {
+        retryAfterSeconds: 30,
+      });
+    });
+    // About 800 m from the Kellyville car park.
+    const nearTheCar = place('3 Example Way, Kellyville', -33.7063, 150.9353);
+
+    it('walks back to a car parked within 1.2 km, and says why', async () => {
+      for (const time of [
+        { type: 'depart' as const, at: evening },
+        { type: 'arrive' as const, at: homeBy },
+      ]) {
+        const response = await planTrip(
+          homeThroughCar({ origin: nearTheCar, time }),
+          atEvening({ transit: busy }),
+        );
+
+        expect(response.itineraries.map((it) => kinds(it.legs))).toEqual([
+          ['walk', 'car-retrieval', 'drive'],
+        ]);
+        expect(response.notices).toEqual([
+          'Public transport times are busy right now. Try again shortly. Your car is close enough to walk to, so the walk is shown.',
+        ]);
+      }
+    });
+
+    it('still fails when the car is too far to walk to', async () => {
+      await expect(planTrip(homeThroughCar(), atEvening({ transit: busy }))).rejects.toMatchObject({
+        failure: 'rate-limited',
+      });
+    });
+  });
+
   it('does not reach the car more than 12 hours before an arrive-by time', async () => {
     const arriveBy = addMinutes(evening, 30 * 60);
     // TfNSW's latest journey back to the car gets there 20 hours before it is needed.

@@ -905,12 +905,26 @@ async function planReturnViaCar(
       strategy: 'return-via-car',
       reason: 'No public transport gets you back to your car in time from here.',
     });
+  // A car within a walk does not need TfNSW to get back to it: when TfNSW fails, the walk is shown
+  // and the failure said, rather than no way home at all.
+  const journeysToCar = async (when: { type: 'depart' | 'arrive'; at: string }) => {
+    try {
+      return await queryTransit(context, origin, car, when);
+    } catch (error) {
+      if (!isWalkableToCar) throw error;
+      const failure = asProviderError(error, context.deps.transit.name);
+      context.notices.push(
+        `${describeFailure(failure, 'Public transport times')} Your car is close enough to walk to, so the walk is shown.`,
+      );
+      return [];
+    }
+  };
 
   try {
     if (time.type === 'depart') {
       let waysToCar = isNearCar
         ? [walkToNearbyCar(context, car, time)]
-        : (await queryTransit(context, origin, car, time))
+        : (await journeysToCar(time))
             .filter((journey) => keepJourney(context, journey))
             .sort(byArrival)
             .slice(0, 2);
@@ -941,7 +955,7 @@ async function planReturnViaCar(
     const toCar = isNearCar
       ? walkToNearbyCar(context, car, { type: 'arrive', at: reachCarBy })
       : (latestJourney(
-          (await queryTransit(context, origin, car, { type: 'arrive', at: reachCarBy })).filter(
+          (await journeysToCar({ type: 'arrive', at: reachCarBy })).filter(
             // A journey that reaches the car any later would cut into the retrieval buffer.
             (journey) => arrivesBy(journey, reachCarBy) && keepJourney(context, journey),
           ),
