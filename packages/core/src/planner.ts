@@ -95,12 +95,12 @@ const PREFERENCE_TOLERANCE_SECONDS = 10 * 60;
 // minutes at normal pace by HopReady's measure, 27 by TfNSW's. Further is a drive to the door. A
 // distance rather than a time, so slow walkers keep the option, marked against their own limit.
 const WALK_THE_REST_MAX_STRAIGHT_METRES = 1_200;
-// A car park past the destination means driving by it and walking back. Measured as the share of
-// the walk that heads back toward the start: 0.95 to 0.99 for the Kellyville car parks from the
-// owner's house to Windsor Rd at Samantha Riley Dr, 0.09 for Schofields to Anson St, 0.29 for the
-// demo Dee Why car park beside the office. Drive times cannot tell these apart: 15 seconds longer
-// than the drive to the door for one Kellyville car park, 8 for Dee Why.
-const MAX_SHARE_OF_WALK_BACK_TOWARD_START = 0.5;
+// A car park past the destination means driving by the door and walking back. More than 300 m of
+// walking back toward the start (about 7 minutes at TfNSW's street pace) is taken to be that: from
+// Castle Hill to Windsor Rd at Samantha Riley Dr, the drive to Kellyville (south) passes 17 m from
+// the destination before a walk 346 m of the way back. Car parks beside a destination measured 52
+// to 280 m (Edmondson Park, Penrith, Gordon, Tallawong P3; Schofields on the owner's trip, 78 m).
+const MAX_WALK_BACK_TOWARD_START_METRES = 300;
 // An option this far from the time asked for answers a different question: a plan for Saturday
 // evening should not offer Monday afternoon, nor "arrive by Sunday 10 am" a Friday arrival.
 const MAX_SECONDS_FROM_TIME_ASKED_FOR = 12 * 60 * 60;
@@ -839,12 +839,7 @@ function walkTheRest(context: PlanContext, point: TransferPoint): Walk | null {
   // Only for car parks HopReady picks: a saved spot, or the car park the traveller asked for, is
   // where they mean to park.
   const pickedByHopReady = point.facility.kind === 'transport-park-and-ride' && !point.preferred;
-  if (
-    pickedByHopReady &&
-    backTowardStartMetres > fromCarPark * MAX_SHARE_OF_WALK_BACK_TOWARD_START
-  ) {
-    return null;
-  }
+  if (pickedByHopReady && backTowardStartMetres > MAX_WALK_BACK_TOWARD_START_METRES) return null;
   const walk = streetWalkBetween(
     point.place.coordinate,
     destination.coordinate,

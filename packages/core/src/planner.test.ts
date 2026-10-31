@@ -1310,6 +1310,32 @@ describe('walking the rest from a car park near the destination', () => {
     ).toEqual(['drive', 'park', 'walk']);
   });
 
+  it('does not walk more than 300 m back toward the start, however long the walk', async () => {
+    // 879 m west of the Bella Vista car park: 350 m of the walk heads back toward Box Hill, though
+    // that is under half of it.
+    const westOfTheCarPark = place('9 Example St, Bella Vista', -33.73035, 150.9345);
+    const response = await planTrip(
+      request({ destination: westOfTheCarPark }),
+      deps({ transit: fakeTransit(() => []) }),
+    );
+
+    expect(response.itineraries.some((it) => it.strategy === 'park-and-ride')).toBe(false);
+  });
+
+  it('walks a short way back from a car park just past the destination', async () => {
+    // 280 m from the Bella Vista car park, 180 m of it back toward Box Hill.
+    const justShortOfTheCarPark = place('6 Example St, Bella Vista', -33.72833, 150.94531);
+    const response = await planTrip(
+      request({ destination: justShortOfTheCarPark }),
+      deps({ transit: fakeTransit(() => []) }),
+    );
+    const bellaVista = response.itineraries.find(
+      (it) => it.parking?.carPark.id === BELLA_VISTA.id,
+    )!;
+
+    expect(kinds(bellaVista.legs)).toEqual(['drive', 'park', 'walk']);
+  });
+
   it('walks from a car park beside the destination, even one a little past it', async () => {
     // 600 m north-east of the Bella Vista car park: 202 m of the walk heads back toward Box Hill.
     const besideTheCarPark = place('4 Example Rd, Bella Vista', -33.72678, 150.94858);
