@@ -1,6 +1,6 @@
 # Plan: car park choice, route choice and a simpler results screen (v2)
 
-Status: in progress (server done; app and docs next)
+Status: done (every step ticked; build 5 awaiting Apple processing and the owner's on-device check)
 Branch: feat/hopready-v1
 
 ## Goal
@@ -55,7 +55,7 @@ Server and core first (no app build needed; build 4 keeps working because every 
 - [x] 9. ADR-0007 (car park choice) and ADR-0008 (preferences), routing.md and providers.md rewritten, PROGRESS updated. Commit 5b688a8; research brief part 2 and the extended hub table follow in their own commits
 - [x] 10. Results screen v2 in the app (short option rows, map card, details behind a tap, car parks and reasons in a sheet, no freshness banner, sort in the toolbar), one trip-options editor; the Plan tab stays as it is (see log). Commits d04bbd8, 223f05c, 9b3e5db; XCUITest 6 tests passed (1 skipped by design) on 2026-10-31 19:45, screenshots refreshed
       done when: 702 or more app tests pass, the XCUITest walk-through passes, screenshots refreshed
-- [ ] 11. TestFlight build 5
+- [x] 11. TestFlight build 5: EAS build 2bf36d92 (build number 5) submitted to App Store Connect on 2026-10-31 at 19:51 from commit 3444b40; Apple processing not yet confirmed. Builds used this month: 5 of 15
 
 ## Open questions
 
