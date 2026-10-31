@@ -1,5 +1,14 @@
 import { haversineMetres } from './geo';
-import type { Fare, Itinerary, Leg, Parking, ServiceAlert, Strategy, TransitLeg } from './model';
+import type {
+  Concern,
+  Fare,
+  Itinerary,
+  Leg,
+  Parking,
+  ServiceAlert,
+  Strategy,
+  TransitLeg,
+} from './model';
 import { secondsBetween } from './time';
 
 // Stops and car park entrances often have slightly different coordinates in different datasets.
@@ -82,6 +91,12 @@ function sumSeconds(legs: readonly Leg[], kinds: readonly Leg['kind'][]): number
     .reduce((total, leg) => total + legSeconds(leg), 0);
 }
 
+// A change whose walk ends after the next service has left cannot be made at all, whatever the
+// traveller's buffer.
+export function hasImpossibleTransfer(legs: readonly Leg[]): boolean {
+  return hasShortTransfer(legs, 0);
+}
+
 // The transfer buffer is the minimum time between stepping off one service and the next one leaving,
 // including any walk between them. It is applied once and never stacked on the provider's walk time.
 export function hasShortTransfer(legs: readonly Leg[], bufferSeconds: number): boolean {
@@ -154,6 +169,7 @@ export interface ItineraryParts {
   fare?: Fare;
   alerts?: readonly ServiceAlert[];
   notes?: readonly string[];
+  concerns?: readonly Concern[];
 }
 
 export function buildItinerary(parts: ItineraryParts): Itinerary {
@@ -180,5 +196,6 @@ export function buildItinerary(parts: ItineraryParts): Itinerary {
     realtime: realtimeCoverage(legs),
     alerts: uniqueAlerts([...legAlerts, ...(parts.alerts ?? [])]),
     notes: [...(parts.notes ?? [])],
+    concerns: [...(parts.concerns ?? [])],
   };
 }

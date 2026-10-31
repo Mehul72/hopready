@@ -517,7 +517,7 @@ describe('arrive by', () => {
     expect(outcomes).not.toContain('used');
   });
 
-  it('counts a car park whose drive runs past the limit in traffic as too far, not used', async () => {
+  it('keeps a car park whose drive runs past the limit in traffic, marked as a long drive', async () => {
     const jammed = fakeDriving({
       async routeDrive(from, to) {
         return {
@@ -533,12 +533,12 @@ describe('arrive by', () => {
       request({ time: { type: 'arrive', at: '2026-10-26T23:00:00Z' } }),
       deps({ driving: jammed }),
     );
-    const outcomes = response.checkedCarParks.map((carPark) => carPark.outcome);
+    const parkAndRide = response.itineraries.filter((it) => it.strategy === 'park-and-ride');
 
-    expect(response.itineraries.some((it) => it.strategy === 'park-and-ride')).toBe(false);
-    expect(response.rejected.map((entry) => entry.reason)).toContain('drive-too-long');
-    expect(outcomes).toContain('too-far-to-drive');
-    expect(outcomes).not.toContain('used');
+    expect(parkAndRide.length).toBeGreaterThan(0);
+    for (const itinerary of parkAndRide) expect(itinerary.concerns).toContain('long-drive');
+    expect(response.rejected.map((entry) => entry.reason)).not.toContain('drive-too-long');
+    expect(response.checkedCarParks.map((carPark) => carPark.outcome)).toContain('used');
   });
 
   it('skips a service now expected after the arrive-by time for one that arrives in time', async () => {
@@ -1258,7 +1258,7 @@ describe('getting home', () => {
 });
 
 describe('connections people cannot make', () => {
-  it('rejects a transfer shorter than the buffer, counting the walk inside it', async () => {
+  it('marks a change shorter than the buffer as tight, counting the walk inside it', async () => {
     const stationA = place('Epping', -33.7727, 151.0818, 'stop');
     const stationB = place('Chatswood', -33.7969, 151.1803, 'stop');
     const tightTransfer: TransitJourney = {
@@ -1278,8 +1278,9 @@ describe('connections people cannot make', () => {
       deps({ transit: fakeTransit(() => [tightTransfer]) }),
     );
 
-    expect(response.itineraries).toEqual([]);
-    expect(response.rejected).toEqual([{ reason: 'transfer-too-short', count: 1 }]);
+    expect(response.itineraries).toHaveLength(1);
+    expect(response.itineraries[0]?.concerns).toEqual(['tight-change']);
+    expect(response.rejected).toEqual([]);
   });
 
   it('drops journeys that use a cancelled service', async () => {
@@ -1304,7 +1305,7 @@ describe('connections people cannot make', () => {
     expect(response.rejected).toEqual([{ reason: 'cancelled-service', count: 1 }]);
   });
 
-  it('rejects walks longer than the traveller allows', async () => {
+  it('marks walks longer than the traveller allows, instead of hiding the trip', async () => {
     const response = await planTrip(
       request({
         access: { transit: true, drive: false, dropOff: false },
@@ -1313,17 +1314,23 @@ describe('connections people cannot make', () => {
       deps(),
     );
 
-    expect(response.itineraries).toEqual([]);
-    expect(response.rejected.map((entry) => entry.reason)).toContain('walk-too-long');
+    expect(response.itineraries.length).toBeGreaterThan(0);
+    for (const itinerary of response.itineraries) {
+      expect(itinerary.concerns).toEqual(['long-walk']);
+    }
+    expect(response.rejected).toEqual([]);
   });
 
-  it('keeps car parks beyond the driving limit out and says so', async () => {
+  it('keeps car parks beyond the driving limit out and says so, and marks the long drive', async () => {
     const response = await planTrip(
       request({ preferences: { ...DEFAULT_PREFERENCES, maxDriveMinutes: 5 } }),
       deps(),
     );
 
-    expect(response.itineraries.every((it) => it.strategy === 'transit-only')).toBe(true);
+    expect(response.itineraries.some((it) => it.strategy === 'park-and-ride')).toBe(false);
+    for (const itinerary of response.itineraries) {
+      expect(itinerary.concerns).toEqual(itinerary.strategy === 'drive-only' ? ['long-drive'] : []);
+    }
     expect(
       response.checkedCarParks.every((carPark) => carPark.outcome === 'too-far-to-drive'),
     ).toBe(true);
@@ -1338,9 +1345,10 @@ describe('when providers fail', () => {
       },
     });
     const response = await planTrip(request(), deps({ driving }));
+    const strategies = response.itineraries.map((it) => it.strategy);
 
-    expect(response.itineraries.every((it) => it.strategy === 'transit-only')).toBe(true);
-    expect(response.itineraries.length).toBeGreaterThan(0);
+    expect(strategies).toContain('transit-only');
+    expect(strategies).not.toContain('park-and-ride');
     expect(response.unavailable).toContainEqual({
       strategy: 'park-and-ride',
       reason: 'Drive times are busy right now. Try again shortly.',

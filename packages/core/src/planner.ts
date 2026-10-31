@@ -4,12 +4,14 @@ import { haversineMetres } from './geo';
 import {
   buildItinerary,
   findContinuityIssues,
+  hasImpossibleTransfer,
   hasShortTransfer,
   legSeconds,
   MAX_LOCATION_GAP_METRES,
   transitLegsOf,
 } from './itinerary';
 import type {
+  Concern,
   Itinerary,
   Leg,
   Occupancy,
@@ -324,6 +326,7 @@ async function planTransitOnly(
           legs: journey.legs,
           fare: journey.fare,
           alerts: journey.alerts,
+          concerns: concernsFor(context, journey.legs, strategy),
         }),
       ),
     };
@@ -351,6 +354,7 @@ async function planDriveOnly(context: PlanContext): Promise<StrategyResult> {
           strategy: 'drive-only',
           legs: [leg],
           notes: ['Parking at your destination is not included in this time.'],
+          concerns: concernsFor(context, [leg], 'drive-only'),
         }),
       ],
     };
@@ -446,13 +450,7 @@ async function planViaTransferPoints(
     const problem = itineraryProblem(context, itinerary);
     if (problem) {
       reject(context, problem);
-      recordCarPark(
-        context,
-        strategy,
-        point,
-        problem === 'drive-too-long' ? 'too-far-to-drive' : 'no-workable-connection',
-        candidate,
-      );
+      recordCarPark(context, strategy, point, 'no-workable-connection', candidate);
       return;
     }
     itineraries.push(itinerary);
@@ -506,8 +504,15 @@ async function planThroughPoint(
       (time.type === 'depart' || arrivesBy(journey, time.at)) &&
       keepJourney(context, journey),
   );
-  // Depart-at wants the journey that arrives first, arrive-by the one that leaves last.
-  const ranked = [...journeys].sort(time.type === 'depart' ? byArrival : byLatestStart);
+  // Journeys within the traveller's preferences first; among those, depart-at wants the one that
+  // arrives first and arrive-by the one that leaves last.
+  const concernCount = (journey: TransitJourney) =>
+    concernsFor(context, journey.legs, strategy).length;
+  const ranked = [...journeys].sort(
+    (a, b) =>
+      concernCount(a) - concernCount(b) ||
+      (time.type === 'depart' ? byArrival(a, b) : byLatestStart(a, b)),
+  );
   let journey: TransitJourney | undefined = ranked[0];
   if (!journey) return null;
 
@@ -590,12 +595,14 @@ async function planThroughPoint(
     });
   }
 
+  const legs = [...firstLegs, ...startWalkingWhenReady(journey.legs, onPlatformAt)];
   return buildItinerary({
     strategy,
-    legs: [...firstLegs, ...startWalkingWhenReady(journey.legs, onPlatformAt)],
+    legs,
     parking,
     fare: journey.fare,
     alerts: journey.alerts,
+    concerns: concernsFor(context, legs, strategy),
   });
 }
 
@@ -701,33 +708,35 @@ function returnItinerary(
     route.durationSeconds > preferences.maxDriveMinutes * 60
       ? [`The drive home is longer than your ${preferences.maxDriveMinutes} min driving limit.`]
       : [];
+  const legs: Leg[] = [
+    ...toCar.legs,
+    {
+      id: 'car-retrieval',
+      kind: 'car-retrieval',
+      from: car,
+      to: car,
+      start: addSeconds(leaveCarAt, -preferences.carRetrievalBufferMinutes * 60),
+      end: leaveCarAt,
+      source: 'hopready',
+      timing: 'buffer',
+    },
+    driveLeg(
+      driving,
+      'drive',
+      car,
+      destination,
+      leaveCarAt,
+      addSeconds(leaveCarAt, route.durationSeconds),
+      route,
+    ),
+  ];
   return buildItinerary({
     strategy: 'return-via-car',
-    legs: [
-      ...toCar.legs,
-      {
-        id: 'car-retrieval',
-        kind: 'car-retrieval',
-        from: car,
-        to: car,
-        start: addSeconds(leaveCarAt, -preferences.carRetrievalBufferMinutes * 60),
-        end: leaveCarAt,
-        source: 'hopready',
-        timing: 'buffer',
-      },
-      driveLeg(
-        driving,
-        'drive',
-        car,
-        destination,
-        leaveCarAt,
-        addSeconds(leaveCarAt, route.durationSeconds),
-        route,
-      ),
-    ],
+    legs,
     fare: toCar.fare,
     alerts: toCar.alerts,
     notes,
+    concerns: concernsFor(context, legs, 'return-via-car'),
   });
 }
 
@@ -1195,35 +1204,40 @@ function keepJourney(context: PlanContext, journey: TransitJourney): boolean {
   return reason ? reject(context, reason) : true;
 }
 
-function journeyProblem(context: PlanContext, legs: readonly Leg[]): RejectionReason | null {
-  const { preferences } = context.request;
+// Only what makes a journey impossible to take. A walk, drive or change outside the traveller's
+// preferences is a concern on the option (concernsFor), never a reason to drop it.
+function journeyProblem(_context: PlanContext, legs: readonly Leg[]): RejectionReason | null {
   if (transitLegsOf(legs).some((leg) => leg.cancelled)) return 'cancelled-service';
-  if (
-    legs.some((leg) => leg.kind === 'walk' && legSeconds(leg) > preferences.maxWalkMinutes * 60)
-  ) {
-    return 'walk-too-long';
-  }
-  if (hasShortTransfer(legs, preferences.transferBufferMinutes * 60)) return 'transfer-too-short';
+  if (hasImpossibleTransfer(legs)) return 'transfer-too-short';
   return null;
 }
 
+// How an option falls outside the traveller's preferences. The drive home from a parked car cannot
+// be avoided, so returnItinerary notes a long one instead of marking it.
+function concernsFor(context: PlanContext, legs: readonly Leg[], strategy: Strategy): Concern[] {
+  const { preferences } = context.request;
+  const concerns: Concern[] = [];
+  if (
+    legs.some((leg) => leg.kind === 'walk' && legSeconds(leg) > preferences.maxWalkMinutes * 60)
+  ) {
+    concerns.push('long-walk');
+  }
+  const longestDriveSeconds = Math.max(
+    0,
+    ...legs.filter((leg) => leg.kind === 'drive' || leg.kind === 'ride').map(legSeconds),
+  );
+  if (strategy !== 'return-via-car' && longestDriveSeconds > preferences.maxDriveMinutes * 60) {
+    concerns.push('long-drive');
+  }
+  if (hasShortTransfer(legs, preferences.transferBufferMinutes * 60)) concerns.push('tight-change');
+  return concerns;
+}
+
 function itineraryProblem(context: PlanContext, itinerary: Itinerary): RejectionReason | null {
-  const { time, preferences } = context.request;
+  const { time } = context.request;
   if (findContinuityIssues(itinerary.legs).length > 0) return 'discontinuous';
   const journeyReason = journeyProblem(context, itinerary.legs);
   if (journeyReason) return journeyReason;
-  const longestDriveSeconds = Math.max(
-    0,
-    ...itinerary.legs.filter((leg) => leg.kind === 'drive' || leg.kind === 'ride').map(legSeconds),
-  );
-  // The drive home from a parked car is the only way to get the car home; returnItinerary notes a
-  // long one instead.
-  if (
-    itinerary.strategy !== 'return-via-car' &&
-    longestDriveSeconds > preferences.maxDriveMinutes * 60
-  ) {
-    return 'drive-too-long';
-  }
   if (secondsBetween(context.now, itinerary.departAt) < -TIME_GRACE_SECONDS)
     return 'departs-in-past';
   if (time.type === 'depart' && secondsBetween(time.at, itinerary.departAt) < -TIME_GRACE_SECONDS) {

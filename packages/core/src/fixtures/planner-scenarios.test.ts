@@ -142,7 +142,10 @@ function expectSoundItinerary(
           );
           return;
         }
-        expect(legSeconds(leg)).toBeLessThanOrEqual(preferences.maxDriveMinutes * 60);
+        // A drive over the limit is marked, never hidden.
+        if (legSeconds(leg) > preferences.maxDriveMinutes * 60) {
+          expect(itinerary.concerns).toContain('long-drive');
+        }
         return;
       case 'walk': {
         // The walk from a car park to its platform is HopReady's own estimate; every other walk
@@ -150,7 +153,10 @@ function expectSoundItinerary(
         const previous = itinerary.legs[index - 1];
         expect(leg.source).toBe(previous?.kind === 'park' ? 'hopready' : 'demo-fixture');
         expect(leg.timing).toBe('estimated');
-        expect(legSeconds(leg)).toBeLessThanOrEqual(preferences.maxWalkMinutes * 60);
+        // A walk over the limit is marked, never hidden.
+        if (legSeconds(leg) > preferences.maxWalkMinutes * 60) {
+          expect(itinerary.concerns).toContain('long-walk');
+        }
         return;
       }
       case 'transit':
@@ -173,10 +179,17 @@ function expectSoundItinerary(
       itinerary.legs[index]!.start,
     );
     const walkSeconds = walkSecondsBetween(itinerary.legs, previousIndex, index);
-    expect(windowSeconds).toBeGreaterThanOrEqual(
-      Math.max(preferences.transferBufferMinutes * 60, walkSeconds),
-    );
+    // A change shorter than the buffer is marked, never hidden; one shorter than its walk is impossible.
+    expect(windowSeconds).toBeGreaterThanOrEqual(walkSeconds);
+    if (windowSeconds < preferences.transferBufferMinutes * 60) {
+      expect(itinerary.concerns).toContain('tight-change');
+    }
   });
+  expect(itinerary.concerns.includes('long-walk')).toBe(
+    itinerary.legs.some(
+      (leg) => leg.kind === 'walk' && legSeconds(leg) > preferences.maxWalkMinutes * 60,
+    ),
+  );
 
   expect(itinerary.realtime).toBe(liveCoverage(transitLegsOf(itinerary.legs)));
 
@@ -483,26 +496,34 @@ describe('connections people cannot make', () => {
     return secondsBetween(legs[bus]!.end, metro.start);
   }
 
-  it('rejects the 2 minute bus to metro change under the default 3 minute transfer buffer', async () => {
+  it('marks the 2 minute bus to metro change as tight under the default 3 minute transfer buffer', async () => {
     const response = await plan(warringahMallToMacquariePark, {
       now: TUESDAY_0730,
       scenario: 'tight-transfer',
     });
     expectSoundResponse(response);
+    const tight = response.itineraries.filter(
+      (itinerary) => busToMetroChangeSeconds(itinerary) === 120,
+    );
 
-    expect(response.rejected).toContainEqual({ reason: 'transfer-too-short', count: 1 });
-    expect(response.itineraries.map(busToMetroChangeSeconds)).not.toContain(120);
+    expect(response.rejected).toEqual([]);
+    expect(tight.length).toBeGreaterThan(0);
+    for (const itinerary of tight) expect(itinerary.concerns).toEqual(['tight-change']);
   });
 
-  it('offers the same 2 minute change to someone who allows 2 minutes', async () => {
+  it('offers the same 2 minute change without a mark to someone who allows 2 minutes', async () => {
     const preferences = { ...DEFAULT_PREFERENCES, transferBufferMinutes: 2 };
     const response = await plan(
       { ...warringahMallToMacquariePark, preferences },
       { now: TUESDAY_0730, scenario: 'tight-transfer' },
     );
     expectSoundResponse(response, preferences);
+    const twoMinutes = response.itineraries.filter(
+      (itinerary) => busToMetroChangeSeconds(itinerary) === 120,
+    );
 
-    expect(response.itineraries.map(busToMetroChangeSeconds)).toContain(120);
+    expect(twoMinutes.length).toBeGreaterThan(0);
+    for (const itinerary of twoMinutes) expect(itinerary.concerns).toEqual([]);
   });
 
   it('gives the same bus a comfortable 5 minute change in the normal timetable', async () => {

@@ -221,6 +221,11 @@ export const STRATEGIES = [
 ] as const;
 export type Strategy = (typeof STRATEGIES)[number];
 
+// Ways an option falls outside the traveller's preferences. Options are marked for these, never
+// hidden: hiding them leaves an empty list when the only sensible trip has a nine minute walk.
+export const CONCERNS = ['long-walk', 'long-drive', 'tight-change'] as const;
+export type Concern = (typeof CONCERNS)[number];
+
 export const itinerarySchema = z.object({
   id: z.string(),
   strategy: z.enum(STRATEGIES),
@@ -238,6 +243,8 @@ export const itinerarySchema = z.object({
   realtime: z.enum(['full', 'partial', 'none']),
   alerts: z.array(alertSchema),
   notes: z.array(z.string()),
+  // Added after build 4, which ignores it; a response without it reads as having none.
+  concerns: z.array(z.enum(CONCERNS)).default([]),
 });
 export type Itinerary = z.infer<typeof itinerarySchema>;
 
@@ -301,6 +308,10 @@ export const planRequestSchema = z.object({
 });
 export type PlanRequest = z.infer<typeof planRequestSchema>;
 
+// walk-too-long and drive-too-long are no longer sent: a walk or drive over the preference marks
+// the option (see CONCERNS) instead of removing it; so does a change shorter than the transfer
+// buffer. transfer-too-short now means a change that cannot be made at all, because the walk
+// between the services ends after the next one has left.
 export const REJECTION_REASONS = [
   'transfer-too-short',
   'walk-too-long',
