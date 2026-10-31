@@ -26,6 +26,9 @@ export interface StoredValueDefinition<T> {
   fillMissingFromDefaults?: boolean;
   // Write the default the first time it is read, for values that must not change once created.
   persistDefault?: boolean;
+  // When the version is bumped because a default changed meaning rather than shape, the value saved
+  // under the previous version is carried over through `migrate` instead of being dropped.
+  migrateFrom?: { version: number; migrate: (previous: unknown) => unknown };
 }
 
 export interface StoredValue<T> {
@@ -97,9 +100,49 @@ export function createStoredValue<T>(
     return result.success ? { value: result.data, filledFromDefaults } : null;
   }
 
+  // The previous version's value, migrated, saved under the new key, with the old key removed.
+  // Null when there is nothing to carry over or it cannot be read.
+  function carryOver(): T | null {
+    const from = definition.migrateFrom;
+    if (!from) return null;
+    const previousKey = storageKey(definition.name, from.version);
+    let previousRaw: string | null;
+    try {
+      previousRaw = backend.getItem(previousKey);
+    } catch (error) {
+      throw new StorageError(`Could not read the previous ${definition.name}`, { cause: error });
+    }
+    if (previousRaw === null) return null;
+    let previous: unknown = null;
+    try {
+      previous = JSON.parse(previousRaw);
+    } catch {
+      // Unreadable JSON is reported below, with the shapes the schema refuses.
+    }
+    const parsed = previous === null ? null : parse(JSON.stringify(from.migrate(previous)));
+    if (!parsed) {
+      // Only the fixed name is logged: the stored value may hold places or trips.
+      console.warn(
+        `HopReady storage: the previous ${definition.name} could not be read, so the defaults apply.`,
+      );
+      return null;
+    }
+    write(parsed.value);
+    try {
+      backend.removeItem(previousKey);
+    } catch {
+      // The carried-over value is already saved; the stale key only wastes space until "delete all
+      // data", which removes every HopReady key.
+      console.warn(`HopReady storage: the previous ${definition.name} could not be removed.`);
+    }
+    return parsed.value;
+  }
+
   function load(): T {
     const raw = readRaw();
     if (raw === null) {
+      const carried = carryOver();
+      if (carried) return carried;
       const fallback = definition.defaultValue();
       if (definition.persistDefault) write(fallback);
       return fallback;

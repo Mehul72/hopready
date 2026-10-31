@@ -120,12 +120,16 @@ export function tripOptionsSummary(
     `${preferences.transferBufferMinutes} min to change`,
   ];
   // A stored mode that can no longer be chosen (such as "Other", from an earlier version) is not
-  // counted, because Trip options would show nothing ticked for it.
-  const avoidedCount = AVOIDABLE_MODES.filter((mode) =>
-    preferences.excludedTransitModes.includes(mode),
+  // counted, because Trip options would show nothing ticked for it. School buses are left out by
+  // default, so only allowing them is worth a mention.
+  const avoidedCount = AVOIDABLE_MODES.filter(
+    (mode) => mode !== 'school-bus' && preferences.excludedTransitModes.includes(mode),
   ).length;
   if (avoidedCount > 0) {
     parts.push(`avoiding ${avoidedCount} ${avoidedCount === 1 ? 'mode' : 'modes'}`);
+  }
+  if (!preferences.excludedTransitModes.includes('school-bus')) {
+    parts.push('school buses allowed');
   }
   if (choices.preferredStation) parts.push(`prefers ${choices.preferredStation.name}`);
   if (choices.preferredCarPark) parts.push(`prefers ${choices.preferredCarPark.name}`);

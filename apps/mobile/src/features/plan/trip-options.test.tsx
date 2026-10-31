@@ -11,6 +11,7 @@ import { planChoices } from './plan-choices';
 import { planDraft } from './plan-draft';
 import { freezeClockAt, renderApp, TUESDAY_0730 } from './test-harness';
 import { RESET_CONFIRMATION_TITLE } from './trip-options-screen';
+import { tripOptionsSummary } from './trip-option-settings';
 
 beforeEach(() => {
   appStorage.deleteAllData();
@@ -76,11 +77,29 @@ describe('trip options', () => {
       transferBufferMinutes: DEFAULT_PREFERENCES.transferBufferMinutes + 1,
       maxDriveMinutes: DEFAULT_PREFERENCES.maxDriveMinutes + 5,
       walkingSpeed: 'slow',
-      excludedTransitModes: ['bus'],
+      excludedTransitModes: ['school-bus', 'bus'],
     });
     expect(screen.getByRole('adjustable', { name: 'Transfer time' })).toHaveAccessibilityValue({
       now: DEFAULT_PREFERENCES.transferBufferMinutes + 1,
     });
+  });
+
+  it('leaves school buses out by default, and allows them when untoggled', async () => {
+    const user = userEvent.setup();
+    await renderApp('/trip-options');
+    const schoolBus = screen.getByRole('togglebutton', { name: 'School bus' });
+    expect(schoolBus).toHaveProp('accessibilityState', expect.objectContaining({ checked: true }));
+    expect(screen.getByText(/School buses are left out unless you allow them/)).toBeOnTheScreen();
+
+    await user.press(schoolBus);
+
+    expect(appStorage.preferences.get().excludedTransitModes).toEqual([]);
+    expect(
+      tripOptionsSummary(appStorage.preferences.get(), {
+        preferredStation: null,
+        preferredCarPark: null,
+      }),
+    ).toBe('Drive up to 30 min, walk up to 15 min, 3 min to change, school buses allowed');
   });
 
   it('keeps at least one mode allowed', async () => {

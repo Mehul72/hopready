@@ -271,7 +271,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   transferBufferMinutes: 3,
   carRetrievalBufferMinutes: 5,
   walkingSpeed: 'normal',
-  excludedTransitModes: [],
+  // School services run on school days at school times. Transport for NSW's trip planner leaves
+  // them out unless asked (transportnsw.info, checked 2026-10-31); anyone with a ticket may ride.
+  excludedTransitModes: ['school-bus'],
 };
 
 export const parkedCarSchema = z.object({

@@ -136,6 +136,51 @@ describe('corrupted storage', () => {
     });
   });
 
+  it('carries trip options saved before school buses were left out over, leaving them out once', () => {
+    const { backend, storage } = freshStorage({
+      [storageKey('preferences', 1)]: JSON.stringify({
+        ...DEFAULT_PREFERENCES,
+        maxDriveMinutes: 45,
+        excludedTransitModes: ['ferry'],
+        navigationApp: 'waze',
+      }),
+    });
+
+    expect(storage.preferences.get()).toMatchObject({
+      maxDriveMinutes: 45,
+      excludedTransitModes: ['ferry', 'school-bus'],
+      navigationApp: 'waze',
+    });
+    expect(backend.values.has(storageKey('preferences', 1))).toBe(false);
+    expect(JSON.parse(backend.values.get(storageKey('preferences', 2)) ?? 'null')).toMatchObject({
+      excludedTransitModes: ['ferry', 'school-bus'],
+    });
+  });
+
+  it('leaves school buses allowed once someone allows them after the update', () => {
+    const { storage } = freshStorage({
+      [storageKey('preferences', 2)]: JSON.stringify({
+        ...DEFAULT_PREFERENCES,
+        excludedTransitModes: [],
+      }),
+      [storageKey('preferences', 1)]: JSON.stringify({
+        ...DEFAULT_PREFERENCES,
+        excludedTransitModes: [],
+      }),
+    });
+
+    expect(storage.preferences.get().excludedTransitModes).toEqual([]);
+  });
+
+  it('starts from the defaults, with a warning, when the old trip options cannot be read', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { storage } = freshStorage({ [storageKey('preferences', 1)]: '{"maxDriveMinutes": 4' });
+
+    expect(storage.preferences.get().excludedTransitModes).toEqual(['school-bus']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain('previous preferences');
+  });
+
   it('replaces an install ID the server would reject', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { storage } = freshStorage({

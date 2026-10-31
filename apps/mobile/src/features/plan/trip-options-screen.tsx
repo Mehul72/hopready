@@ -202,7 +202,7 @@ export function TripOptionsScreen() {
 
       <Section
         title="Modes to avoid"
-        note="Options that use these are left out. At least one stays allowed.">
+        note="Options that use these are left out. At least one stays allowed. School buses are left out unless you allow them; they run on school days at school times, and anyone with a valid ticket can ride.">
         <View style={styles.chips}>
           {AVOIDABLE_MODES.map((mode) => {
             const isAvoided = avoided.includes(mode);
