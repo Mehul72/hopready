@@ -58,7 +58,7 @@ const MAX_JOURNEYS_PER_QUERY = 10;
 // decides this for itself and is not told the traveller's walking limit (its answers on 2026-10-31
 // included 18 minute walks); 15 keeps the demo connections as they were tuned. Like TfNSW's, the
 // reach is a distance: a slow walker reaches the same stops, and the walks take longer.
-const WALK_REACH_MINUTES = 15;
+export const DEMO_WALK_REACH_MINUTES = 15;
 
 const MORNING_CANCELLATION_ALERT: ServiceAlert = {
   id: 'demo-m1-morning-cancellations',
@@ -192,12 +192,12 @@ function beatsWalking(plan: JourneyPlan, query: TransitQuery, atMs: number, dire
 function withinReach(from: Pick<Place, 'coordinate'>, to: Pick<Place, 'coordinate'>): boolean {
   return (
     walkBetween(from.coordinate, to.coordinate, 'normal').durationSeconds <=
-    WALK_REACH_MINUTES * SECONDS_PER_MINUTE
+    DEMO_WALK_REACH_MINUTES * SECONDS_PER_MINUTE
   );
 }
 
 function stopsWithinWalk(place: Place, speed: WalkingSpeed): StopWalk[] {
-  const reachMetres = maxStraightLineMetres(WALK_REACH_MINUTES, 'normal');
+  const reachMetres = maxStraightLineMetres(DEMO_WALK_REACH_MINUTES, 'normal');
   const nearby: StopWalk[] = [];
   NETWORK_STOPS.forEach((stop, index) => {
     if (place.stopId === stop.id) {

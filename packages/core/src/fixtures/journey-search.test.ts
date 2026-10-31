@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Place } from '../model';
+import { type Place, WALKING_SPEEDS } from '../model';
 import type { TransitQuery } from '../providers';
 import { walkBetween, type WalkingSpeed } from '../walking';
 import { DEMO_PLACES } from './places';
 import { scenarioSettings } from './scenarios';
 import { NETWORK_STOPS, STOPS, WALKING_LINKS, type NetworkStop } from './stops';
 import { stopIndexOf, timetableWindowAround, type TimetableWindow } from './timetable';
-import { createDemoTransitProvider } from './transit-provider';
+import { createDemoTransitProvider, DEMO_WALK_REACH_MINUTES } from './transit-provider';
 
 // Checks the connection scan against a separate, slower search over the same trips: Dijkstra on
 // (stop, arrived on foot or on a vehicle) states. If both agree on the earliest arrival for many
@@ -15,8 +15,15 @@ import { createDemoTransitProvider } from './transit-provider';
 
 const SETTINGS = scenarioSettings('normal');
 const MINIMUM_CHANGE_MS = SETTINGS.minimumChangeMinutes * 60_000;
-const MAX_WALK_MINUTES = 15;
-const SPEED: WalkingSpeed = 'normal';
+
+// The demo world reaches stops a fixed walk away at normal pace, as TfNSW does, and times the walks
+// at the traveller's own pace.
+function withinReach(from: Place, to: Pick<Place, 'coordinate'>): boolean {
+  return (
+    walkBetween(from.coordinate, to.coordinate, 'normal').durationSeconds <=
+    DEMO_WALK_REACH_MINUTES * 60
+  );
+}
 
 const stopPlace = (stop: NetworkStop): Place => ({
   name: stop.name,
@@ -49,25 +56,24 @@ const TIMES = [
   '2026-10-31T00:20:00Z', // Saturday 11.20 am
 ];
 
-function walksNear(place: Place): Map<number, number> {
+function walksNear(place: Place, speed: WalkingSpeed): Map<number, number> {
   const walks = new Map<number, number>();
   NETWORK_STOPS.forEach((stop, index) => {
     if (place.stopId === stop.id) {
       walks.set(index, 0);
       return;
     }
-    const walk = walkBetween(place.coordinate, stop.coordinate, SPEED);
-    if (walk.durationSeconds > MAX_WALK_MINUTES * 60) return;
-    walks.set(index, walk.durationSeconds * 1_000);
+    if (!withinReach(place, stop)) return;
+    walks.set(index, walkBetween(place.coordinate, stop.coordinate, speed).durationSeconds * 1_000);
   });
   return walks;
 }
 
-function linkWalks(): Map<number, { stop: number; ms: number }[]> {
+function linkWalks(speed: WalkingSpeed): Map<number, { stop: number; ms: number }[]> {
   const links = new Map<number, { stop: number; ms: number }[]>();
   for (const [first, second] of WALKING_LINKS) {
-    const ms = walkBetween(first.coordinate, second.coordinate, SPEED).durationSeconds * 1_000;
-    if (ms > MAX_WALK_MINUTES * 60_000) continue;
+    if (!withinReach(stopPlace(first), second)) continue;
+    const ms = walkBetween(first.coordinate, second.coordinate, speed).durationSeconds * 1_000;
     for (const [from, to] of [
       [first, second],
       [second, first],
@@ -166,10 +172,11 @@ function dijkstraEarliestArrival(
   from: Place,
   to: Place,
   departAfterMs: number,
+  speed: WalkingSpeed,
 ): number | null {
-  const access = walksNear(from);
-  const egress = walksNear(to);
-  const links = linkWalks();
+  const access = walksNear(from, speed);
+  const egress = walksNear(to, speed);
+  const links = linkWalks(speed);
   const boardings = boardingsByStop(window);
   const best = new Map<string, number>();
   const settled = new Set<string>();
@@ -211,13 +218,19 @@ function dijkstraEarliestArrival(
   return Number.isFinite(arrival) ? arrival : null;
 }
 
-function query(from: Place, to: Place, at: string, type: 'depart' | 'arrive'): TransitQuery {
+function query(
+  from: Place,
+  to: Place,
+  at: string,
+  type: 'depart' | 'arrive',
+  speed: WalkingSpeed,
+): TransitQuery {
   return {
     from,
     to,
     time: { type, at },
     maxJourneys: 3,
-    walkingSpeed: SPEED,
+    walkingSpeed: speed,
     excludedModes: [],
   };
 }
@@ -230,25 +243,21 @@ const provider = createDemoTransitProvider({
   scenario: 'normal',
 });
 
-describe('connection scan against an independent search', () => {
+describe.each(WALKING_SPEEDS)('connection scan against an independent search, %s pace', (speed) => {
   it.each(TIMES)(
     'finds the earliest arrival for every pair of places leaving at %s',
     async (at) => {
       const window = timetableWindowAround(Date.parse(at), SETTINGS.timetable);
       let compared = 0;
       for (const [from, to] of pairs) {
-        const expected = dijkstraEarliestArrival(window, from, to, Date.parse(at));
+        const expected = dijkstraEarliestArrival(window, from, to, Date.parse(at), speed);
         const journeys = await provider.planJourneys(
-          query(from, to, at, 'depart'),
+          query(from, to, at, 'depart', speed),
           new AbortController().signal,
         );
-        const walkMs = walkBetween(from.coordinate, to.coordinate, SPEED).durationSeconds * 1_000;
+        const walkMs = walkBetween(from.coordinate, to.coordinate, speed).durationSeconds * 1_000;
         // Rides slower than walking the whole way are dropped on purpose, so skip those pairs.
-        if (
-          expected !== null &&
-          expected >= Date.parse(at) + walkMs &&
-          walkMs <= MAX_WALK_MINUTES * 60_000
-        ) {
+        if (expected !== null && expected >= Date.parse(at) + walkMs && withinReach(from, to)) {
           continue;
         }
         const actual = journeys[0] ? Date.parse(journeys[0].legs.at(-1)!.end) : null;
@@ -267,19 +276,18 @@ describe('connection scan against an independent search', () => {
     const window = timetableWindowAround(Date.parse(at), SETTINGS.timetable);
     let compared = 0;
     for (const [from, to] of pairs) {
-      const walkMs = walkBetween(from.coordinate, to.coordinate, SPEED).durationSeconds * 1_000;
       // Pairs within walking distance drop rides slower than the walk, so the latest ride shown
       // is not necessarily the latest ride there is.
-      if (walkMs <= MAX_WALK_MINUTES * 60_000) continue;
+      if (withinReach(from, to)) continue;
       const journeys = await provider.planJourneys(
-        query(from, to, at, 'arrive'),
+        query(from, to, at, 'arrive', speed),
         new AbortController().signal,
       );
       const latest = journeys.at(-1);
       if (!latest) continue;
       compared += 1;
       const leavesMs = Date.parse(latest.legs[0]!.start);
-      const laterArrival = dijkstraEarliestArrival(window, from, to, leavesMs + 60_000);
+      const laterArrival = dijkstraEarliestArrival(window, from, to, leavesMs + 60_000, speed);
 
       expect(Date.parse(latest.legs.at(-1)!.end)).toBeLessThanOrEqual(Date.parse(at));
       expect(laterArrival === null || laterArrival > Date.parse(at)).toBe(true);
