@@ -58,6 +58,8 @@ The owner's Saturday evening trip from 14 James Mileham Drive, Kellyville to 24 
 - What removing it loses (verified): nothing at 15 or 30. At 8, four small cases where it found a journey 0 to 6 minutes later with a final walk 4 to 5 minutes shorter, still over 8.
 - School buses (verified): none in the 36 default answers; 13 of 36 answers at 15 and 5 of 20 at 8 used one, always 6627 days later. Default answers do use school buses when they run near the time asked for (Monday 14:30).
 - Walking pace (verified): TfNSW walks about 1.1 m/s (Schofields Station to Anson St, 1,082 m in 16.2 minutes); HopReady's own walks assume 1.3 m/s over 1.3 times the straight line, so its estimate there is 13 minutes.
+- Walking speed (verified): `changeSpeed` is honoured (`changeSpeed=50` halves walking times) and, like the walking cap, sends TfNSW days ahead: home to Anson St at 9.30 pm Saturday with `changeSpeed=slow` returned only Monday 1.44 pm, ending on school bus 6627, against six journeys that night without it.
+- School buses on transportnsw.info (verified on the live site and in TfNSW's school travel FAQ): left out unless the person ticks School bus; dedicated school services are open to all fare-paying passengers.
 - On Demand (verified in responses): TfNSW returns On Demand D700 as product class 10 with icon 23; the adapter maps only classes 1, 2, 4, 5, 7, 9 and 11, so those journeys are dropped (6 of 12 from Tallawong to Anson St at Monday 08:00). Not changed by ADR-0009.
 
 ## 2. What the literature, the engines and the other apps say (researched 2026-10-31)

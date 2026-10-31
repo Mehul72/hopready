@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Supersedes decisions 1 and 4 of ADR-0008; the rest of ADR-0008 stands.
+Accepted. Supersedes decisions 1 and 4 of ADR-0008; the rest of ADR-0008 stands. Decision 3 (walking the rest) is refined by ADR-0010: gated by distance, timed like TfNSW, and losing to free public transport.
 
 ## Date
 
