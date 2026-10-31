@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { HUBS } from './data/park-and-ride-hub-times';
-import { estimateTransitMinutes, hubPeriodFor, roughRideMinutes } from './estimate';
+import {
+  estimateTransit,
+  estimateTransitMinutes,
+  hubPeriodFor,
+  roughRideMinutes,
+  walkCost,
+} from './estimate';
 
 const CENTRAL = HUBS.find((hub) => hub.id === 'central')!.coordinate;
 const SEVEN_HILLS = { coordinate: { lat: -33.774430434, lon: 150.936513359 }, stopId: '214710' };
@@ -86,5 +92,33 @@ describe('estimateTransitMinutes', () => {
     const evening = estimateTransitMinutes(SEVEN_HILLS, CENTRAL, 'weekday-evening', 'normal');
 
     expect(evening - peak).toBeCloseTo(7, 0);
+  });
+});
+
+describe('estimateTransit', () => {
+  it('weights the wait at 1.4 and the walk at 1.5 in the cost, not in the minutes', () => {
+    // About 500 m north of Central Station: 33 on board, 4 waiting, then a walk.
+    const nearCentral = { lat: CENTRAL.lat + 0.0045, lon: CENTRAL.lon };
+    const estimate = estimateTransit(SEVEN_HILLS, nearCentral, 'weekday-peak', 'normal');
+    const walkMinutes = estimate.minutes - 33 - 4;
+
+    expect(walkMinutes).toBeGreaterThan(6);
+    expect(estimate.cost).toBeCloseTo(33 + 4 * 1.4 + walkMinutes * 1.5, 5);
+    expect(walkCost(10)).toBe(15);
+  });
+
+  it('costs a straight-line ride at its plain minutes, so a hub route must beat it outright', () => {
+    const savedSpot = { coordinate: { lat: -33.7101, lon: 150.9562 } };
+    const estimate = estimateTransit(savedSpot, CENTRAL, 'weekday-peak', 'normal');
+
+    expect(estimate.cost).toBe(estimate.minutes);
+  });
+
+  it('chooses the hub by cost and reports that route in plain minutes', () => {
+    // Hills Showground to Central: the recorded ride and 2 minutes of waiting, a frequent service.
+    const estimate = estimateTransit(HILLS_SHOWGROUND, CENTRAL, 'weekday-peak', 'normal');
+
+    expect(estimate.minutes).toBeCloseTo(41, 0);
+    expect(estimate.cost).toBeCloseTo(39 + 2 * 1.4, 0);
   });
 });

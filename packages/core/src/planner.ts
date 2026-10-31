@@ -1,5 +1,5 @@
 import { combineSignals, mapSettled } from './async';
-import { estimateTransitMinutes, hubPeriodFor } from './estimate';
+import { estimateTransit, hubPeriodFor, walkCost } from './estimate';
 import { haversineMetres } from './geo';
 import {
   buildItinerary,
@@ -123,8 +123,13 @@ interface Candidate {
   // Parking or drop-off, the walk to the platform and the public transport from there: everything a
   // drive time does not change.
   beyondDriveMinutes: number;
+  // The same stretch in weighted minutes, with waiting and walking counting for more, as people
+  // weigh them when choosing where to drive to.
+  beyondDriveCost: number;
   // Door to door: the rough drive at first, the provider's drive time once it is known.
   estimatedMinutes: number;
+  // What the candidates are ranked by: the drive plus the weighted stretch beyond it.
+  score: number;
 }
 
 interface RankedCandidate extends Candidate {
@@ -900,20 +905,23 @@ function shortlistByEstimate(
       continue;
     }
     const rough = roughDriveMinutes(origin, point.place);
-    const beyondDriveMinutes =
-      bufferSeconds / 60 +
-      walkToBoarding(context, point).durationSeconds / 60 +
-      estimateTransitMinutes(
-        point.boarding,
-        destination.coordinate,
-        period,
-        preferences.walkingSpeed,
-      );
+    const bufferMinutes = bufferSeconds / 60;
+    const walkMinutes = walkToBoarding(context, point).durationSeconds / 60;
+    const transit = estimateTransit(
+      point.boarding,
+      destination.coordinate,
+      period,
+      preferences.walkingSpeed,
+    );
+    const beyondDriveMinutes = bufferMinutes + walkMinutes + transit.minutes;
+    const beyondDriveCost = bufferMinutes + walkCost(walkMinutes) + transit.cost;
     candidates.push({
       point,
       roughDriveMinutes: rough,
       beyondDriveMinutes,
+      beyondDriveCost,
       estimatedMinutes: rough + beyondDriveMinutes,
+      score: rough + beyondDriveCost,
     });
   }
 
@@ -926,7 +934,7 @@ function shortlistByEstimate(
     (a, b) =>
       Number(b.point.preferred) - Number(a.point.preferred) ||
       likelyOverLimit(a) - likelyOverLimit(b) ||
-      a.estimatedMinutes - b.estimatedMinutes,
+      a.score - b.score,
   );
   const preferredCount = ranked.filter((candidate) => candidate.point.preferred).length;
   const shortlisted = ranked.slice(0, Math.max(context.limits.maxEtaCandidates, preferredCount));
@@ -985,18 +993,20 @@ async function rankByDriveTime(
       }
       return;
     }
+    const driveMinutes = estimate.durationSeconds / 60;
     reachable.push({
       ...candidate,
       driveSeconds: estimate.durationSeconds,
-      estimatedMinutes: estimate.durationSeconds / 60 + candidate.beyondDriveMinutes,
+      estimatedMinutes: driveMinutes + candidate.beyondDriveMinutes,
+      score: driveMinutes + candidate.beyondDriveCost,
     });
   });
-  return reachable.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
+  return reachable.sort((a, b) => a.score - b.score);
 }
 
 // Which of the reachable car parks are asked for journeys: the ones asked for by name or station,
-// the quickest drive, then the best estimates, one car park per station. Two car parks at one station
-// get the same services, so the one surer of a space, then the quicker one, speaks for both. The
+// the quickest drive, then the best scores, one car park per station. Two car parks at one station
+// get the same services, so the one surer of a space, then the better scored, speaks for both. The
 // rest are listed with their estimates, so the traveller can see what was not tried and why.
 function chooseCandidates(
   context: PlanContext,
@@ -1039,14 +1049,14 @@ function chooseCandidates(
     ...quickestDrives,
     ...contenders
       .filter((candidate) => !candidate.point.preferred && !quickestDrives.includes(candidate))
-      .sort((a, b) => a.estimatedMinutes - b.estimatedMinutes),
+      .sort((a, b) => a.score - b.score),
   ];
   const preferredCount = ordered.filter((candidate) => candidate.point.preferred).length;
   const chosen = ordered.slice(0, Math.max(context.limits.maxTransferCandidates, preferredCount));
   for (const candidate of [...ordered.slice(chosen.length), ...spokenFor]) {
     recordCarPark(context, strategy, candidate.point, 'not-tried', candidate);
   }
-  return chosen.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
+  return chosen.sort((a, b) => a.score - b.score);
 }
 
 // Room beats no count or a stale one, which beats nearly full.

@@ -14,6 +14,11 @@ const ROUGH_TRANSIT_OVERHEAD_MINUTES = 8;
 const WALKABLE_FROM_HUB_METRES = 1_500;
 // Changing at the hub onto whatever reaches the destination.
 const CHANGE_AT_HUB_MINUTES = 5;
+// A minute waiting or walking weighs more than a minute on board when people choose a route
+// (Transport for NSW and ATAP appraisal guidance), so the choice between car parks uses these
+// weights while the minutes shown stay plain.
+const WAIT_WEIGHT = 1.4;
+const WALK_WEIGHT = 1.5;
 
 const MINUTES_PER_HOUR = 60;
 const MORNING_PEAK = { fromHour: 6, toHour: 10 };
@@ -36,33 +41,63 @@ export function hubPeriodFor(instant: string | Date): HubPeriod {
   return inPeak(MORNING_PEAK) || inPeak(AFTERNOON_PEAK) ? 'weekday-peak' : 'weekday-evening';
 }
 
-// Minutes from a platform to the destination's door: the recorded ride to the best hub, half the
-// service interval waiting for it, then on from the hub on foot or by another ride; or a rough
-// straight-line ride when no hub route beats it or the table has no row for the stop.
-export function estimateTransitMinutes(
+export interface TransitEstimate {
+  // Plain minutes, for saying roughly how long an untried car park would take.
+  minutes: number;
+  // Weighted minutes, for choosing between car parks: waiting and walking count for more.
+  cost: number;
+}
+
+// From a platform to the destination's door: the recorded ride to the best hub, half the service
+// interval waiting for it, then on from the hub on foot or by another ride; or a rough straight-line
+// ride when no hub route beats it or the table has no row for the stop. The best hub is the one a
+// person would choose, by weighted minutes, and its plain minutes are what gets reported.
+export function estimateTransit(
   from: TransitOrigin,
   to: Coordinate,
   period: HubPeriod,
   speed: WalkingSpeed,
-): number {
-  let best = roughRideMinutes(from.coordinate, to);
+): TransitEstimate {
+  const rough = roughRideMinutes(from.coordinate, to);
+  let best: TransitEstimate = { minutes: rough, cost: rough };
   const byHub = from.stopId === undefined ? undefined : HUB_TIMES_BY_STATION[from.stopId];
   if (!byHub) return best;
   for (const hub of HUBS) {
     const time = byHub[hub.id]?.[period];
     if (!time) continue;
     const [rideMinutes, headwayMinutes] = time;
-    const viaHub = rideMinutes + headwayMinutes / 2 + onwardMinutes(hub.coordinate, to, speed);
-    if (viaHub < best) best = viaHub;
+    const waitMinutes = headwayMinutes / 2;
+    const onward = onwardFromHub(hub.coordinate, to, speed);
+    const viaHub = {
+      minutes: rideMinutes + waitMinutes + onward.minutes,
+      cost: rideMinutes + waitMinutes * WAIT_WEIGHT + onward.cost,
+    };
+    if (viaHub.cost < best.cost) best = viaHub;
   }
   return best;
 }
 
-function onwardMinutes(hub: Coordinate, to: Coordinate, speed: WalkingSpeed): number {
+export function estimateTransitMinutes(
+  from: TransitOrigin,
+  to: Coordinate,
+  period: HubPeriod,
+  speed: WalkingSpeed,
+): number {
+  return estimateTransit(from, to, period, speed).minutes;
+}
+
+// Walking weighs more than riding when choosing between car parks.
+export function walkCost(walkMinutes: number): number {
+  return walkMinutes * WALK_WEIGHT;
+}
+
+function onwardFromHub(hub: Coordinate, to: Coordinate, speed: WalkingSpeed): TransitEstimate {
   if (haversineMetres(hub, to) <= WALKABLE_FROM_HUB_METRES) {
-    return walkBetween(hub, to, speed).durationSeconds / MINUTES_PER_HOUR;
+    const walkMinutes = walkBetween(hub, to, speed).durationSeconds / MINUTES_PER_HOUR;
+    return { minutes: walkMinutes, cost: walkCost(walkMinutes) };
   }
-  return CHANGE_AT_HUB_MINUTES + roughRideMinutes(hub, to);
+  const minutes = CHANGE_AT_HUB_MINUTES + roughRideMinutes(hub, to);
+  return { minutes, cost: minutes };
 }
 
 export function roughRideMinutes(from: Coordinate, to: Coordinate): number {
