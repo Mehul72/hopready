@@ -1,6 +1,6 @@
 # Plan: neutral appearance
 
-Status: in progress
+Status: done
 Branch: feat/rebrand
 
 ## Goal
@@ -25,10 +25,12 @@ Routing, storage, API, permission and consent behaviour, navigation structure an
       done when: contrast checks, typecheck, lint and existing tests pass; artwork inspected.
 - [x] 2. Inspect the main screens in light mode and the accessible planner in dark mode.
       done when: native build and both capture journeys pass, screenshots inspected and refreshed.
-- [ ] 3. Commit, push and publish the corrected build.
+- [x] 3. Commit, push and publish the corrected build.
       done when: CI passes and Apple reports the new build valid and in internal beta testing.
 
 ## Log
+
+- 2026-11-01: Committed and pushed `ebd75db` (`fix: use a neutral app palette`); CI passed. Production build 0.1.0 (8), EAS `5e584810-7651-4947-9ce4-0b801625ef17`, uploaded successfully. Apple confirms `VALID` and `IN_BETA_TESTING` for existing internal testers.
 
 - 2026-11-01: Both native capture journeys passed. Inspected the light-mode planner, results and settings, and dark-mode controls at maximum text size. Refreshed the nine main screenshots and four accessibility captures.
 
