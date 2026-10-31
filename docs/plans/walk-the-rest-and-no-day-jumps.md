@@ -48,15 +48,18 @@ Verifiable by:
 - [x] 5. App: times on a different day from the time asked for show the day ("Mon 2:32 pm")
       files: apps/mobile route card, trip summary, steps, followed trip card, alternatives; tests
       done when: a card for a next-day option shows the day, a same-day one does not
-- [ ] 6. Deploy staging; re-run Anson St, Kellyville to Central and Parramatta; record in docs/research/park-and-ride.md and PROGRESS
-- [ ] 7. ADR-0009 (supersedes ADR-0008 decisions 1 and 4), routing.md, providers.md
-- [ ] 8. Adversarial review of the diff; fix what it confirms
+- [x] 6. Deploy staging; re-run Anson St, Kellyville to Central and Parramatta; record in docs/research/park-and-ride.md and PROGRESS
+      done: staging 1b0908dc, 2026-10-31 22:03 to 22:17 (log)
+- [x] 7. ADR-0009 (supersedes ADR-0008 decisions 1 and 4), routing.md, providers.md
+      done: ADR-0009, ADR-0010 and ADR-0011, routing.md and providers.md
+- [x] 8. Adversarial review of the diff; fix what it confirms
+      done: two review workflows; every confirmed finding fixed with a test that fails without it (log)
 - [ ] 9. TestFlight build 6
 
 ## Open questions
 
-- Should school buses be left out by default? Researching (blocks nothing above; a default change would be its own step).
-- Ceiling for walking the rest: 20 minutes or the walking limit, whichever is longer, until the probes say otherwise.
+- Answered: school buses are left out by default (ADR-0010 decision 9).
+- Answered: walking the rest is gated at 1.2 km in a straight line (ADR-0010 decision 1).
 
 ## Log
 
@@ -68,3 +71,8 @@ Verifiable by:
 - 2026-10-31 Probe matrix (126 TfNSW calls; docs/research/park-and-ride.md 1.5): at the default limit of 15 the parameter made the best arrival later in 12 of 36 trip and time pairs and earlier in none; with it, "arrive by Sunday 10:00" returned Friday arrivals, so step 4 gained an arrive-by twin (`arrives-long-before-target`, commit 0ea23d1).
 - 2026-10-31 Found, not fixed here: TfNSW returns On Demand D700 as product class 10, which the adapter drops as an unsupported mode. It hides options rather than adding wrong ones; logged in docs/PROGRESS.md known limitations.
 - 2026-10-31 Investigation workflow (10 agents) finished. Design critic and code audit found, and the coordinator fixed (commits c3c99d4, a2cb15b, 3f67b0b, ea3fd29): walk estimate a quarter short of TfNSW's (now 1.5 times the straight line at 1.1 m/s); gate in the person's minutes (now 1.2 km straight line); paid walk beating a free bus (now a mark); a followed walking trip flipping to the bus on a check (the chosen car park now keeps both); twins hiding a car park beside the destination; drop-off wasting a slot on a station next to the destination; build 5 left with no explanation when the 12 hour limit removed everything (now an unavailable entry); no walk back to a car TfNSW had no journey to; checked times and trips days away without a day; fee note wrong at Gosford and Beverly Hills. School buses are now off by default, as on transportnsw.info (refuters confirmed both the default and that anyone with a ticket may ride). Recorded in ADR-0010. Deferred: a 3 hour cut of next-morning options when same-night ones exist; Dee Why opening hours; On Demand class 10.
+- 2026-10-31 21:40 Owner, build 5, home to 24 Anson St at 8.23 pm Saturday: option 2 was drive 17, walk 5, school bus 5642, walk 2, school bus 6627, walk 7 on Monday. The second review workflow (staging and planner) reproduced it on Monday 2.32 pm with build 5's empty exclusion list: the chain from Schofields arrives 15:24, the walk 15:16. Cause: the walk carried two marks (long-walk and the Park&Ride fee mark), the chain none, and the 10 minute tolerance let it win. Either mark alone flipped it.
+- 2026-10-31 A first fix compared the drive to each car park with the drive to the door. It dropped the demo Dee Why walk (car park 615 s, office 607 s) and same-minute car parks in the tests; staging showed Kellyville (south) only 15 to 26 s longer than the door. Replaced by the share of the walk heading back toward the start (Kellyville 0.95 to 0.99, Schofields 0.09, Dee Why 0.29). Recorded in ADR-0011.
+- 2026-10-31 Landed test-first, each test seen failing before its fix, each fix mutation-checked: 9a03d8d (12 hour limit measured to the first and last service), 14dc690 (arrive-by journey the drive can still make), c6b4ada (TfNSW failure reads provider-error), d7c476a (trip home walks to a nearby car when TfNSW fails), 4e707fe (walk and ride listed by how close they get there), 0520308 (no walk back from past the destination), e5c31dd (walkable twins are one choice). App: 7bbd501 (a followed trip's day labels read the minute clock; the React Compiler had cached new Date() in three render blocks, confirmed by compiling the file), 70e1603 (full weekdays for VoiceOver), 822d141 and dcfb39e (daylight saving and day label tests). Core 312, API 329, app 726 tests pass.
+- 2026-10-31 22:03 Staging 1b0908dc: Anson St now gives drive 16, then drive 14, park at Schofields, walk 20 (arrive 22:45, fee note). Monday 14:32 with excluded modes [] and with school buses excluded: drive 18, then the Schofields walk arriving 15:16; no school bus chain. Windsor Rd at Samantha Riley Dr: no walk back from Kellyville. Arrive by Sunday 07:00: the Schofields walk second. Trip home through Schofields: walk 20, retrieve 5, drive 18. Kellyville to Central Monday 08:00 matches the earlier run; Parramatta to Carrington St at 22:17 gives ten options that night.
+- 2026-10-31 Still open, not part of this fix: options hours after the time asked for inside the 12 hour line (Windsor Rd at 00:30 lists a 06:20 bus last), and arrive-by public transport up to 4 hours early that a later journey beats at both ends (Sunday 07:00: options leaving 00:34 to 03:20).

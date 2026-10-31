@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Supersedes decision 3 of ADR-0009; the rest of ADR-0009 stands.
+Accepted. Supersedes decision 3 of ADR-0009; the rest of ADR-0009 stands. Decision 3 is superseded and decision 5 amended by ADR-0011: walking and public transport from a car park are listed by how close they get there, and walkable twins are one choice.
 
 ## Date
 
