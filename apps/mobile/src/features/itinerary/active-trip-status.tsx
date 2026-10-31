@@ -19,6 +19,7 @@ import {
 
 import { showResultsFor } from '../saved/plan-requests';
 import { writeOrAlert } from '../saved/storage-writes';
+import { tripTimes } from '../results/route-summary';
 import { shownDurationSeconds } from '../shared/shown-duration';
 import { describeTripSummary } from './trip-summary-card';
 import { optionLabel } from '../shared/option-labels';
@@ -74,7 +75,9 @@ function AlternativeCard({
   const from = refresh.restOfTrip ? (refresh.request?.origin.name ?? null) : null;
   // The alternatives are only as fresh as the check that found them.
   const staleCheckAt = useStaleCheckAt(refresh.checkedAt);
-  const summary = describeTripSummary(alternative, staleCheckAt);
+  const requestedAt = refresh.request?.time.at ?? null;
+  const summary = describeTripSummary(alternative, staleCheckAt, requestedAt);
+  const times = tripTimes(alternative, requestedAt);
   return (
     <Card
       onPress={() => followAlternative(alternative, refresh)}
@@ -85,7 +88,7 @@ function AlternativeCard({
           {from ? `${optionLabel(alternative)} from ${from}` : optionLabel(alternative)}
         </AppText>
         <AppText variant="headline" tabularNumbers>
-          {`Leave ${formatSydneyTime(alternative.departAt)} · Arrive ${formatSydneyTime(alternative.arriveAt)}`}
+          {`Leave ${times.leave.text} · Arrive ${times.arrive.text}`}
         </AppText>
         <AppText variant="subheadline" tone="secondary" tabularNumbers>
           {`${total.text} total`}

@@ -1,6 +1,5 @@
 import {
   type DriveLeg,
-  formatSydneyTime,
   type Leg,
   legSeconds,
   type ParkLeg,
@@ -9,7 +8,7 @@ import {
   type TransitLeg,
   type WalkLeg,
 } from '@hopready/core';
-import type { ReactNode } from 'react';
+import { createContext, type ReactNode, use } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText, Banner, Button, Card, ModeIcon, TimingBadge, timingStyleFor } from '@/components';
@@ -17,6 +16,7 @@ import { LEG_VISUALS, legVisualKind, SPACING } from '@/theme';
 
 import { describeOccupancy, SPACES_CAN_FILL_NOTE } from '../shared/occupancy-wording';
 import { isSampleLeg } from '../shared/sample-data';
+import { describeTripTime } from '../shared/trip-time';
 import { openLink } from './open-link';
 import {
   ALERT_TONES,
@@ -45,11 +45,31 @@ export interface LegRowProps {
   // From describeStepNotes. Only walks, waits and services ever get any, so only their rows
   // show them.
   notes?: StepNotes;
+  // When the trip leaves, so a step after midnight says which day.
+  tripStartsAt?: string | null;
 }
+
+// The day the trip starts, read by every row's times, so a step after midnight says which day
+// without each kind of row passing it along.
+const TripStartContext = createContext<string | null>(null);
 
 // One step of the trip. Each card is one VoiceOver element that reads the step as a sentence;
 // buttons and links inside it stay separate so they can still be reached and activated.
-export function LegRow({ leg, nowMs, staleCheckAt, onStartDriving, notes = [] }: LegRowProps) {
+export function LegRow({ tripStartsAt = null, ...row }: LegRowProps) {
+  return (
+    <TripStartContext value={tripStartsAt}>
+      <LegRowContent {...row} />
+    </TripStartContext>
+  );
+}
+
+function LegRowContent({
+  leg,
+  nowMs,
+  staleCheckAt,
+  onStartDriving,
+  notes = [],
+}: Omit<LegRowProps, 'tripStartsAt'>) {
   switch (leg.kind) {
     case 'drive':
       return <DriveRow leg={leg} onStartDriving={onStartDriving} />;
@@ -96,8 +116,9 @@ interface LegCardProps {
 }
 
 function LegCard({ leg, title, spoken, details, notes = [], actions }: LegCardProps) {
-  const start = formatSydneyTime(leg.start);
-  const label = [`${start}.`, spoken, ...notes.map((note) => note.spoken)].join(' ');
+  const time = describeTripTime(leg.start, use(TripStartContext));
+  const start = time.text;
+  const label = [`${time.spoken}.`, spoken, ...notes.map((note) => note.spoken)].join(' ');
   return (
     <Card testID={`leg-${leg.kind}`}>
       <View accessible accessibilityLabel={label} style={styles.summary}>
@@ -322,7 +343,8 @@ function TransitRow({
   const arrival = arrivalPlatform ? `${leg.to.name}, ${arrivalPlatform}` : leg.to.name;
   const stops = stopCount(leg.stopCount);
   const delay = describeDelay(leg);
-  const arrive = formatSydneyTime(leg.end);
+  const arriveTime = describeTripTime(leg.end, use(TripStartContext));
+  const arrive = arriveTime.spoken;
   const sample = isSampleLeg(leg);
   const timing = timingStyleFor(leg.timing, sample, staleCheckAt).spoken;
   const spokenParts = [
@@ -345,7 +367,9 @@ function TransitRow({
       details={
         <>
           <Detail>{`From ${leg.from.name}${platform ? ` · ${platform}` : ''}`}</Detail>
-          <Detail>{[`To ${arrival}, arrive ${arrive}`, stops].filter(Boolean).join(' · ')}</Detail>
+          <Detail>
+            {[`To ${arrival}, arrive ${arriveTime.text}`, stops].filter(Boolean).join(' · ')}
+          </Detail>
           <View style={styles.badges}>
             <TimingBadge timing={leg.timing} sample={sample} staleCheckAt={staleCheckAt} />
             {delay ? (
@@ -394,16 +418,22 @@ export function AlertBanner({ alert }: { alert: ServiceAlert }) {
 }
 
 // The final row: where and when the trip ends.
-export function ArrivalRow({ leg }: { leg: Leg }) {
-  const arrive = formatSydneyTime(leg.end);
+export function ArrivalRow({
+  leg,
+  tripStartsAt = null,
+}: {
+  leg: Leg;
+  tripStartsAt?: string | null;
+}) {
+  const arrive = describeTripTime(leg.end, tripStartsAt);
   return (
     <Card testID="arrival">
       <View
         accessible
-        accessibilityLabel={`${arrive}. Arrive at ${leg.to.name}.`}
+        accessibilityLabel={`${arrive.spoken}. Arrive at ${leg.to.name}.`}
         style={styles.summary}>
         <AppText variant="subheadline" tone="secondary" weight="semibold" tabularNumbers>
-          {arrive}
+          {arrive.text}
         </AppText>
         <AppText variant="headline">{`Arrive at ${leg.to.name}`}</AppText>
       </View>

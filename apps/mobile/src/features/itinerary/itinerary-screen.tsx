@@ -227,7 +227,11 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
       footer={<TripFooter trip={trip} tripHomeOutOfDate={tripHomeOutOfDate} />}
       testID="itinerary-screen">
       {status}
-      <TripSummaryCard itinerary={itinerary} staleCheckAt={staleCheckAt} />
+      <TripSummaryCard
+        itinerary={itinerary}
+        staleCheckAt={staleCheckAt}
+        requestedAt={trip.request?.time.at ?? null}
+      />
       {concerns.map((concern) => (
         <Banner
           key={concern.text}
@@ -256,6 +260,7 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
           key={`${index}:${leg.id}`}
           leg={leg}
           notes={stepNotes[index]}
+          tripStartsAt={itinerary.departAt}
           nowMs={nowMs}
           staleCheckAt={staleCheckAt}
           onStartDriving={(destination) => {
@@ -263,7 +268,7 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
           }}
         />
       ))}
-      {lastLeg ? <ArrivalRow leg={lastLeg} /> : null}
+      {lastLeg ? <ArrivalRow leg={lastLeg} tripStartsAt={itinerary.departAt} /> : null}
       {tripAlerts.length > 0 ? (
         <>
           <AppText variant="title3" accessibilityRole="header" style={styles.heading}>

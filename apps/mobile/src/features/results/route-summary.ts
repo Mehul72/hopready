@@ -20,6 +20,7 @@ import {
 import { optionLabel } from '../shared/option-labels';
 import { isSampleItinerary } from '../shared/sample-data';
 import { shownDurationSeconds } from '../shared/shown-duration';
+import { describeTripTime } from '../shared/trip-time';
 
 const SECONDS_PER_MINUTE = 60;
 // Shorter than this rounds to "0 min", which reads as a mistake rather than a short step.
@@ -262,27 +263,42 @@ export function parkingSummary(itinerary: Itinerary, now: Date): ParkingSummary 
   };
 }
 
+// Leave and arrive times, each with its day when that differs: leaving from the time asked for,
+// arriving from leaving.
+export function tripTimes(
+  itinerary: Pick<Itinerary, 'departAt' | 'arriveAt'>,
+  requestedAt: string | null,
+): { leave: Wording; arrive: Wording } {
+  return {
+    leave: describeTripTime(itinerary.departAt, requestedAt),
+    arrive: describeTripTime(itinerary.arriveAt, itinerary.departAt),
+  };
+}
+
 function capitalise(text: string): string {
   return text.length === 0 ? text : `${text[0]?.toUpperCase() ?? ''}${text.slice(1)}`;
 }
 
 // The whole card as one sentence, so VoiceOver users hear an option the way it looks.
 // `staleCheckAt`, from staleCheckOf, words old live times by when they were checked. With the
-// person's preferences, the planner's marks are read against them.
+// person's preferences, the planner's marks are read against them; with the time the trip was
+// asked for, a time on another day says which.
 export function describeItinerary(
   itinerary: Itinerary,
   now: Date,
   staleCheckAt: string | null = null,
   preferences: Preferences | null = null,
+  requestedAt: string | null = null,
 ): string {
   const facts = tripFacts(itinerary);
   const parking = parkingSummary(itinerary, now);
   const alerts = alertSummary(itinerary);
   const steps = legSteps(itinerary).map((step) => step.spoken);
   const concerns = preferences ? concernSummaries(itinerary, preferences) : [];
+  const times = tripTimes(itinerary, requestedAt);
   const sentences = [
     optionLabel(itinerary),
-    `Leave ${formatSydneyTime(itinerary.departAt)}, arrive ${formatSydneyTime(itinerary.arriveAt)}, ${facts.total.spoken} in total`,
+    `Leave ${times.leave.spoken}, arrive ${times.arrive.spoken}, ${facts.total.spoken} in total`,
     steps.length > 0 ? capitalise(steps.join(', then ')) : null,
     facts.changes?.spoken ?? null,
     ...concerns.map((concern) => concern.spoken),

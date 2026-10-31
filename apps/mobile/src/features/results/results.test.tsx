@@ -367,6 +367,36 @@ describe('how live the times are', () => {
   });
 });
 
+describe('times on another day', () => {
+  it('says the day of a time that is not on the day asked for', async () => {
+    // 10:30 pm on Monday in Sydney.
+    const mondayNight = new Date('2026-10-26T11:30:00.000Z');
+    freezeClockAt(mondayNight);
+    appStorage.settings.setDemoMode(false);
+    // Leaves 11:20 pm and gets there 12:15 am; the other leaves at 6:40 am on Tuesday.
+    const tonight = transitItinerary({ departAt: '2026-10-26T12:20:00.000Z' });
+    const tomorrow = transitItinerary({ departAt: '2026-10-26T19:40:00.000Z', service: 'T1' });
+    jest.spyOn(tripService, 'planTrip').mockResolvedValue(planResponse([tonight, tomorrow]));
+    await planSession.plan(
+      planRequest({ time: { type: 'depart', at: mondayNight.toISOString() } }),
+    );
+
+    await renderApp('/results');
+
+    expect(
+      within(screen.getByTestId(`route-card-${tonight.id}`)).getByText('11:20 pm → Tue 12:15 am'),
+    ).toBeOnTheScreen();
+    expect(
+      within(screen.getByTestId(`route-card-${tomorrow.id}`)).getByText('Tue 6:40 am → 7:35 am'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', {
+        name: /^Public transport\. Leave Tuesday 6:40\sam, arrive 7:35\sam,/,
+      }),
+    ).toBeOnTheScreen();
+  });
+});
+
 describe('a trip home', () => {
   const car: ParkedCar = {
     location: PLACES.tallawongCarPark,

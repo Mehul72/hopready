@@ -1,4 +1,3 @@
-import { formatSydneyTime } from '@hopready/core';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -8,6 +7,7 @@ import { useActiveTrip } from '@/storage';
 import { SPACING } from '@/theme';
 
 import { isFollowedTripOver } from './followed-trip-window';
+import { tripTimes } from '../results/route-summary';
 import { optionLabel } from '../shared/option-labels';
 
 const STATUS_NOTES: Readonly<Partial<Record<ActiveTripRefreshStatus, string>>> = {
@@ -28,8 +28,10 @@ export function FollowedTripCard({ now }: { now: Date }) {
   const { itinerary } = activeTrip;
 
   const strategy = optionLabel(itinerary);
-  const times = `Leave ${formatSydneyTime(itinerary.departAt)} · Arrive ${formatSydneyTime(itinerary.arriveAt)}`;
-  const spokenTimes = `Leave ${formatSydneyTime(itinerary.departAt)}, arrive ${formatSydneyTime(itinerary.arriveAt)}`;
+  // On the Plan tab the reference is today: a trip tomorrow morning says so.
+  const { leave, arrive } = tripTimes(itinerary, now.toISOString());
+  const times = `Leave ${leave.text} · Arrive ${arrive.text}`;
+  const spokenTimes = `Leave ${leave.spoken}, arrive ${arrive.spoken}`;
   const note = STATUS_NOTES[activeTripRefresh.status] ?? null;
 
   return (

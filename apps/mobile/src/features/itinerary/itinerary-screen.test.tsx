@@ -93,6 +93,30 @@ describe('itinerary screen', () => {
     );
   });
 
+  it('says the day of times past midnight, from the summary to the last step', async () => {
+    // Asked for at 10:30 pm on Monday; leaves 11:50 pm, rides from midnight, arrives 12:45 am.
+    const mondayNight = '2026-10-26T11:30:00.000Z';
+    freezeClockAt(new Date(mondayNight));
+    appStorage.settings.setDemoMode(false);
+    const overnight = transitItinerary({ departAt: '2026-10-26T12:50:00.000Z' });
+    jest.spyOn(tripService, 'planTrip').mockResolvedValue(planResponse([overnight]));
+    await planSession.plan(planRequest({ time: { type: 'depart', at: mondayNight } }));
+
+    await renderApp(`/itinerary/${overnight.id}`);
+
+    const summary = within(screen.getByTestId('trip-summary'));
+    expect(summary.getByText('11:50 pm')).toBeOnTheScreen();
+    expect(summary.getByText('Tue 12:45 am')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('leg-transit')).getByText('Tue 12:00 am')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('arrival')).getByText('Tue 12:45 am')).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(describeTripSummary(overnight, null, mondayNight)),
+    ).toBeOnTheScreen();
+    expect(describeTripSummary(overnight, null, mondayNight)).toContain(
+      'Leave 11:50\u00a0pm, arrive Tuesday 12:45\u00a0am.',
+    );
+  });
+
   it('shows the leave and arrive times, the map, every step and the data sources', async () => {
     const itinerary = firstWithStrategy(await planDemoCommute(), 'park-and-ride');
     await renderApp(`/itinerary/${itinerary.id}`);

@@ -1,9 +1,10 @@
-import { formatSydneyTime, type Itinerary } from '@hopready/core';
+import type { Itinerary } from '@hopready/core';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText, Card } from '@/components';
 import { type ColourTokens, COMPACT_MAX_FONT_SCALE, RADII, SPACING, useTheme } from '@/theme';
 
+import { tripTimes } from '../results/route-summary';
 import { isSampleItinerary } from '../shared/sample-data';
 import { shownDurationSeconds } from '../shared/shown-duration';
 import { optionLabel } from '../shared/option-labels';
@@ -47,16 +48,19 @@ function tripFacts(itinerary: Itinerary): Wording[] {
   return facts;
 }
 
+// `requestedAt` is the time the trip was asked for, so a time on another day says which.
 export function describeTripSummary(
   itinerary: Itinerary,
   staleCheckAt: string | null = null,
+  requestedAt: string | null = null,
 ): string {
   const total = duration(shownDurationSeconds(itinerary));
   const facts = tripFacts(itinerary).map((fact) => fact.spoken);
   const coverage = describeRealtimeCoverage(itinerary, staleCheckAt);
+  const times = tripTimes(itinerary, requestedAt);
   return [
     `${optionLabel(itinerary)}.`,
-    `Leave ${formatSydneyTime(itinerary.departAt)}, arrive ${formatSydneyTime(itinerary.arriveAt)}.`,
+    `Leave ${times.leave.spoken}, arrive ${times.arrive.spoken}.`,
     `${total.spoken} in total${facts.length > 0 ? `, ${facts.join(', ')}` : ''}.`,
     coverage?.spoken ?? null,
   ]
@@ -66,15 +70,18 @@ export function describeTripSummary(
 
 // The top of the trip: big leave and arrive times, then the totals and how live the times are.
 // VoiceOver reads it as one sentence. `staleCheckAt` is set once live times are too old to call
-// live (staleCheckOf).
+// live (staleCheckOf). `requestedAt` is the time the trip was asked for.
 export function TripSummaryCard({
   itinerary,
   staleCheckAt = null,
+  requestedAt = null,
 }: {
   itinerary: Itinerary;
   staleCheckAt?: string | null;
+  requestedAt?: string | null;
 }) {
   const { colours } = useTheme();
+  const times = tripTimes(itinerary, requestedAt);
   const total = duration(shownDurationSeconds(itinerary));
   const facts = tripFacts(itinerary);
   const coverage = describeRealtimeCoverage(itinerary, staleCheckAt);
@@ -86,7 +93,7 @@ export function TripSummaryCard({
     <Card testID="trip-summary">
       <View
         accessible
-        accessibilityLabel={describeTripSummary(itinerary, staleCheckAt)}
+        accessibilityLabel={describeTripSummary(itinerary, staleCheckAt, requestedAt)}
         style={styles.body}>
         <AppText variant="subheadline" tone="secondary" weight="semibold">
           {optionLabel(itinerary)}
@@ -97,7 +104,7 @@ export function TripSummaryCard({
               Leave
             </AppText>
             <AppText variant="title1" tabularNumbers>
-              {formatSydneyTime(itinerary.departAt)}
+              {times.leave.text}
             </AppText>
           </View>
           <View style={styles.time}>
@@ -105,7 +112,7 @@ export function TripSummaryCard({
               Arrive
             </AppText>
             <AppText variant="title1" tabularNumbers>
-              {formatSydneyTime(itinerary.arriveAt)}
+              {times.arrive.text}
             </AppText>
           </View>
         </View>

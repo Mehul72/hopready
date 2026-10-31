@@ -1,9 +1,4 @@
-import {
-  formatSydneyTime,
-  type Itinerary,
-  type Preferences,
-  type ServiceAlert,
-} from '@hopready/core';
+import { type Itinerary, type Preferences, type ServiceAlert } from '@hopready/core';
 import { type SFSymbol, SymbolView } from 'expo-symbols';
 import { StyleSheet, View } from 'react-native';
 
@@ -31,6 +26,7 @@ import {
   TIMING_SUMMARY_WORDING,
   timingSummary,
   tripFacts,
+  tripTimes,
 } from './route-summary';
 
 interface PillStyle {
@@ -65,6 +61,8 @@ export interface RouteCardProps {
   staleCheckAt: string | null;
   // The limits and buffers the trip was planned with, which the planner's marks are read against.
   preferences: Preferences;
+  // The time the trip was asked for, so a time on another day can say which day.
+  requestedAt: string;
   // The option the person chose to follow, if it is this one.
   selected: boolean;
   onPress: () => void;
@@ -134,6 +132,7 @@ export function RouteCard({
   now,
   staleCheckAt,
   preferences,
+  requestedAt,
   selected,
   onPress,
 }: RouteCardProps) {
@@ -143,6 +142,7 @@ export function RouteCard({
   const parking = parkingSummary(itinerary, now);
   const alerts = alertSummary(itinerary);
   const concerns = concernSummaries(itinerary, preferences);
+  const times = tripTimes(itinerary, requestedAt);
   // "Drive · Drive 52 min" says it twice, and the steps row already shows the drive.
   const driving = itinerary.strategy === 'drive-only' ? null : facts.driving;
   const factLine = [optionLabel(itinerary), driving, facts.walking, facts.changes]
@@ -153,13 +153,13 @@ export function RouteCard({
     <Card
       onPress={onPress}
       selected={selected}
-      accessibilityLabel={describeItinerary(itinerary, now, staleCheckAt, preferences)}
+      accessibilityLabel={describeItinerary(itinerary, now, staleCheckAt, preferences, requestedAt)}
       accessibilityHint="Opens the steps and map for this option"
       testID={`route-card-${itinerary.id}`}>
       <View style={styles.content}>
         <View style={styles.timesRow}>
           <AppText variant="title2" tabularNumbers style={styles.shrink}>
-            {`${formatSydneyTime(itinerary.departAt)} → ${formatSydneyTime(itinerary.arriveAt)}`}
+            {`${times.leave.text} → ${times.arrive.text}`}
           </AppText>
           <AppText variant="headline" tabularNumbers>
             {facts.total.text}

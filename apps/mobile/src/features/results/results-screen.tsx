@@ -296,6 +296,7 @@ export function ResultsScreen() {
               now={now}
               staleCheckAt={staleCheckAt}
               preferences={request.preferences}
+              requestedAt={request.time.at}
               selected={itinerary.id === session.selectedItineraryId}
               onPress={() => openItinerary(itinerary)}
             />
