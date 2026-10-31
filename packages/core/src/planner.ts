@@ -836,7 +836,15 @@ function walkTheRest(context: PlanContext, point: TransferPoint): Walk | null {
   if (startToDestination <= fromCarPark) return null;
   const backTowardStartMetres =
     haversineMetres(origin.coordinate, point.place.coordinate) - startToDestination;
-  if (backTowardStartMetres > fromCarPark * MAX_SHARE_OF_WALK_BACK_TOWARD_START) return null;
+  // Only for car parks HopReady picks: a saved spot, or the car park the traveller asked for, is
+  // where they mean to park.
+  const pickedByHopReady = point.facility.kind === 'transport-park-and-ride' && !point.preferred;
+  if (
+    pickedByHopReady &&
+    backTowardStartMetres > fromCarPark * MAX_SHARE_OF_WALK_BACK_TOWARD_START
+  ) {
+    return null;
+  }
   const walk = streetWalkBetween(
     point.place.coordinate,
     destination.coordinate,

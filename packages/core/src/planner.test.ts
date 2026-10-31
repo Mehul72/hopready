@@ -1288,6 +1288,28 @@ describe('walking the rest from a car park near the destination', () => {
     expect(response.itineraries.some((it) => it.strategy === 'park-and-ride')).toBe(false);
   });
 
+  it('still walks back from a saved spot, or the car park asked for, past the destination', async () => {
+    // The rule is for car parks HopReady picks: where someone saved a spot or chose to park, they
+    // mean to park there.
+    const shortOfTheCarPark = place('2 Example Rd, Bella Vista', -33.7252, 150.944);
+    const savedSpot = { id: 'spot-1', name: 'Work car space', coordinate: BELLA_VISTA.coordinate };
+    const fromSpot = await planTrip(
+      request({ destination: shortOfTheCarPark, savedParkingSpots: [savedSpot] }),
+      deps({ transit: fakeTransit(() => []), carParks: fakeCarParks(new Map(), []) }),
+    );
+    expect(
+      kinds(fromSpot.itineraries.find((it) => it.parking?.carPark.id === savedSpot.id)!.legs),
+    ).toEqual(['drive', 'park', 'walk']);
+
+    const askedFor = await planTrip(
+      request({ destination: shortOfTheCarPark, preferredCarParkId: BELLA_VISTA.id }),
+      deps({ transit: fakeTransit(() => []) }),
+    );
+    expect(
+      kinds(askedFor.itineraries.find((it) => it.parking?.carPark.id === BELLA_VISTA.id)!.legs),
+    ).toEqual(['drive', 'park', 'walk']);
+  });
+
   it('walks from a car park beside the destination, even one a little past it', async () => {
     // 600 m north-east of the Bella Vista car park: 202 m of the walk heads back toward Box Hill.
     const besideTheCarPark = place('4 Example Rd, Bella Vista', -33.72678, 150.94858);
