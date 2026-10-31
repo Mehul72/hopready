@@ -40,7 +40,7 @@ import {
   secondsBetween,
   toIso,
 } from './time';
-import { walkBetween } from './walking';
+import { NO_WALK, walkBetween, type Walk } from './walking';
 
 export interface PlannerLimits {
   maxEtaCandidates: number;
@@ -110,6 +110,10 @@ interface TransferPoint {
   id: string;
   name: string;
   place: Place;
+  // Where public transport is asked for from: the station a car park serves (by stop id, so the
+  // journey starts at the platform and the walk from the car park is HopReady's own), or the
+  // place itself when nothing better is known.
+  boarding: Place;
   facility: CarParkFacility | null;
   // The station the traveller catches public transport from: the one a car park serves, or the
   // drop-off station. Null when there is none, as for a spot the traveller saved.
@@ -470,14 +474,17 @@ async function planThroughPoint(
   occupancy: Map<string, Occupancy>,
 ): Promise<Itinerary | null> {
   const { origin, destination, time } = context.request;
+  const toBoarding = walkToBoarding(context, point);
+  // From arriving at the car park or station to being on the platform.
+  const accessSeconds = bufferSeconds + toBoarding.durationSeconds;
 
   const transitTime =
     time.type === 'depart'
-      ? { type: 'depart' as const, at: addSeconds(time.at, rankedDriveSeconds + bufferSeconds) }
+      ? { type: 'depart' as const, at: addSeconds(time.at, rankedDriveSeconds + accessSeconds) }
       : time;
   // Parking or being dropped off only makes sense with a public transport leg after it, and
   // Park&Ride is only free with one. A walk-only answer means the destination is simply nearby.
-  const journeys = (await queryTransit(context, point.place, destination, transitTime)).filter(
+  const journeys = (await queryTransit(context, point.boarding, destination, transitTime)).filter(
     (journey) =>
       transitLegsOf(journey.legs).length > 0 &&
       (time.type === 'depart' || arrivesBy(journey, time.at)) &&
@@ -488,7 +495,7 @@ async function planThroughPoint(
   let journey: TransitJourney | undefined = ranked[0];
   if (!journey) return null;
 
-  const mustArriveAt = addSeconds(journeyStart(journey), -bufferSeconds);
+  const mustArriveAt = addSeconds(journeyStart(journey), -accessSeconds);
   let route = await routeDrive(context, driving, origin, point.place, {
     type: 'arrive',
     at: mustArriveAt,
@@ -505,8 +512,8 @@ async function planThroughPoint(
     });
     leaveAt = time.at;
     arriveAt = addSeconds(time.at, route.durationSeconds);
-    const walkFrom = addSeconds(arriveAt, bufferSeconds);
-    journey = ranked.find((candidate) => !isBefore(journeyStart(candidate), walkFrom));
+    const onPlatformFrom = addSeconds(arriveAt, accessSeconds);
+    journey = ranked.find((candidate) => !isBefore(journeyStart(candidate), onPlatformFrom));
     if (!journey) {
       reject(context, 'departs-before-requested');
       return null;
@@ -514,6 +521,7 @@ async function planThroughPoint(
   }
 
   const readyAt = addSeconds(arriveAt, bufferSeconds);
+  const onPlatformAt = addSeconds(readyAt, toBoarding.durationSeconds);
   const firstLegs: Leg[] = [
     driveLeg(
       driving,
@@ -551,14 +559,40 @@ async function planThroughPoint(
       timing: 'buffer',
     });
   }
+  if (toBoarding.durationSeconds > 0) {
+    firstLegs.push({
+      id: `walk-to-platform-${point.id}`,
+      kind: 'walk',
+      from: point.place,
+      to: point.boarding,
+      start: readyAt,
+      end: onPlatformAt,
+      source: 'hopready',
+      timing: 'estimated',
+      distanceMetres: toBoarding.distanceMetres,
+      path: [point.place.coordinate, point.boarding.coordinate],
+    });
+  }
 
   return buildItinerary({
     strategy,
-    legs: [...firstLegs, ...startWalkingWhenReady(journey.legs, readyAt)],
+    legs: [...firstLegs, ...startWalkingWhenReady(journey.legs, onPlatformAt)],
     parking,
     fare: journey.fare,
     alerts: journey.alerts,
   });
+}
+
+// The walk from a car park to the platform it serves is HopReady's own estimate, from the car
+// park's position to the station's. Asking TfNSW from the stop id instead of the car park's
+// coordinate makes the journey start at the platform, without TfNSW's padded access walk.
+function walkToBoarding(context: PlanContext, point: TransferPoint): Walk {
+  if (point.boarding === point.place) return NO_WALK;
+  return walkBetween(
+    point.place.coordinate,
+    point.boarding.coordinate,
+    context.request.preferences.walkingSpeed,
+  );
 }
 
 async function planReturnViaCar(
@@ -732,22 +766,26 @@ async function transferPoints(
 
   const preferredStopId = request.preferredStop?.stopId;
   if (strategy === 'park-and-ride') {
-    const documented = facilities.map((facility) => ({
-      id: facility.id,
-      name: facility.name,
-      place: {
+    const documented = facilities.map((facility): TransferPoint => {
+      const place: Place = {
         name: facility.name,
         coordinate: facility.coordinate,
-        kind: 'car-park' as const,
+        kind: 'car-park',
         carParkId: facility.id,
-      },
-      facility,
-      station: facility.station ? stationKey(facility.station) : null,
-      preferred:
-        facility.id === request.preferredCarParkId ||
-        (preferredStopId !== undefined && facility.station?.stopId === preferredStopId),
-    }));
-    const saved = (request.savedParkingSpots ?? []).map((spot) => {
+      };
+      return {
+        id: facility.id,
+        name: facility.name,
+        place,
+        boarding: facility.station?.stopId ? facility.station : place,
+        facility,
+        station: facility.station ? stationKey(facility.station) : null,
+        preferred:
+          facility.id === request.preferredCarParkId ||
+          (preferredStopId !== undefined && facility.station?.stopId === preferredStopId),
+      };
+    });
+    const saved = (request.savedParkingSpots ?? []).map((spot): TransferPoint => {
       const facility: CarParkFacility = {
         id: spot.id,
         name: spot.name,
@@ -758,10 +796,12 @@ async function transferPoints(
         rules: { status: 'unknown' },
         station: null,
       };
+      const place: Place = { name: spot.name, coordinate: spot.coordinate, kind: 'saved-parking' };
       return {
         id: spot.id,
         name: spot.name,
-        place: { name: spot.name, coordinate: spot.coordinate, kind: 'saved-parking' as const },
+        place,
+        boarding: place,
         facility,
         station: null,
         preferred: spot.id === request.preferredCarParkId,
@@ -780,6 +820,7 @@ async function transferPoints(
       id: `station:${key}`,
       name: station.name,
       place: station,
+      boarding: station,
       facility: null,
       station: key,
       preferred: preferredStopId !== undefined && station.stopId === preferredStopId,
@@ -792,6 +833,7 @@ async function transferPoints(
       id: `station:${key}`,
       name: preferredStop.name,
       place: preferredStop,
+      boarding: preferredStop,
       facility: null,
       station: key,
       preferred: true,
@@ -1164,21 +1206,16 @@ function selectItineraries(context: PlanContext, candidates: Itinerary[]): Itine
   return listed;
 }
 
-// Another car park or station that is no better on anything the results can be sorted by is padding,
-// not a choice, as long as the shown one is as likely to have a space. A car park at another station
-// is the fallback for when the shown one fills, so it is hidden only while the shown one's count will
-// still be fresh, with room, when the traveller parks. Car parks at one station share its services,
-// so there one hides another whenever its count is no worse, however old it will be by then. The car
-// park the traveller asked for is never hidden, and an option at a station they asked for is hidden
-// only behind another option at that station, whatever car park they also asked for.
+// Two car parks at one station share its services, so one that is no better on anything the cards
+// show, and no surer of a space, is padding rather than a choice. Car parks at different stations
+// are always listed: a station a few minutes back, or on another line, is a real choice even when
+// another arrives sooner, and it is where to go when the first fills. The car park the traveller
+// asked for is never hidden.
 function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): Itinerary[] {
   const isPreferred = (option: Itinerary) => context.preferredOptions.has(option.id);
   const isCarParkAskedFor = (option: Itinerary) =>
     option.parking !== null && option.parking.carPark.id === context.request.preferredCarParkId;
-  const { preferredStop } = context.request;
-  const stationAskedFor = preferredStop ? stationKey(preferredStop) : undefined;
-  const isAtStationAskedFor = (option: Itinerary) =>
-    stationAskedFor !== undefined && context.optionStations.get(option.id) === stationAskedFor;
+  const stationOf = (option: Itinerary) => context.optionStations.get(option.id);
   // Strongest first, so an option is only ever hidden behind one that is shown. Options through the
   // car park or station the traveller asked for lead, so of two that read the same, theirs is shown.
   // After that, an option sorts ahead of any it strictly dominates, and of two that dominate each
@@ -1193,20 +1230,21 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
         a.transfers - b.transfers ||
         a.alerts.length - b.alerts.length ||
         LIVE_TIMES_RANK[b.realtime] - LIVE_TIMES_RANK[a.realtime] ||
-        Number(canCountOnASpace(context, b)) - Number(canCountOnASpace(context, a)) ||
         spaceOutlook(b) - spaceOutlook(a) ||
         shownSecondsBetween(a.departAt, b.departAt),
     );
   const shown: Itinerary[] = [];
   const hidden = new Set<Itinerary>();
   for (const option of strongestFirst) {
+    const station = stationOf(option);
     const dominated =
+      station !== undefined &&
       !isCarParkAskedFor(option) &&
       shown.some(
         (other) =>
           other.strategy === option.strategy &&
-          (isAtStationAskedFor(other) || !isAtStationAskedFor(option)) &&
-          canStandInFor(context, other, option) &&
+          stationOf(other) === station &&
+          spaceOutlook(other) >= spaceOutlook(option) &&
           dominates(other, option),
       );
     if (dominated) hidden.add(option);
@@ -1252,34 +1290,10 @@ function shownDriveMinutes(itinerary: Itinerary): number {
   return Math.round(itinerary.driveSeconds / 60);
 }
 
-// Whether `shown` leaves the traveller as sure of a space as `other` would. A drop-off needs no
-// space. A car park at the other's station shares its services, so a count no worse than the other's
-// is enough. One at another station needs a space to count on, or the other stays as the fallback
-// for when it fills.
-function canStandInFor(context: PlanContext, shown: Itinerary, other: Itinerary): boolean {
-  if (shown.strategy === 'drop-off') return true;
-  const station = context.optionStations.get(shown.id);
-  if (station !== undefined && station === context.optionStations.get(other.id)) {
-    return spaceOutlook(shown) >= spaceOutlook(other);
-  }
-  return canCountOnASpace(context, shown);
-}
-
-// A drop-off needs no space. A car park needs a count with room that is still within the freshness
-// limit when the traveller parks: a count says nothing about a space much later, however fresh it
-// was when the trip was planned.
-function canCountOnASpace(context: PlanContext, itinerary: Itinerary): boolean {
-  if (itinerary.strategy === 'drop-off') return true;
-  const occupancy = itinerary.parking?.occupancy;
-  const park = itinerary.legs.find((leg) => leg.kind === 'park');
-  if (occupancy?.status !== 'known' || !park) return false;
-  const minutesOldOnParking = secondsBetween(occupancy.observedAt, park.start) / 60;
-  return minutesOldOnParking <= context.limits.occupancyFreshMinutes && hasRoom(occupancy);
-}
-
 // How likely a car park is to have a space, judged from its count as it stands: room beats no count
-// or an old one, which beats nearly full.
+// or an old one, which beats nearly full. A drop-off needs no space.
 function spaceOutlook(itinerary: Itinerary): number {
+  if (itinerary.strategy === 'drop-off') return 2;
   const occupancy = itinerary.parking?.occupancy;
   if (occupancy?.status !== 'known') return 1;
   return hasRoom(occupancy) ? 2 : 0;

@@ -126,20 +126,32 @@ function rideMinutes(from: Place, to: Place) {
   return Math.max(3, Math.round((haversineMetres(from.coordinate, to.coordinate) * 1.3) / 583));
 }
 
-// Every origin connects to every destination by: walk 4 min, metro every 6 min, walk 5 min. A slower
-// service can be asked for by name.
-function metroJourney(
-  from: Place,
-  to: Place,
-  metroDeparts: string,
-  slower: { name: string; extraRideMinutes: number } | null = null,
-): TransitJourney {
+// How a journey reaches its first service: from a stop (asked for by stop id, as the planner does
+// for a car park's station) it starts on the platform, like TfNSW; from anywhere else it walks 4
+// minutes to a nearby station.
+function boarding(from: Place, boards: string): { station: Place; access: Leg[] } {
+  if (from.stopId) return { station: from, access: [] };
   const station = place(
     `${from.name} station`,
     from.coordinate.lat,
     from.coordinate.lon + 0.001,
     'stop',
   );
+  return {
+    station,
+    access: [walk(from, station, addMinutes(boards, -WALK_TO_STOP_MINUTES), boards)],
+  };
+}
+
+// Every origin connects to every destination by: walk 4 min (none from a stop), metro every 6 min,
+// walk 5 min. A slower service can be asked for by name.
+function metroJourney(
+  from: Place,
+  to: Place,
+  metroDeparts: string,
+  slower: { name: string; extraRideMinutes: number } | null = null,
+): TransitJourney {
+  const { station, access } = boarding(from, metroDeparts);
   const alight = place(`${to.name} station`, to.coordinate.lat, to.coordinate.lon - 0.001, 'stop');
   const metroArrives = addMinutes(
     metroDeparts,
@@ -147,7 +159,7 @@ function metroJourney(
   );
   return {
     legs: [
-      walk(from, station, addMinutes(metroDeparts, -WALK_TO_STOP_MINUTES), metroDeparts),
+      ...access,
       transit(station, alight, metroDeparts, metroArrives, { realtime: true, name: slower?.name }),
       walk(
         alight,
@@ -176,12 +188,7 @@ function journeyBoardingAt(
   boards: string,
   { rideMinutes, change = false }: { rideMinutes: number; change?: boolean },
 ): TransitJourney {
-  const station = place(
-    `${from.name} station`,
-    from.coordinate.lat,
-    from.coordinate.lon + 0.001,
-    'stop',
-  );
+  const { station, access } = boarding(from, boards);
   const alight = place(`${to.name} station`, to.coordinate.lat, to.coordinate.lon - 0.001, 'stop');
   const epping = place('Epping Station', -33.7727, 151.0818, 'stop');
   const arrives = addMinutes(boards, rideMinutes);
@@ -193,7 +200,7 @@ function journeyBoardingAt(
     : [transit(station, alight, boards, arrives, { realtime: true })];
   return {
     legs: [
-      walk(from, station, addMinutes(boards, -WALK_TO_STOP_MINUTES), boards),
+      ...access,
       ...rides,
       walk(alight, to, arrives, addMinutes(arrives, WALK_FROM_STOP_MINUTES), `walk-${to.name}`),
     ],
@@ -212,7 +219,8 @@ function alignToHeadway(iso: string, direction: 'up' | 'down'): string {
 function metroTimetable(query: TransitQuery): TransitJourney[] {
   const { from, to, time } = query;
   if (time.type === 'depart') {
-    const first = alignToHeadway(addMinutes(time.at, WALK_TO_STOP_MINUTES), 'up');
+    const accessMinutes = from.stopId ? 0 : WALK_TO_STOP_MINUTES;
+    const first = alignToHeadway(addMinutes(time.at, accessMinutes), 'up');
     return [0, 1, 2].map((n) =>
       metroJourney(from, to, addMinutes(first, n * METRO_HEADWAY_MINUTES)),
     );
@@ -529,7 +537,7 @@ describe('arrive by', () => {
 
   it('skips a service now expected after the arrive-by time for one that arrives in time', async () => {
     const runningLate = fakeTransit((query) =>
-      query.from.kind === 'car-park'
+      query.from.kind === 'stop'
         ? [
             ...metroTimetable(query),
             journeyArrivingAt(query.from, query.to, addMinutes(query.time.at, 3)),
@@ -593,24 +601,13 @@ describe('choosing which car parks to check', () => {
   });
 });
 
-describe('leaving out car parks that are no better', () => {
-  // From Tallawong P1 the traveller leaves later, drives less and arrives sooner than from Bella Vista.
-  const tallawongAndBellaVista = (tallawongCount: Occupancy | null) =>
-    fakeCarParks(new Map(tallawongCount ? [[TALLAWONG.id, tallawongCount]] : []), [
-      TALLAWONG,
-      BELLA_VISTA,
-    ]);
+describe('listing car parks as real choices', () => {
   const count = (spacesAvailable: number, minutesAgo = 2): Occupancy => ({
     status: 'known',
     spacesAvailable,
     totalSpaces: 120,
     observedAt: addMinutes(NOW, -minutesAgo),
   });
-  // The traveller parks at Tallawong P1 20 minutes after a count taken just before planning, and at
-  // Kellyville later still. Unless a test says otherwise, counts here are trusted for 30 minutes, so
-  // one lasts the drive and a car park with room can stand in for one at another station.
-  const depsTrustingCountsForTheDrive = (overrides: Partial<PlannerDeps> = {}) =>
-    deps({ limits: { occupancyFreshMinutes: 30 }, ...overrides });
   const shownCarParks = (response: PlanResponse) =>
     response.itineraries.flatMap((it) => (it.parking ? [it.parking.carPark.id] : []));
   const LIFTS_OUT: ServiceAlert = {
@@ -628,235 +625,127 @@ describe('leaving out car parks that are no better', () => {
       leg.kind === 'transit' ? { ...leg, timing: 'scheduled' } : leg,
     ),
   });
+  // The planner asks for a car park's journeys from its station, so journeys are keyed by the
+  // station's name, and two car parks at one station get the same answer.
   const changingJourneysFrom = (
-    carParkName: string,
+    stationName: string,
     change: (journey: TransitJourney) => TransitJourney,
   ) =>
     fakeTransit((query) => {
       const journeys = metroTimetable(query);
-      return query.from.name === carParkName ? journeys.map(change) : journeys;
+      return query.from.name === stationName ? journeys.map(change) : journeys;
     });
 
-  it('hides the slower car park only while the quicker one has a fresh count with room', async () => {
-    const planWith = async (tallawongCount: Occupancy | null) =>
-      shownCarParks(
-        await planTrip(
-          request(),
-          depsTrustingCountsForTheDrive({ carParks: tallawongAndBellaVista(tallawongCount) }),
-        ),
-      );
+  describe('at different stations', () => {
+    // From Tallawong P1 the traveller leaves later, drives less and arrives sooner than from Bella
+    // Vista, which is no reason to hide Bella Vista: it is a different station, and where to go
+    // when Tallawong fills.
+    const tallawongAndBellaVista = (tallawongCount: Occupancy | null) =>
+      fakeCarParks(new Map(tallawongCount ? [[TALLAWONG.id, tallawongCount]] : []), [
+        TALLAWONG,
+        BELLA_VISTA,
+      ]);
 
-    expect(await planWith(count(13))).toEqual([TALLAWONG.id]);
-    // A tenth of the spaces free is nearly full, so Bella Vista stays as somewhere else to park.
-    expect(await planWith(count(12))).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
-    expect(await planWith(count(60, 45))).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
-    expect(await planWith(null)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
-  });
-
-  it('says a hidden car park is matched by a shown one, rather than used', async () => {
-    const checkedWith = async (tallawongCount: Occupancy) =>
-      (
-        await planTrip(
-          request(),
-          depsTrustingCountsForTheDrive({ carParks: tallawongAndBellaVista(tallawongCount) }),
-        )
-      ).checkedCarParks;
-    const bellaVista = (outcome: string) => ({
-      id: BELLA_VISTA.id,
-      name: BELLA_VISTA.name,
-      outcome,
-    });
-
-    expect(await checkedWith(count(60))).toContainEqual(bellaVista('matched-by-another'));
-    expect(await checkedWith(count(12))).toContainEqual(bellaVista('used'));
-  });
-
-  describe('with a count that may be out of date by the time the traveller parks', () => {
-    // Tallawong P1's count has room, taken two minutes before planning.
-    const roomAtTallawongBefore = (plannedAt: string) =>
-      tallawongAndBellaVista({
-        status: 'known',
-        spacesAvailable: 60,
-        totalSpaces: 120,
-        observedAt: addMinutes(plannedAt, -2),
-      });
-
-    it('keeps the slower car park once the count is older than the limit at the car park', async () => {
-      // The traveller parks at Tallawong P1 at 7.48 am, 20 minutes after the count.
-      const planWithin = async (occupancyFreshMinutes: number) =>
+    it('lists both, whatever the better one says about its spaces', async () => {
+      const planWith = async (tallawongCount: Occupancy | null) =>
         shownCarParks(
-          await planTrip(
-            request(),
-            deps({ carParks: roomAtTallawongBefore(NOW), limits: { occupancyFreshMinutes } }),
-          ),
+          await planTrip(request(), deps({ carParks: tallawongAndBellaVista(tallawongCount) })),
         );
 
-      expect(await planWithin(DEFAULT_PLANNER_LIMITS.occupancyFreshMinutes)).toEqual([
-        TALLAWONG.id,
-        BELLA_VISTA.id,
-      ]);
-      expect(await planWithin(19)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
-      expect(await planWithin(20)).toEqual([TALLAWONG.id]);
+      expect(await planWith(count(60))).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
+      expect(await planWith(count(12))).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
+      expect(await planWith(count(60, 45))).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
+      expect(await planWith(null)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
     });
 
-    it('keeps the slower car park for a trip planned the evening before', async () => {
-      const eveningBefore = '2026-10-26T10:00:00Z'; // 9 pm on Monday
+    it('reports both as used', async () => {
       const response = await planTrip(
         request(),
-        depsTrustingCountsForTheDrive({
-          clock: { now: () => new Date(eveningBefore) },
-          carParks: roomAtTallawongBefore(eveningBefore),
-        }),
+        deps({ carParks: tallawongAndBellaVista(count(60)) }),
       );
 
-      expect(shownCarParks(response)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
-    });
-
-    it('keeps the slower car park for an arrive-by trip planned an hour ahead', async () => {
-      // To arrive by 9.30 am, the traveller leaves at 7.51 am and parks at Tallawong P1 at 8.06 am.
-      const anHourAhead = '2026-10-26T19:50:00Z'; // 6.50 am
-      const response = await planTrip(
-        request({ time: { type: 'arrive', at: '2026-10-26T22:30:00Z' } }),
-        depsTrustingCountsForTheDrive({
-          clock: { now: () => new Date(anHourAhead) },
-          carParks: roomAtTallawongBefore(anHourAhead),
-        }),
-      );
-
-      expect(shownCarParks(response)).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
-    });
-
-    it('lists the one whose count will hold, of two at different stations that read the same', async () => {
-      // A made-up car park beside Tallawong P1 that serves another station. Its train, a minute
-      // later, arrives with Tallawong's, but its count was taken 12 minutes before planning: 31
-      // minutes old when the traveller parks there, past the 30 minutes counts are trusted for here.
-      const NEXT_DOOR = facility(
-        '99',
-        'Next door',
-        TALLAWONG.coordinate.lat,
-        TALLAWONG.coordinate.lon,
-        'Another Station',
-        '9999999',
-      );
-      const transit = fakeTransit((query) => {
-        if (query.from.kind !== 'car-park') return metroTimetable(query);
-        const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
-        return query.from.name === NEXT_DOOR.name
-          ? [metroJourney(query.from, query.to, addMinutes(first, 1))]
-          : [
-              metroJourney(query.from, query.to, first, {
-                name: 'M1 all stops',
-                extraRideMinutes: 1,
-              }),
-            ];
+      expect(response.checkedCarParks).toContainEqual({
+        id: BELLA_VISTA.id,
+        name: BELLA_VISTA.name,
+        outcome: 'used',
       });
-      const occupancy = new Map([
-        [TALLAWONG.id, count(60)],
-        [NEXT_DOOR.id, count(60, 12)],
-      ]);
-      const response = await planTrip(
-        request(),
-        depsTrustingCountsForTheDrive({
-          transit,
-          carParks: fakeCarParks(occupancy, [TALLAWONG, NEXT_DOOR]),
-        }),
-      );
-
-      expect(shownCarParks(response)).toEqual([TALLAWONG.id]);
+      expect(response.checkedCarParks).toContainEqual({
+        id: TALLAWONG.id,
+        name: TALLAWONG.name,
+        outcome: 'used',
+      });
     });
-  });
 
-  describe('with a service alert or live times on one car park only', () => {
-    const planWith = async (transit: TransitProvider) =>
-      shownCarParks(
-        await planTrip(
-          request(),
-          depsTrustingCountsForTheDrive({ transit, carParks: tallawongAndBellaVista(count(60)) }),
-        ),
-      );
+    it('lists both when only one has an alert, or only one has live times', async () => {
+      const planWith = async (transit: TransitProvider) =>
+        shownCarParks(
+          await planTrip(request(), deps({ transit, carParks: tallawongAndBellaVista(count(60)) })),
+        );
+      const tallawongStation = TALLAWONG.station!.name;
 
-    it('keeps the slower car park when only the quicker one has an alert', async () => {
-      expect(await planWith(changingJourneysFrom(TALLAWONG.name, withLiftsOut))).toEqual([
+      expect(await planWith(changingJourneysFrom(tallawongStation, withLiftsOut))).toEqual([
         TALLAWONG.id,
         BELLA_VISTA.id,
       ]);
-      expect(await planWith(changingJourneysFrom(BELLA_VISTA.name, withLiftsOut))).toEqual([
-        TALLAWONG.id,
-      ]);
-    });
-
-    it('still hides the slower car park when both have the same alert', async () => {
-      const everyJourney = fakeTransit((query) => metroTimetable(query).map(withLiftsOut));
-
-      expect(await planWith(everyJourney)).toEqual([TALLAWONG.id]);
-    });
-
-    it('keeps the slower car park when only it has live times', async () => {
-      expect(await planWith(changingJourneysFrom(TALLAWONG.name, onTimetable))).toEqual([
+      expect(await planWith(changingJourneysFrom(tallawongStation, onTimetable))).toEqual([
         TALLAWONG.id,
         BELLA_VISTA.id,
       ]);
-      expect(await planWith(changingJourneysFrom(BELLA_VISTA.name, onTimetable))).toEqual([
-        TALLAWONG.id,
-      ]);
-    });
-  });
-
-  describe('keeps a car park that is better on any one count', () => {
-    // Tallawong P1 is a 15 min drive and Kellyville 23 min. Each has one journey, boarding at a set
-    // time, so the traveller leaves 27 min before a Tallawong train or 35 min before a Kellyville one.
-    const at = (minutesAfterNow: number) => addMinutes(NOW, minutesAfterNow);
-    const planWith = async (
-      journeys: Record<string, { boards: string; rideMinutes: number; change?: boolean }>,
-      overrides: Partial<PlanRequest> = {},
-    ) => {
-      const transit = fakeTransit((query) => {
-        const journey = journeys[query.from.name];
-        return journey
-          ? [journeyBoardingAt(query.from, query.to, journey.boards, journey)]
-          : metroTimetable(query);
-      });
-      const occupancy = new Map([
-        [TALLAWONG.id, count(60)],
-        [KELLYVILLE.id, count(60)],
-      ]);
-      const carParks = fakeCarParks(occupancy, [TALLAWONG, KELLYVILLE]);
-      return shownCarParks(
-        await planTrip(request(overrides), depsTrustingCountsForTheDrive({ transit, carParks })),
-      );
-    };
-
-    it('arrives sooner, even next to one at the station asked for that drives less', async () => {
-      // Kellyville: leave 7.31, arrive 8.41. Tallawong: leave 7.33, arrive 8.45.
-      const shown = await planWith(
-        {
-          [TALLAWONG.name]: { boards: at(30), rideMinutes: 40 },
-          [KELLYVILLE.name]: { boards: at(36), rideMinutes: 30 },
-        },
-        { preferredStop: TALLAWONG.station! },
-      );
-
-      expect(shown).toEqual([KELLYVILLE.id, TALLAWONG.id]);
     });
 
-    it('drives less, next to one that arrives sooner and leaves as late', async () => {
-      // Kellyville: leave 7.33, arrive 8.43. Tallawong: leave 7.33, arrive 8.45.
-      const shown = await planWith({
-        [TALLAWONG.name]: { boards: at(30), rideMinutes: 40 },
-        [KELLYVILLE.name]: { boards: at(38), rideMinutes: 30 },
+    describe('in order of arrival', () => {
+      // Tallawong P1 is a 15 min drive and Kellyville 23 min. Each station has one journey,
+      // boarding at a set time.
+      const at = (minutesAfterNow: number) => addMinutes(NOW, minutesAfterNow);
+      const tallawongStation = TALLAWONG.station!.name;
+      const kellyvilleStation = KELLYVILLE.station!.name;
+      const planWith = async (
+        journeys: Record<string, { boards: string; rideMinutes: number; change?: boolean }>,
+        overrides: Partial<PlanRequest> = {},
+      ) => {
+        const transit = fakeTransit((query) => {
+          const journey = journeys[query.from.name];
+          return journey
+            ? [journeyBoardingAt(query.from, query.to, journey.boards, journey)]
+            : metroTimetable(query);
+        });
+        const occupancy = new Map([
+          [TALLAWONG.id, count(60)],
+          [KELLYVILLE.id, count(60)],
+        ]);
+        const carParks = fakeCarParks(occupancy, [TALLAWONG, KELLYVILLE]);
+        return shownCarParks(await planTrip(request(overrides), deps({ transit, carParks })));
+      };
+
+      it('puts the one arriving sooner first, even behind one at the station asked for', async () => {
+        const shown = await planWith(
+          {
+            [tallawongStation]: { boards: at(30), rideMinutes: 40 },
+            [kellyvilleStation]: { boards: at(36), rideMinutes: 30 },
+          },
+          { preferredStop: TALLAWONG.station! },
+        );
+
+        expect(shown).toEqual([KELLYVILLE.id, TALLAWONG.id]);
       });
 
-      expect(shown).toEqual([KELLYVILLE.id, TALLAWONG.id]);
-    });
+      it('keeps the one that drives less, after one that arrives sooner', async () => {
+        const shown = await planWith({
+          [tallawongStation]: { boards: at(30), rideMinutes: 40 },
+          [kellyvilleStation]: { boards: at(38), rideMinutes: 30 },
+        });
 
-    it('has fewer changes, next to one that arrives sooner and drives less', async () => {
-      // Tallawong, changing at Epping: leave 7.31, arrive 8.40. Kellyville: leave 7.31, arrive 8.41.
-      const shown = await planWith({
-        [TALLAWONG.name]: { boards: at(28), rideMinutes: 37, change: true },
-        [KELLYVILLE.name]: { boards: at(36), rideMinutes: 30 },
+        expect(shown).toEqual([KELLYVILLE.id, TALLAWONG.id]);
       });
 
-      expect(shown).toEqual([TALLAWONG.id, KELLYVILLE.id]);
+      it('keeps the one with fewer changes, after one that arrives sooner', async () => {
+        const shown = await planWith({
+          [tallawongStation]: { boards: at(28), rideMinutes: 37, change: true },
+          [kellyvilleStation]: { boards: at(36), rideMinutes: 30 },
+        });
+
+        expect(shown).toEqual([TALLAWONG.id, KELLYVILLE.id]);
+      });
     });
   });
 
@@ -874,214 +763,124 @@ describe('leaving out car parks that are no better', () => {
     expect(isBefore(arrivals('drop-off')[0]!, arrivals('park-and-ride')[0]!)).toBe(true);
   });
 
-  it('still shows a slower car park the traveller asked for', async () => {
-    const withRoomAtTallawong = depsTrustingCountsForTheDrive({
-      carParks: tallawongAndBellaVista(count(60)),
+  describe('at one station', () => {
+    // Two car parks at Tallawong Station, which both get the same train. P2 is beside the platform;
+    // P1 is a walk away, so from P1 the traveller leaves earlier for that train.
+    const platform = TALLAWONG.station!.coordinate;
+    const metresPerDegreeOfLongitude = 92_600;
+    const carParkWestOfPlatform = (id: string, name: string, metres: number): CarParkFacility => ({
+      ...TALLAWONG,
+      id,
+      name,
+      coordinate: { lat: platform.lat, lon: platform.lon - metres / metresPerDegreeOfLongitude },
     });
-
-    expect(shownCarParks(await planTrip(request(), withRoomAtTallawong))).toEqual([TALLAWONG.id]);
-    expect(
-      shownCarParks(
-        await planTrip(request({ preferredCarParkId: BELLA_VISTA.id }), withRoomAtTallawong),
-      ),
-    ).toEqual([TALLAWONG.id, BELLA_VISTA.id]);
-  });
-
-  it('keeps a car park at the station asked for, even behind a better car park asked for', async () => {
-    // From Tallawong P1 the traveller leaves at 7.33 am and arrives at 8.45 am. From Kellyville
-    // (north) they leave at 7.31 am, drive longer and arrive at 8.50 am.
-    const journeys: Record<string, { boardsAfter: number; rideMinutes: number }> = {
-      [TALLAWONG.name]: { boardsAfter: 30, rideMinutes: 40 },
-      [KELLYVILLE.name]: { boardsAfter: 36, rideMinutes: 39 },
-    };
-    const transit = fakeTransit((query) => {
-      const journey = journeys[query.from.name];
-      if (!journey) return metroTimetable(query);
-      const boards = addMinutes(NOW, journey.boardsAfter);
-      return [
-        journeyBoardingAt(query.from, query.to, boards, { rideMinutes: journey.rideMinutes }),
-      ];
-    });
-    const occupancy = new Map([
-      [TALLAWONG.id, count(60)],
-      [KELLYVILLE.id, count(60)],
-    ]);
-    const withRoomAtBoth = depsTrustingCountsForTheDrive({
-      transit,
-      carParks: fakeCarParks(occupancy, [TALLAWONG, KELLYVILLE]),
-    });
-    const planAskingFor = async (asked: Partial<PlanRequest>) =>
-      shownCarParks(await planTrip(request(asked), withRoomAtBoth));
-    const kellyvilleStation = KELLYVILLE.station!;
-
-    expect(await planAskingFor({})).toEqual([TALLAWONG.id]);
-    expect(await planAskingFor({ preferredStop: kellyvilleStation })).toEqual([
-      TALLAWONG.id,
-      KELLYVILLE.id,
-    ]);
-    expect(
-      await planAskingFor({ preferredStop: kellyvilleStation, preferredCarParkId: TALLAWONG.id }),
-    ).toEqual([TALLAWONG.id, KELLYVILLE.id]);
-  });
-
-  describe('of two car parks at the same station', () => {
-    // About 30 m west of P1, so the planner lists P1 first and drives into P2 can be told apart.
-    const TALLAWONG_P2 = facility(
-      '27',
-      'Tallawong P2',
-      TALLAWONG.coordinate.lat,
-      TALLAWONG.coordinate.lon - 0.0003,
-      'Tallawong Station',
-      '2155384',
+    const TALLAWONG_P2 = carParkWestOfPlatform('27', 'Tallawong P2', 0);
+    const twoMinutesFromPlatform = carParkWestOfPlatform('26', 'Tallawong P1', 100);
+    const tallawongTwins = (p1: CarParkFacility, occupancy: Map<string, Occupancy>) =>
+      fakeCarParks(occupancy, [p1, TALLAWONG_P2]);
+    // One train from the station, so the twins can only differ in the walk, the drive and the count.
+    const oneTrain = fakeTransit((query) =>
+      query.from.kind === 'stop'
+        ? [metroJourney(query.from, query.to, addMinutes(NOW, 45))]
+        : metroTimetable(query),
     );
-    const tallawongTwins = (occupancy: Map<string, Occupancy>) =>
-      fakeCarParks(occupancy, [TALLAWONG, TALLAWONG_P2]);
-    // From P2 a quicker train two minutes later arrives with the all-stops one from P1.
-    const quickerTrainFromP2 = () =>
-      fakeTransit((query) => {
-        if (query.from.kind !== 'car-park') return metroTimetable(query);
-        const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
-        return query.from.name === TALLAWONG_P2.name
-          ? [metroJourney(query.from, query.to, addMinutes(first, 2))]
-          : [
-              metroJourney(query.from, query.to, first, {
-                name: 'M1 all stops',
-                extraRideMinutes: 2,
-              }),
-            ];
-      });
-    // The same line from both, with P2's train a set number of minutes after P1's.
-    const p2TrainLater = (minutes: number) =>
-      fakeTransit((query) => {
-        if (query.from.kind !== 'car-park') return metroTimetable(query);
-        const first = alignToHeadway(addMinutes(query.time.at, WALK_TO_STOP_MINUTES), 'up');
-        const boards = query.from.name === TALLAWONG_P2.name ? addMinutes(first, minutes) : first;
-        return [metroJourney(query.from, query.to, boards)];
-      });
+    const planWith = async (
+      p1: CarParkFacility,
+      p1Count: Occupancy | null,
+      p2Count: Occupancy | null,
+      overrides: Partial<PlanRequest> = {},
+    ) => {
+      const occupancy = new Map<string, Occupancy>();
+      if (p1Count) occupancy.set(p1.id, p1Count);
+      if (p2Count) occupancy.set(TALLAWONG_P2.id, p2Count);
+      return planTrip(
+        request(overrides),
+        deps({ transit: oneTrain, carParks: tallawongTwins(p1, occupancy) }),
+      );
+    };
 
     it('lists only the one with room when their cards would read the same', async () => {
-      // Twenty seconds more driving into P2 still reads as the same whole minutes.
-      const driving = fakeDriving();
-      const intoP2 = (to: { lon: number }) => to.lon === TALLAWONG_P2.coordinate.lon;
-      const longerIntoP2: DrivingProvider = {
-        ...driving,
-        estimateDrives: async (origin, destinations, time, signal) =>
-          (await driving.estimateDrives(origin, destinations, time, signal)).map(
-            (estimate, index) =>
-              estimate && intoP2(destinations[index]!)
-                ? { ...estimate, durationSeconds: estimate.durationSeconds + 20 }
-                : estimate,
-          ),
-        routeDrive: async (from, to, time, signal) => {
-          const route = await driving.routeDrive(from, to, time, signal);
-          return intoP2(to) ? { ...route, durationSeconds: route.durationSeconds + 20 } : route;
-        },
-      };
-      const occupancy = new Map([
-        [TALLAWONG.id, count(12)],
-        [TALLAWONG_P2.id, count(60)],
-      ]);
-      const response = await planTrip(
-        request(),
-        deps({ driving: longerIntoP2, carParks: tallawongTwins(occupancy) }),
-      );
+      const beside = carParkWestOfPlatform('26', 'Tallawong P1', 0);
 
-      expect(shownCarParks(response)).toEqual([TALLAWONG_P2.id]);
+      expect(shownCarParks(await planWith(beside, count(12), count(60)))).toEqual([
+        TALLAWONG_P2.id,
+      ]);
+      expect(shownCarParks(await planWith(beside, count(60), count(12)))).toEqual([beside.id]);
     });
 
-    it('lists only the one that lets the traveller leave later for the same arrival', async () => {
-      const occupancy = new Map([
-        [TALLAWONG.id, count(60)],
-        [TALLAWONG_P2.id, count(60)],
-      ]);
-      const response = await planTrip(
-        request(),
-        deps({ transit: quickerTrainFromP2(), carParks: tallawongTwins(occupancy) }),
-      );
+    it('lists only the one that lets the traveller leave later for the same train', async () => {
+      const response = await planWith(twoMinutesFromPlatform, count(60), count(60));
+      const [option] = response.itineraries.filter((it) => it.strategy === 'park-and-ride');
 
       expect(shownCarParks(response)).toEqual([TALLAWONG_P2.id]);
+      // Beside the platform there is nothing to walk, and the drive is timed to meet the train.
+      expect(option?.legs.map((leg) => leg.kind)).toEqual(['drive', 'park', 'transit', 'walk']);
     });
 
-    it('lists the one that leaves two minutes later, but not one that leaves a minute later', async () => {
-      const occupancy = new Map([
-        [TALLAWONG.id, count(60)],
-        [TALLAWONG_P2.id, count(60)],
-      ]);
-      const planWithP2Later = async (minutes: number) =>
-        shownCarParks(
-          await planTrip(
-            request(),
-            deps({ transit: p2TrainLater(minutes), carParks: tallawongTwins(occupancy) }),
-          ),
-        );
+    it('walks from the car park to the platform in its own estimate when they are apart', async () => {
+      const response = await planWith(twoMinutesFromPlatform, count(60), null);
+      const option = response.itineraries.find((it) => it.parking?.carPark.id === '26')!;
+      const walkToPlatform = option.legs[2]!;
 
-      expect(await planWithP2Later(2)).toEqual([TALLAWONG.id, TALLAWONG_P2.id]);
-      expect(await planWithP2Later(1)).toEqual([TALLAWONG.id]);
+      expect(option.legs.map((leg) => leg.kind)).toEqual([
+        'drive',
+        'park',
+        'walk',
+        'transit',
+        'walk',
+      ]);
+      expect(walkToPlatform).toMatchObject({ source: 'hopready', timing: 'estimated' });
+      expect(secondsBetween(walkToPlatform.start, walkToPlatform.end)).toBe(120);
+      expect(walkToPlatform.to).toEqual(TALLAWONG.station);
     });
 
     it('leaves one out only behind a twin no less likely to have a space, however old the counts', async () => {
-      // P1's train is a minute ahead of P2's, so P1 matches or beats P2 on every count. Neither
-      // count will still be fresh when the traveller parks, which matters only between stations.
-      const planWith = async (p1Count: Occupancy | null, p2Count: Occupancy | null) => {
-        const occupancy = new Map<string, Occupancy>();
-        if (p1Count) occupancy.set(TALLAWONG.id, p1Count);
-        if (p2Count) occupancy.set(TALLAWONG_P2.id, p2Count);
-        return shownCarParks(
-          await planTrip(
-            request(),
-            deps({ transit: p2TrainLater(1), carParks: tallawongTwins(occupancy) }),
-          ),
-        );
-      };
+      const shownWith = async (p1Count: Occupancy | null, p2Count: Occupancy | null) =>
+        shownCarParks(await planWith(twoMinutesFromPlatform, p1Count, p2Count));
       const withRoom = count(60);
       const nearlyFull = count(12);
       const stale = count(60, 45);
 
-      // Room beats no count or a stale one, which beats nearly full.
-      expect(await planWith(withRoom, nearlyFull)).toEqual([TALLAWONG.id]);
-      expect(await planWith(null, null)).toEqual([TALLAWONG.id]);
-      expect(await planWith(stale, nearlyFull)).toEqual([TALLAWONG.id]);
-      expect(await planWith(nearlyFull, null)).toEqual([TALLAWONG.id, TALLAWONG_P2.id]);
-      expect(await planWith(null, withRoom)).toEqual([TALLAWONG.id, TALLAWONG_P2.id]);
+      // P2 leaves later for the same train, so it hides P1 unless P1 is surer of a space. Listed
+      // options are in order of arrival, then total time, so P2 comes first when both are listed.
+      expect(await shownWith(null, null)).toEqual([TALLAWONG_P2.id]);
+      expect(await shownWith(nearlyFull, withRoom)).toEqual([TALLAWONG_P2.id]);
+      expect(await shownWith(nearlyFull, null)).toEqual([TALLAWONG_P2.id]);
+      expect(await shownWith(null, stale)).toEqual([TALLAWONG_P2.id]);
+      expect(await shownWith(withRoom, nearlyFull)).toEqual([TALLAWONG_P2.id, '26']);
+      expect(await shownWith(withRoom, null)).toEqual([TALLAWONG_P2.id, '26']);
+      expect(await shownWith(stale, nearlyFull)).toEqual([TALLAWONG_P2.id, '26']);
     });
 
-    it('lists only the one without an alert, or with live times, when the rest reads the same', async () => {
-      const occupancy = new Map([
-        [TALLAWONG.id, count(60)],
-        [TALLAWONG_P2.id, count(60)],
-      ]);
-      // P1 comes first, so the planner has to look past it to the twin that is more certain.
-      const planWith = async (transit: TransitProvider) =>
-        shownCarParks(
-          await planTrip(request(), deps({ transit, carParks: tallawongTwins(occupancy) })),
-        );
+    it('says the hidden twin is matched by the shown one, rather than used', async () => {
+      const response = await planWith(twoMinutesFromPlatform, null, null);
 
-      expect(await planWith(changingJourneysFrom(TALLAWONG.name, withLiftsOut))).toEqual([
-        TALLAWONG_P2.id,
-      ]);
-      expect(await planWith(changingJourneysFrom(TALLAWONG.name, onTimetable))).toEqual([
-        TALLAWONG_P2.id,
-      ]);
+      expect(response.checkedCarParks).toContainEqual({
+        id: '26',
+        name: 'Tallawong P1',
+        outcome: 'matched-by-another',
+      });
+      expect(response.checkedCarParks).toContainEqual({
+        id: TALLAWONG_P2.id,
+        name: TALLAWONG_P2.name,
+        outcome: 'used',
+      });
     });
 
-    it('still lists the car park asked for when a better one is at the station asked for', async () => {
-      const occupancy = new Map([
-        [TALLAWONG.id, count(60)],
-        [TALLAWONG_P2.id, count(60)],
-      ]);
-      const planAskingFor = async (asked: Partial<PlanRequest>) =>
-        shownCarParks(
-          await planTrip(
-            request(asked),
-            deps({ transit: quickerTrainFromP2(), carParks: tallawongTwins(occupancy) }),
-          ),
-        );
-      const station = TALLAWONG.station!;
+    it('still lists the car park asked for, next to its better twin', async () => {
+      const response = await planWith(twoMinutesFromPlatform, null, null, {
+        preferredCarParkId: '26',
+      });
 
-      expect(await planAskingFor({ preferredStop: station })).toEqual([TALLAWONG_P2.id]);
-      expect(
-        await planAskingFor({ preferredStop: station, preferredCarParkId: TALLAWONG.id }),
-      ).toEqual([TALLAWONG_P2.id, TALLAWONG.id]);
+      expect(shownCarParks(response)).toEqual([TALLAWONG_P2.id, '26']);
+    });
+
+    it('lists one option for a station asked for, not one per car park', async () => {
+      const response = await planWith(twoMinutesFromPlatform, null, null, {
+        preferredStop: TALLAWONG.station!,
+      });
+
+      expect(shownCarParks(response)).toEqual([TALLAWONG_P2.id]);
     });
   });
 });
@@ -1121,10 +920,12 @@ describe('more options than the list has room for', () => {
 
     expect(response.rejected).toEqual([]);
     expect(response.itineraries).toHaveLength(DEFAULT_PLANNER_LIMITS.maxItineraries);
-    expect(response.itineraries.map((it) => it.parking?.carPark.id).filter(Boolean)).toEqual([
-      KELLYVILLE.id,
-      TALLAWONG.id,
-    ]);
+    expect(
+      response.itineraries
+        .map((it) => it.parking?.carPark.id)
+        .filter(Boolean)
+        .sort(),
+    ).toEqual([TALLAWONG.id, KELLYVILLE.id].sort());
     expect(outcomeOf(TALLAWONG)).toBe('used');
     expect(outcomeOf(KELLYVILLE)).toBe('used');
     expect(outcomeOf(BELLA_VISTA)).toBe('left-out-for-space');
@@ -1153,7 +954,7 @@ describe('transfer strategies need public transport', () => {
 describe('choosing which journey to take from a car park', () => {
   it('takes the journey that arrives first, even when a slower one leaves earlier', async () => {
     const slowerFirst = fakeTransit((query) =>
-      query.from.kind === 'car-park'
+      query.from.kind === 'stop'
         ? [
             metroJourney(query.from, query.to, addMinutes(query.time.at, WALK_TO_STOP_MINUTES), {
               name: 'Slow',
@@ -1186,12 +987,12 @@ describe('choosing which journey to take from a car park', () => {
     });
     // The first service leaves just as the estimate has the traveller reach the platform.
     const justInTime = fakeTransit((query) =>
-      query.from.kind === 'car-park'
+      query.from.kind === 'stop'
         ? [0, 1, 2].map((n) =>
             metroJourney(
               query.from,
               query.to,
-              addMinutes(query.time.at, WALK_TO_STOP_MINUTES + n * METRO_HEADWAY_MINUTES),
+              addMinutes(query.time.at, n * METRO_HEADWAY_MINUTES),
             ),
           )
         : [],

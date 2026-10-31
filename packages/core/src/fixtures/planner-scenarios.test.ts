@@ -144,11 +144,15 @@ function expectSoundItinerary(
         }
         expect(legSeconds(leg)).toBeLessThanOrEqual(preferences.maxDriveMinutes * 60);
         return;
-      case 'walk':
-        expect(leg.source).toBe('demo-fixture');
+      case 'walk': {
+        // The walk from a car park to its platform is HopReady's own estimate; every other walk
+        // comes from the transit provider.
+        const previous = itinerary.legs[index - 1];
+        expect(leg.source).toBe(previous?.kind === 'park' ? 'hopready' : 'demo-fixture');
         expect(leg.timing).toBe('estimated');
         expect(legSeconds(leg)).toBeLessThanOrEqual(preferences.maxWalkMinutes * 60);
         return;
+      }
       case 'transit':
         expectHonestTransitLeg(leg);
         return;
@@ -680,19 +684,6 @@ describe('only real choices', () => {
   const hasRoom = (count: { spacesAvailable: number; totalSpaces: number }) =>
     count.spacesAvailable > count.totalSpaces * NEARLY_FULL_FREE_SHARE;
 
-  // A count with more than a tenth of the spaces free, taken at most 15 minutes before the traveller
-  // parks.
-  const canCountOnASpace = (itinerary: Itinerary) => {
-    const occupancy = itinerary.parking?.occupancy;
-    const park = itinerary.legs.find((leg) => leg.kind === 'park');
-    return (
-      occupancy?.status === 'known' &&
-      park !== undefined &&
-      secondsBetween(occupancy.observedAt, park.start) <= OCCUPANCY_FRESH_MINUTES * 60 &&
-      hasRoom(occupancy)
-    );
-  };
-
   // Room beats no count or a stale one, which beats nearly full.
   const spaceOutlook = (itinerary: Itinerary) => {
     const occupancy = itinerary.parking?.occupancy;
@@ -704,15 +695,15 @@ describe('only real choices', () => {
     PARK_AND_RIDE_CATALOGUE.find((entry) => entry.facilityId === itinerary.parking?.carPark.id)
       ?.station.stopId;
 
-  // A drop-off needs no space. A car park at the other's station needs a count no worse; one at
-  // another station needs a space to count on, or the other is a fallback.
+  // Only a car park at the other's station can stand in for it, and only with a count no worse. A
+  // car park at another station is a choice in its own right, and where to go when the other fills.
   const canStandInFor = (better: Itinerary, other: Itinerary) => {
-    if (better.strategy === 'drop-off') return true;
     const station = stationOf(better);
-    if (station !== undefined && station === stationOf(other)) {
-      return spaceOutlook(better) >= spaceOutlook(other);
-    }
-    return canCountOnASpace(better);
+    return (
+      station !== undefined &&
+      station === stationOf(other) &&
+      spaceOutlook(better) >= spaceOutlook(other)
+    );
   };
 
   const placeOf = (itinerary: Itinerary) =>
@@ -790,9 +781,8 @@ describe('only real choices', () => {
   }
 
   it('lists one of the two Kellyville car parks beside Tallawong P2 from Box Hill at 7.30 am', async () => {
-    // Tallawong P2's count will be over 15 minutes old when the traveller parks there at 7.52 am, so
-    // a car park at another station stays as somewhere else to park. Both Kellyville car parks serve
-    // the same station and read the same, so one card is enough.
+    // Kellyville is another station, so it is listed whatever Tallawong's count says. Both
+    // Kellyville car parks serve the same station and read the same, so one card is enough.
     const response = await plan(request(), { now: TUESDAY_0730 });
     expectSoundResponse(response);
 
@@ -878,12 +868,15 @@ describe('only real choices', () => {
     ).toBe('matched-by-another');
   });
 
-  it('drops off at Tallawong only, the quicker of two stations on the same line', async () => {
+  it('drops off at both stations on the line, the quicker one first', async () => {
     const dropOffOnly = request({ access: { transit: true, drive: false, dropOff: true } });
     const response = await plan(dropOffOnly, { now: TUESDAY_0730 });
     expectSoundResponse(response);
 
-    expect(byStrategy(response, 'drop-off').map(placeOf)).toEqual(['Tallawong Station']);
+    expect(byStrategy(response, 'drop-off').map(placeOf)).toEqual([
+      'Tallawong Station',
+      'Kellyville Station',
+    ]);
   });
 
   it('lists the car park the traveller asked for, even behind the quicker Tallawong P2', async () => {
