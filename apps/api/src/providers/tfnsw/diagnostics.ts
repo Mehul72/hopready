@@ -24,7 +24,11 @@ export type TfnswDiagnostic =
     }
   | { kind: 'stale-facility-list'; ageHours: number }
   | { kind: 'empty-facility-list' }
-  | { kind: 'occupancy-left-out'; reason: 'unreadable' | 'request-failed'; facilityIds: string[] };
+  | { kind: 'occupancy-left-out'; reason: 'unreadable' | 'request-failed'; facilityIds: string[] }
+  // The one-call list of every car park could not be read or fetched, so car parks were asked for
+  // one at a time instead.
+  | { kind: 'full-list-unavailable' }
+  | { kind: 'full-list-entries-unreadable'; count: number };
 
 export type DiagnosticSink = (diagnostic: TfnswDiagnostic) => void;
 

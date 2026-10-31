@@ -142,6 +142,15 @@ export const carParkListSchema = z.union([
   z.array(z.object({ facility_id: numberLikeSchema, facility_name: z.string() })),
 ]);
 
+// GET /v1/carpark/full-list: every facility's details and occupancy in one answer. The endpoint is
+// not in the documentation; the shape recorded on 2026-10-28 is an array of the objects that
+// GET /v1/carpark?facility=<id> returns one at a time. Entries are read one by one, so a broken
+// entry costs only itself.
+export const carParkFullListSchema = z.union([
+  z.array(z.unknown()),
+  z.record(z.string(), z.unknown()),
+]);
+
 // GET /v1/carpark?facility=<id>
 export const carParkFacilitySchema = z.object({
   facility_id: numberLikeSchema,

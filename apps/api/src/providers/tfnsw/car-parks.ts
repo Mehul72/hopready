@@ -20,12 +20,21 @@ import {
 import { asProviderError, type TfnswClient } from './client';
 import type { DiagnosticSink } from './diagnostics';
 import { nonEmptyText } from './fields';
-import { carParkFacilitySchema, carParkListSchema, type CarParkFacilityFeed } from './schemas';
+import {
+  carParkFacilitySchema,
+  carParkFullListSchema,
+  carParkListSchema,
+  type CarParkFacilityFeed,
+} from './schemas';
 
 const PROVIDER = 'tfnsw-car-park';
+const FULL_LIST_PATH = '/v1/carpark/full-list';
 const HOUR_MS = 60 * 60 * 1_000;
 const FACILITY_LIST_TTL_MS = 24 * HOUR_MS;
 const OCCUPANCY_TTL_MS = 60 * 1_000;
+// One answer carries every car park, so a plan's several car parks cost one request. A single car
+// park is no cheaper that way, so it is asked for on its own.
+const MIN_IDS_FOR_FULL_LIST = 2;
 // Car park detail calls share the TfNSW rate limit with trip planning, so only a few run at once.
 const FACILITY_CONCURRENCY = 3;
 // IDs 1 to 5 are the Metro North West car parks the documentation marks "Historical Only".
@@ -60,6 +69,8 @@ export class TfnswCarParkProvider implements CarParkProvider {
   // A null value records that the latest answer had no usable occupancy, so it is not asked again
   // within the minute.
   private readonly occupancyById = new Map<string, Stored<Occupancy | null>>();
+  // The ids the latest full list carried, so a car park it left out is asked for on its own.
+  private fullList: Stored<Set<string>> | null = null;
 
   constructor(
     private readonly client: TfnswClient,
@@ -133,7 +144,14 @@ export class TfnswCarParkProvider implements CarParkProvider {
     signal: AbortSignal,
   ): Promise<Map<string, Occupancy>> {
     const ids = [...new Set(facilityIds)].filter(isLiveFacilityId);
+    if (
+      this.withoutFreshOccupancy(ids).length >= MIN_IDS_FOR_FULL_LIST &&
+      !this.hasFreshFullList()
+    ) {
+      await this.refreshFromFullList(signal);
+    }
     const known = new Map<string, Occupancy>();
+    const unreadable: string[] = [];
     const toFetch: string[] = [];
     for (const id of ids) {
       const stored = this.occupancyById.get(id);
@@ -141,13 +159,14 @@ export class TfnswCarParkProvider implements CarParkProvider {
         toFetch.push(id);
       } else if (stored.value) {
         known.set(id, stored.value);
+      } else {
+        unreadable.push(id);
       }
     }
 
     const outcomes = await mapSettled(toFetch, FACILITY_CONCURRENCY, (id) =>
       this.fetchFacility(id, signal),
     );
-    const unreadable: string[] = [];
     const failed: string[] = [];
     let firstFailure: ProviderError | undefined;
     outcomes.forEach((outcome, index) => {
@@ -172,6 +191,52 @@ export class TfnswCarParkProvider implements CarParkProvider {
       this.report({ kind: 'occupancy-left-out', reason: 'request-failed', facilityIds: failed });
     }
     return known;
+  }
+
+  private withoutFreshOccupancy(ids: readonly string[]): string[] {
+    return ids.filter((id) => {
+      const stored = this.occupancyById.get(id);
+      return !stored || this.ageMs(stored) >= OCCUPANCY_TTL_MS;
+    });
+  }
+
+  private hasFreshFullList(): boolean {
+    return this.fullList !== null && this.ageMs(this.fullList) < OCCUPANCY_TTL_MS;
+  }
+
+  // Reads every car park's details and occupancy in one request. A failure is not an error here:
+  // each car park can still be asked for on its own.
+  private async refreshFromFullList(signal: AbortSignal): Promise<void> {
+    let entries: unknown[];
+    try {
+      const body = await this.client.get({
+        provider: PROVIDER,
+        path: FULL_LIST_PATH,
+        params: {},
+        parse: (raw) => carParkFullListSchema.parse(raw),
+        signal,
+      });
+      entries = Array.isArray(body) ? body : Object.values(body);
+    } catch {
+      this.report({ kind: 'full-list-unavailable' });
+      return;
+    }
+
+    const carried = new Set<string>();
+    let unreadable = 0;
+    for (const entry of entries) {
+      const parsed = carParkFacilitySchema.safeParse(entry);
+      if (!parsed.success) {
+        unreadable += 1;
+        continue;
+      }
+      const id = String(parsed.data.facility_id).trim();
+      if (!isLiveFacilityId(id)) continue;
+      carried.add(id);
+      this.rememberDetails(id, parsed.data);
+    }
+    if (unreadable > 0) this.report({ kind: 'full-list-entries-unreadable', count: unreadable });
+    this.fullList = { value: carried, storedAtMs: this.nowMs() };
   }
 
   private async fetchFacilityNames(signal: AbortSignal): Promise<Map<string, string>> {

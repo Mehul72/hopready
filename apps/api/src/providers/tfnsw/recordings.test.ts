@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { occupancyFromFeed } from './car-parks';
 import {
   carParkFacilitySchema,
+  carParkFullListSchema,
   carParkListSchema,
   stopFinderResponseSchema,
   tripResponseSchema,
@@ -31,8 +32,10 @@ const read = (fileName: string): unknown =>
 const trips = recorded('trip-');
 const stopSearches = recorded('stop-finder-');
 const facilityLists = recorded('carpark-list');
+const fullLists = recorded('carpark-full-list');
 const facilities = recorded('carpark-facility-');
-const anyRecorded = [...trips, ...stopSearches, ...facilityLists, ...facilities].length > 0;
+const anyRecorded =
+  [...trips, ...stopSearches, ...facilityLists, ...fullLists, ...facilities].length > 0;
 
 // The journey's own first and last places stand in for the planner's; only the stops between them
 // come from the recording.
@@ -78,6 +81,20 @@ describe.skipIf(!anyRecorded)('TfNSW recorded responses', () => {
       const list = carParkListSchema.parse(read(fileName));
 
       expect(Object.keys(list).length).toBeGreaterThan(0);
+    });
+  }
+
+  for (const fileName of fullLists) {
+    it(`reads every facility and most occupancies from ${fileName}`, () => {
+      const list = carParkFullListSchema.parse(read(fileName));
+      const entries = Array.isArray(list) ? list : Object.values(list);
+      const feeds = entries.map((entry) => carParkFacilitySchema.parse(entry));
+      const withOccupancy = feeds.filter((feed) => occupancyFromFeed(feed) !== null);
+
+      // 41 live facilities were listed when this was recorded; a few may be between readings.
+      expect(feeds.length).toBeGreaterThanOrEqual(40);
+      expect(withOccupancy.length).toBeGreaterThanOrEqual(feeds.length - 5);
+      for (const feed of feeds) expect(feed.tsn).toBeTruthy();
     });
   }
 

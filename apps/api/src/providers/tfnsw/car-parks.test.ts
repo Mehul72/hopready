@@ -18,10 +18,15 @@ const unavailable = () => new Response('', { status: 503 });
 
 type Overrides = Record<string, () => Response>;
 
-// Answers like the Car Park API: the list without `facility`, one car park with it. Overrides are
-// keyed by facility ID, or 'list'.
+// Answers like the Car Park API: the list without `facility`, one car park with it, and every car
+// park at /full-list. Overrides are keyed by facility ID, 'list' or 'full-list'.
 function carParkApi(overrides: Overrides = {}): FakeFetch {
   return fakeFetch((url) => {
+    if (url.pathname === '/v1/carpark/full-list') {
+      const override = overrides['full-list'];
+      if (override) return override();
+      return jsonResponse(loadFixture('carpark-full-list.schema-sample.json'));
+    }
     const facilityId = url.searchParams.get('facility');
     const override = overrides[facilityId ?? 'list'];
     if (override) return override();
@@ -282,10 +287,15 @@ describe('TfNSW car park facilities', () => {
 
 describe('TfNSW car park occupancy', () => {
   it('gives free spaces as spots minus total, never below zero, observed at MessageDate', async () => {
-    const { carParks } = setUp(carParkApi());
+    const fetchImpl = carParkApi();
+    const { carParks } = setUp(fetchImpl);
 
     const occupancy = await carParks.occupancy(['26', '27', '486'], neverAborted());
 
+    // Several car parks come from the one full list.
+    expect(fetchImpl.requests.map((request) => request.url.pathname)).toEqual([
+      '/v1/carpark/full-list',
+    ]);
     expect(occupancy.get('26')).toEqual({
       status: 'known',
       spacesAvailable: 24,
@@ -325,11 +335,12 @@ describe('TfNSW car park occupancy', () => {
     ['an unreadable MessageDate', { MessageDate: '26/10/2026 7:45' }],
     ['no MessageDate', { MessageDate: null }],
   ])('leaves out a car park with %s, and says so', async (_, change) => {
-    const feed = {
-      ...loadFixtureCopy<Record<string, unknown>>('carpark-facility-26.schema-sample.json'),
-      ...change,
-    };
-    const { carParks, diagnostics } = setUp(carParkApi({ '26': () => jsonResponse(feed) }));
+    const fullList = loadFixtureCopy<Record<string, unknown>[]>(
+      'carpark-full-list.schema-sample.json',
+    ).map((entry) => (String(entry.facility_id) === '26' ? { ...entry, ...change } : entry));
+    const { carParks, diagnostics } = setUp(
+      carParkApi({ 'full-list': () => jsonResponse(fullList) }),
+    );
 
     const occupancy = await carParks.occupancy(['26', '486'], neverAborted());
 
@@ -367,8 +378,68 @@ describe('TfNSW car park occupancy', () => {
     expect(occupancy.get('491')).toMatchObject({ totalSpaces: 180 });
   });
 
+  it('reads several car parks in one request and keeps every count for 60 seconds', async () => {
+    const fetchImpl = carParkApi();
+    const { carParks, advanceClock } = setUp(fetchImpl);
+
+    await carParks.occupancy(['26', '27'], neverAborted());
+    advanceClock(59_999);
+    const later = await carParks.occupancy(['486'], neverAborted());
+    expect(fetchImpl.requests.map((request) => request.url.pathname)).toEqual([
+      '/v1/carpark/full-list',
+    ]);
+    expect(later.get('486')).toMatchObject({ spacesAvailable: 180 });
+
+    advanceClock(1);
+    await carParks.occupancy(['486', '27'], neverAborted());
+    expect(fetchImpl.requests).toHaveLength(2);
+  });
+
+  it('asks on its own for a car park the full list leaves out', async () => {
+    const fetchImpl = carParkApi();
+    const { carParks } = setUp(fetchImpl);
+
+    const occupancy = await carParks.occupancy(['26', '7'], neverAborted());
+
+    expect(fetchImpl.requests.map((request) => request.url.pathname)).toEqual([
+      '/v1/carpark/full-list',
+      '/v1/carpark',
+    ]);
+    expect(facilityIdsAsked(fetchImpl)).toEqual([null, '7']);
+    expect([...occupancy.keys()].sort()).toEqual(['26', '7']);
+  });
+
+  it('falls back to one request per car park when the full list is unavailable', async () => {
+    const fetchImpl = carParkApi({ 'full-list': unavailable });
+    const { carParks, diagnostics } = setUp(fetchImpl);
+
+    const occupancy = await carParks.occupancy(['26', '486'], neverAborted());
+
+    // The full list is tried (and retried once, as any unavailable answer is) before each car park.
+    expect(fetchImpl.requests[0]!.url.pathname).toBe('/v1/carpark/full-list');
+    expect(facilityIdsAsked(fetchImpl).filter((id) => id !== null)).toEqual(['26', '486']);
+    expect([...occupancy.keys()]).toEqual(['26', '486']);
+    expect(diagnostics).toContainEqual({ kind: 'full-list-unavailable' });
+  });
+
+  it('skips and counts full-list entries it cannot read', async () => {
+    const fullList = [
+      ...loadFixtureCopy<unknown[]>('carpark-full-list.schema-sample.json'),
+      'not a facility',
+      { tsn: '1' },
+    ];
+    const { carParks, diagnostics } = setUp(
+      carParkApi({ 'full-list': () => jsonResponse(fullList) }),
+    );
+
+    const occupancy = await carParks.occupancy(['26', '27'], neverAborted());
+
+    expect([...occupancy.keys()]).toEqual(['26', '27']);
+    expect(diagnostics).toContainEqual({ kind: 'full-list-entries-unreadable', count: 2 });
+  });
+
   it('returns what it has when some car parks fail, and fails when all of them do', async () => {
-    const someFail = setUp(carParkApi({ '486': unavailable }));
+    const someFail = setUp(carParkApi({ 'full-list': unavailable, '486': unavailable }));
     const occupancy = await someFail.carParks.occupancy(['26', '486'], neverAborted());
     expect([...occupancy.keys()]).toEqual(['26']);
     expect(someFail.diagnostics).toContainEqual({
@@ -377,7 +448,9 @@ describe('TfNSW car park occupancy', () => {
       facilityIds: ['486'],
     });
 
-    const allFail = setUp(carParkApi({ '26': unavailable, '486': unavailable }));
+    const allFail = setUp(
+      carParkApi({ 'full-list': unavailable, '26': unavailable, '486': unavailable }),
+    );
     const error = await allFail.carParks
       .occupancy(['26', '486'], neverAborted())
       .catch((reason: unknown) => reason);
