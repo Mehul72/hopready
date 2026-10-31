@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Decisions 1 (the walking limit sent to TfNSW) and 4 (from a car park, the journey within the preferences is preferred) are superseded by ADR-0009; the rest stands.
 
 ## Date
 

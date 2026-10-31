@@ -8,14 +8,14 @@ HopReady estimates every documented car park within the driving limit, checks th
 
 ## Strategies
 
-| Strategy         | Legs                                                      | Provider calls                                                                                                |
-| ---------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `transit-only`   | walk, transit, walk (from TfNSW)                          | 1 TfNSW trip                                                                                                  |
-| `park-and-ride`  | drive, park, walk (HopReady's estimate), transit, walk    | 1 occupancy list, Apple ETAs for up to 20 car parks (10 a request), up to 5 TfNSW trips, up to 5 Apple routes |
-| `drop-off`       | ride (someone else drives), drop-off, walk, transit, walk | same as park-and-ride, from the stations those car parks serve, without the occupancy list                    |
-| `drive-only`     | drive                                                     | 1 Apple route                                                                                                 |
-| `return-via-car` | walk, transit, walk to the car, car retrieval, drive      | 1 TfNSW trip (none within 300 m of the car), up to 2 Apple routes                                             |
-| `transit-home`   | walk, transit, walk                                       | 1 TfNSW trip                                                                                                  |
+| Strategy         | Legs                                                                                            | Provider calls                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `transit-only`   | walk, transit, walk (from TfNSW)                                                                | 1 TfNSW trip                                                                                                  |
+| `park-and-ride`  | drive, park, walk (HopReady's estimate), transit, walk; or drive, park, walk to the destination | 1 occupancy list, Apple ETAs for up to 20 car parks (10 a request), up to 5 TfNSW trips, up to 5 Apple routes |
+| `drop-off`       | ride (someone else drives), drop-off, walk, transit, walk                                       | same as park-and-ride, from the stations those car parks serve, without the occupancy list                    |
+| `drive-only`     | drive                                                                                           | 1 Apple route                                                                                                 |
+| `return-via-car` | walk, transit, walk to the car, car retrieval, drive                                            | 1 TfNSW trip (none within 300 m of the car), up to 2 Apple routes                                             |
+| `transit-home`   | walk, transit, walk                                                                             | 1 TfNSW trip                                                                                                  |
 
 A traveller who was dropped off gets `transit-home` and is never sent back for a car. The trip kind (`return-via-car` or `return-without-car`) comes from what the user confirmed in the app, not from the car park that was suggested.
 
@@ -28,8 +28,10 @@ The rules below are ADR-0007. Direction is never a rule on its own: for a trip i
 3. **Estimate.** Every car park within reach gets a door-to-door estimate: a rough drive (straight line × 1.35 at 40 km/h), the parking buffer, HopReady's walk from the entrance to the platform, and the public transport time from the station. The public transport time comes from the hub table (`packages/core/src/data/park-and-ride-hub-times.ts`): on-board minutes and headway from each Park&Ride station to Sydney's hubs, recorded from the TfNSW Trip Planner for weekday peak (6 to 10 and 15 to 19), weekday off-peak and weekend. The planner adds half the headway as waiting, then the walk from the hub nearest the destination (up to 1.5 km) or a 5 minute change and a rough onward ride. A straight-line ride (distance × 1.35 at 35 km/h, plus 8 minutes) is the ceiling, so a destination far from every hub still gets an estimate (`packages/core/src/estimate.ts`). Alongside the plain minutes, each car park gets a score in which waiting counts 1.4 times and walking 1.5 times, the weights Transport for NSW and ATAP use in appraisal, because a minute waiting or walking weighs more than a minute on board when people choose where to drive to. The score decides the ranking below; the plain minutes are what the list shows.
 4. **Drive times.** The best 20 by score are sent to Apple's ETA endpoint, and the estimate and score are refined with the real drive. A car park whose drive runs past `maxDriveMinutes` is `too-far-to-drive`.
 5. **Choice.** Five car parks are asked for journeys: any car park or station the person asked for, the quickest drive, then the best by refined score. One car park per station: of two at one station, the one surer of a space (a fresh count with more than 10% free beats unknown or stale, which beats nearly full), then the better scored, speaks for both. The hub table is a timetable snapshot, so the exact check corrects the five that matter; the rest are shown with their estimate, not with a journey.
-6. **Journeys.** TfNSW is asked for journeys from the station's stop id, so they start at the platform without TfNSW's padded walk from the car park. HopReady adds its own walk leg from the car park to the platform at the person's walking speed (source `hopready`).
-7. **Explanation.** Each car park within reach is reported with its station, its estimate and one outcome: `used`, `matched-by-another`, `left-out-for-space`, `too-far-to-drive`, `not-tried`, `no-workable-connection` or `provider-error`. A car park is `used` only when its option is shown. One not among the five, or spoken for by a twin at its station, is `not-tried`, so none goes missing from the list. One whose option works but is left out behind a shown option at the same station (see "Only real choices") is `matched-by-another`. One whose option works but is cut because more options work than the 10 a response lists is `left-out-for-space`. `not-towards-destination` is no longer produced; it stays in the schema so older answers still parse.
+6. **Journeys.** TfNSW is asked for journeys from the station's stop id, so they start at the platform without TfNSW's padded walk from the car park. HopReady adds its own walk leg from the car park to the platform at the person's walking speed (source `hopready`). A walk-only answer from TfNSW starts at the platform, the wrong place to walk from, so it is not used.
+7. **Walking the rest (ADR-0009).** A park-and-ride car park (Transport Park&Ride or a saved spot) whose walk to the destination is at most 20 minutes, or the walking limit when that is longer, also offers drive, park, walk: HopReady's walk estimate from the car park to the destination, no public transport. At a Transport Park&Ride car park it carries the note that parking is free only with a public transport trip. Step 3's estimate uses this walk when it is the cheaper way on. The option needs no answer from TfNSW, so it still works when TfNSW fails.
+8. **One option per car park.** Of the ways on from a car park (each TfNSW journey, and walking the rest), the one that gets there first is used, or for arrive-by the one that leaves last. One with fewer marks (see "Preferences") is used instead only when it is at most 10 minutes worse, so a preference never trades a walk tonight for a bus days later.
+9. **Explanation.** Each car park within reach is reported with its station, its estimate and one outcome: `used`, `matched-by-another`, `left-out-for-space`, `too-far-to-drive`, `not-tried`, `no-workable-connection` or `provider-error`. A car park is `used` only when its option is shown. One not among the five, or spoken for by a twin at its station, is `not-tried`, so none goes missing from the list. One whose option works but is left out behind a shown option at the same station (see "Only real choices") is `matched-by-another`. One whose option works but is cut because more options work than the 10 a response lists is `left-out-for-space`. `not-towards-destination` is no longer produced; it stays in the schema so older answers still parse.
 
 Drop-off uses the stations served by the car parks within reach, plus a preferred station, through the same steps without the occupancy list: the preferred station, the quickest drive, then the best by estimate, five in all. When no drop-off option works, an `unavailable` entry says whether no station was within the driving limit or no connection worked from the stations checked.
 
@@ -38,14 +40,15 @@ Drop-off uses the stations served by the car parks within reach, plus a preferre
 **Depart at T.**
 
 1. TfNSW is asked for journeys from the station's platform leaving after `T + drive estimate + parking buffer + walk from the car park`, rounded up to the minute.
-2. For the workable journey that arrives first (of two that arrive together, the one that leaves later; of two with the same times, the one within the preferences), Apple is asked for the drive that arrives by `journey start − walk from the car park − parking buffer`. TfNSW's order is not relied on.
+2. For the journey chosen as in step 8 of "Choosing car parks" (of two that arrive together, the one that leaves later), Apple is asked for the drive that arrives by `journey start − walk from the car park − parking buffer`. TfNSW's order is not relied on.
+   Walking the rest needs no journey: Apple is asked for the drive leaving at T, then the parking buffer and the walk follow.
 3. That gives the latest sensible "Leave at", which cuts waiting.
 4. If traffic means that leaving time would be before T, the drive is recalculated leaving at T, and the first journey in the same order that can still be caught is used. The car park is dropped only if none can.
 
 **Arrive by T.**
 
-1. TfNSW is asked for journeys arriving by T. The latest workable one that arrives by T is chosen, so a service now running late is skipped.
-2. Apple is asked for a drive arriving by `journey start − walk from the car park − parking buffer`. Apple supports arrival times natively, so the planner never guesses.
+1. TfNSW is asked for journeys arriving by T. The latest workable one that arrives by T is chosen (step 8 of "Choosing car parks"), so a service now running late is skipped.
+2. Apple is asked for a drive arriving by `journey start − walk from the car park − parking buffer`, or for walking the rest, by `T − walk − parking buffer`. Apple supports arrival times natively, so the planner never guesses.
 3. Options that would need you to leave in the past are rejected.
 
 **Return through the car.** TfNSW plans a journey to the car's exact confirmed coordinate. Then the car retrieval buffer applies. Then Apple plans the drive home, leaving at that moment (depart-at), or arriving by T (arrive-by, solved backwards from the drive).
@@ -68,7 +71,7 @@ After parking, the walk to the platform starts straight away, and any wait happe
 
 A change is marked `tight-change` when `window < max(buffer, walk time)` (see "Preferences"), and rejected only when `window < walk time`, that is when the next service has left before the walk ends. The buffer is never added on top of TfNSW's own walking time, so it is not double-counted. All defaults can be changed in the app, and Settings explains each one. The trip timeline shows each change against the transfer buffer the trip was planned with, on the walk or wait that starts it, for example "Change at Wynyard Station: 8 min including the walk; your transfer buffer is 3 min".
 
-HopReady sends TfNSW the walking limit as a preference (`itOptionsActive=1`, `trITMOT=100`, `trITMOTvalue100=N`, with N shortened for a slow walker), which shapes the journeys TfNSW proposes without rejecting any (see "Preferences"). It sends no walking speed, because no parameter for it has been verified. For a slow walker, TfNSW's walking times are stretched by how much longer walking takes at the slow speed than at the normal one, before any of these checks; normal and fast keep TfNSW's times.
+HopReady sends TfNSW no walking limit (ADR-0009). The engine treats `trITMOTvalue100` as the most each walk to or from a stop may take, and searches days ahead for a journey that fits: a Saturday evening plan came back as Monday's school bus. TfNSW's own reach applies, and the limit marks options instead. HopReady sends no walking speed either; the vendor documents `changeSpeed` for this, unverified on TfNSW. For a slow walker, TfNSW's walking times are stretched by how much longer walking takes at the slow speed than at the normal one, before any of these checks; normal and fast keep TfNSW's times.
 
 ## Preferences: options that are marked, never hidden
 
@@ -80,19 +83,21 @@ The walking limit, the driving limit and the transfer buffer are preferences (AD
 | `long-drive`   | The drive is longer than the driving limit (driving the whole way included), except the drive home from a parked car |
 | `tight-change` | A change is shorter than the transfer buffer, including any walk between the services                                |
 
-The walking limit also goes to TfNSW as a preference, which shapes the journeys it proposes. The driving limit also decides which car parks are tried (see "Choosing car parks"). From a car park, when a journey within the preferences and one outside them both work, the one within is used.
+The driving limit also decides which car parks are tried (see "Choosing car parks"). From a car park, a way on within the preferences is used over a quicker one only when it gets there at most 10 minutes later (step 8 of "Choosing car parks"). The walking limit is not sent to TfNSW (see "Buffers, applied once").
 
 ## Feasibility: options that are rejected, never shown
 
-| Reason                     | Rule                                                                                    |
-| -------------------------- | --------------------------------------------------------------------------------------- |
-| `cancelled-service`        | Any transit leg is marked cancelled                                                     |
-| `transfer-too-short`       | A change cannot be made: the walk between the services ends after the next one has left |
-| `departs-in-past`          | The trip would start more than a minute before now                                      |
-| `departs-before-requested` | A depart-at trip starts before the requested time                                       |
-| `arrives-after-target`     | An arrive-by trip arrives after the target                                              |
-| `discontinuous`            | Legs overlap in time, or jump more than 300 m between legs                              |
-| `duplicate`                | The same services and car park as another option                                        |
+| Reason                         | Rule                                                                                    |
+| ------------------------------ | --------------------------------------------------------------------------------------- |
+| `cancelled-service`            | Any transit leg is marked cancelled                                                     |
+| `transfer-too-short`           | A change cannot be made: the walk between the services ends after the next one has left |
+| `departs-in-past`              | The trip would start more than a minute before now                                      |
+| `departs-before-requested`     | A depart-at trip starts before the requested time                                       |
+| `departs-long-after-requested` | A depart-at trip starts more than 12 hours after the requested time (ADR-0009)          |
+| `arrives-after-target`         | An arrive-by trip arrives after the target                                              |
+| `arrives-long-before-target`   | An arrive-by trip arrives more than 12 hours before the target (ADR-0009)               |
+| `discontinuous`                | Legs overlap in time, or jump more than 300 m between legs                              |
+| `duplicate`                    | The same services and car park as another option                                        |
 
 `walk-too-long` and `drive-too-long` are no longer produced; they stay in the schema so older answers still parse. Counts of each reason come back with the response, so the app can explain an empty result ("some connections could not be made in time at your walking speed") instead of padding the list with poor options.
 

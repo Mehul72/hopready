@@ -42,6 +42,24 @@ Walking legs in TfNSW's answers include station access padding: the same Hills S
 3. The walking limit can be passed to TfNSW as `trITMOTvalue100`, which improves the journeys it proposes, but HopReady must not discard what comes back; TfNSW already returns the most sensible journey even when it breaks the cap.
 4. Capacity and live occupancy per facility are available and unused.
 
+### 1.5 The walking limit sent to TfNSW (probed 2026-10-31, 20:30 to 21:00)
+
+The owner's Saturday evening trip from 14 James Mileham Drive, Kellyville to 24 Anson St, Nirimba Fields came back with every public transport option on Monday afternoon (docs/plans/walk-the-rest-and-no-day-jumps.md). A matrix of 126 direct calls (4 door-to-door trips and 4 Park&Ride stations to two destinations, 5 times from Saturday 20:45 to Monday 21:30, `trITMOTvalue100` none, 8, 15 and 30) settled what the parameter does. Raw answers and the analyser are in the session scratchpad (investigation/).
+
+| `trITMOTvalue100`      | Pairs | Best arrival later than with none | Earlier | Day jumps the default did not have |
+| ---------------------- | ----- | --------------------------------- | ------- | ---------------------------------- |
+| 15 (the default limit) | 36    | 12 (11 of them 6 to 42 hours)     | 0       | 10                                 |
+| 8                      | 20    | 8                                 | 0       | 4                                  |
+| 30                     | 20    | 0                                 | 0       | 0                                  |
+
+- Mechanism (verified): nothing changes until the trip needs a walk longer than N by TfNSW's measure; then TfNSW searches forward, days if needed, for a journey that fits. Every 6 to 42 hour delay was a trip to Anson St ending on school bus 6627 at 15:24 on the next school day. Arrive-by jumps backwards the same way: "arrive by Sunday 10:00" with 15 returned only Friday 15:24 arrivals.
+- The vendor documents it as a cap: "the maximum time from the starting point to the first stop and also from the destination stop to the destination point" (Mentz EFA JSON training EN 2.9, page 74, default 10). It is not even a cap HopReady can mirror: 17 accepted an 18 minute walk, 8 kept 16 and 18 minute walks, and 60 added 82 minute walks.
+- Without it (verified): no hard cap. The longest walk in the 36 default answers was 19 minutes (Schofields Station to Anson St, 1,149 m); where nothing is closer TfNSW walks further (67 minutes from Bobbin Head, 68 from Audley). Inferred from 25 against 30: a soft default somewhere around 25 to 29 minutes.
+- What removing it loses (verified): nothing at 15 or 30. At 8, four small cases where it found a journey 0 to 6 minutes later with a final walk 4 to 5 minutes shorter, still over 8.
+- School buses (verified): none in the 36 default answers; 13 of 36 answers at 15 and 5 of 20 at 8 used one, always 6627 days later. Default answers do use school buses when they run near the time asked for (Monday 14:30).
+- Walking pace (verified): TfNSW walks about 1.1 m/s (Schofields Station to Anson St, 1,082 m in 16.2 minutes); HopReady's own walks assume 1.3 m/s over 1.3 times the straight line, so its estimate there is 13 minutes.
+- On Demand (verified in responses): TfNSW returns On Demand D700 as product class 10 with icon 23; the adapter maps only classes 1, 2, 4, 5, 7, 9 and 11, so those journeys are dropped (6 of 12 from Tallawong to Anson St at Monday 08:00). Not changed by ADR-0009.
+
 ## 2. What the literature, the engines and the other apps say (researched 2026-10-31)
 
 Eight research notes were written on 2026-10-31 and every critical claim was re-checked by a second reader against the primary source. Only upheld claims appear here; where the checker narrowed a claim, the narrowed version is given and the downgrade is noted. Verified means the source was read or the computation was run; inferred means consistent with the sources but not stated by one; unknown means no source settles it. Sources are numbered in 2.7 and cited as [n].
