@@ -35,14 +35,14 @@ Three more planner rules made it worse:
 Constraints:
 
 - Build 5 on the owner's phone reads unknown rejection reasons and car park outcomes, nothing else new; strategies and leg kinds cannot change.
-- Transport Park&Ride parking is free only with a public transport trip; otherwise the standard rate applies at the exit (transportnsw.info/parkandride, read 2026-10-31).
+- Transport Park&Ride parking is free for up to 18 hours with a public transport trip; otherwise a charge that depends on the car park, the day, the time and the stay applies at the exit (transportnsw.info/parkandride, read 2026-10-31).
 - HopReady's walk estimate is the straight line times 1.3 at the traveller's pace; it knows nothing of rivers or motorways.
 
 ## Decision
 
 1. TfNSW is not given the walking limit (no `itOptionsActive`, `trITMOT` or `trITMOTvalue100`), and the provider query no longer carries it. TfNSW's own reach applies; the limit marks options (`long-walk`). The demo world walks a fixed 15 minutes at normal pace to, from and between stops, as TfNSW's reach is a distance whatever the traveller's pace.
 2. From each car park or station, the option that gets there first is used (for arrive-by, the one that leaves last). One with fewer marks is used instead only when it is at most 10 minutes worse.
-3. A park-and-ride car park (Transport Park&Ride or a saved spot) whose walk to the destination is at most 20 minutes, or the walking limit when that is longer, also offers drive, park, walk, with HopReady's walk estimate. It competes with that car park's public transport under rule 2. At a Transport Park&Ride car park it carries the note "Park&Ride parking is free only with a public transport trip. Walking from here instead, you pay the car park rate at the exit." The car park's ranking estimate counts the walk when it is the cheaper way on.
+3. A park-and-ride car park (Transport Park&Ride or a saved spot) whose walk to the destination is at most 20 minutes, or the walking limit when that is longer, also offers drive, park, walk, with HopReady's walk estimate. It competes with that car park's public transport under rule 2. At a Transport Park&Ride car park it carries the note "Park&Ride parking is free with a public transport trip, tapping on and off. Walking from here instead, you may be charged when you leave: check the rates at the car park." The charge without a trip depends on the car park, the day, the time and the stay: $5 for up to 3 hours at Schofields on a weekend, $30 a day at standard-rate car parks on weekdays, free at Gosford at weekends and under 20 minutes anywhere The car park's ranking estimate counts the walk when it is the cheaper way on.
 4. A depart-at option that leaves more than 12 hours after the time asked for is rejected as `departs-long-after-requested`, and an arrive-by option that arrives more than 12 hours before the target as `arrives-long-before-target`. With the cap in place, "arrive by Sunday 10:00" came back as Friday 3.24 pm arrivals.
 5. The app shows the weekday on any time that falls on another Sydney day from its reference: the time asked for on the results and trip screens, the trip's start on its steps, and today on the Plan tab card.
 

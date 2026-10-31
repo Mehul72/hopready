@@ -96,10 +96,12 @@ const WALK_THE_REST_MAX_MINUTES = 20;
 // An option this far from the time asked for answers a different question: a plan for Saturday
 // evening should not offer Monday afternoon, nor "arrive by Sunday 10 am" a Friday arrival.
 const MAX_SECONDS_FROM_TIME_ASKED_FOR = 12 * 60 * 60;
-// Shown on a drive, park, walk option at a Transport Park&Ride car park, whose parking is free only
-// with a public transport trip (transportnsw.info/parkandride, read 2026-10-31).
+// Shown on a drive, park, walk option at a Transport Park&Ride car park. Parking there is free for
+// up to 18 hours with a public transport trip; without one the charge depends on the car park, the
+// day, the time and the stay (free under 20 minutes, free at Gosford at weekends and for 3 hours at
+// Beverly Hills), so the note says "may" (transportnsw.info/parkandride, read 2026-10-31).
 export const PARK_AND_WALK_FEE_NOTE =
-  'Park&Ride parking is free only with a public transport trip. Walking from here instead, you pay the car park rate at the exit.';
+  'Park&Ride parking is free with a public transport trip, tapping on and off. Walking from here instead, you may be charged when you leave: check the rates at the car park.';
 // A count with no more than this share of the spaces free could easily be full by the time the
 // traveller gets there.
 const NEARLY_FULL_FREE_SHARE = 0.1;
@@ -673,8 +675,8 @@ async function planTransitThroughPoint(
 }
 
 // Drive, park, then walk from the car park to the destination. Depart-at leaves when asked;
-// arrive-by parks early enough to walk in by the time. Park&Ride parking is free only with a public
-// transport trip, so a Transport car park says so.
+// arrive-by parks early enough to walk in by the time. Park&Ride parking is free with a public
+// transport trip and may be charged without one, so a Transport car park says so.
 async function planWalkFromCarPark(
   context: PlanContext,
   driving: DrivingProvider,
