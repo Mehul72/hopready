@@ -1086,12 +1086,12 @@ describe('walking the rest from a car park near the destination', () => {
     );
 
     expect(response.itineraries).toEqual([]);
-    // Tuesday 7.30 am plus 42 hours is a 1.30 am bus on Thursday, less the 4 minute walk to it.
+    // Tuesday 7.30 am plus 42 hours is a 1.30 am bus on Thursday.
     expect(response.unavailable).toEqual([
       {
         strategy: 'transit-only',
         reason:
-          'The first public transport found leaves Thu 29 Oct 1:26\u00a0am, more than 12 hours after the time asked for.',
+          'The first public transport found leaves Thu 29 Oct 1:30\u00a0am, more than 12 hours after the time asked for.',
       },
     ]);
     expect(response.rejected).toEqual([{ reason: 'departs-long-after-requested', count: 1 }]);
@@ -1108,6 +1108,67 @@ describe('walking the rest from a car park near the destination', () => {
 
     expect(response.itineraries).toHaveLength(1);
     expect(response.rejected).toEqual([]);
+  });
+
+  it('never leaves on time only to wait more than 12 hours for the bus', async () => {
+    // Each route takes 5 minutes longer than the estimate the car park was ranked on, so the drive
+    // misses the service it was planned for, and the next one TfNSW found is 40 hours later.
+    const slowerThanEstimated = fakeDriving({
+      async routeDrive(from, to) {
+        return {
+          durationSeconds: driveSeconds(from, to) + 5 * 60,
+          distanceMetres: haversineMetres(from, to) * 1.35,
+          trafficAware: true,
+          path: [from, to],
+        };
+      },
+    });
+    const tonightOrDaysLater = fakeTransit((query) =>
+      query.from.stopId
+        ? [
+            journeyWithFinalWalk(query.from, query.to, query.time.at, 30, 5, 'TONIGHT'),
+            journeyWithFinalWalk(
+              query.from,
+              query.to,
+              addMinutes(query.time.at, 40 * 60),
+              30,
+              5,
+              'DAYS-LATER',
+            ),
+          ]
+        : [],
+    );
+    const response = await planTrip(
+      request(),
+      deps({ driving: slowerThanEstimated, transit: tonightOrDaysLater }),
+    );
+
+    for (const itinerary of response.itineraries) {
+      expect(secondsBetween(itinerary.departAt, itinerary.arriveAt)).toBeLessThan(12 * 60 * 60);
+    }
+    expect(response.rejected.map((entry) => entry.reason)).toContain(
+      'departs-long-after-requested',
+    );
+  });
+
+  it('takes a journey inside 12 hours over a better one just past them', async () => {
+    // A boards 11 h 45 min after the time asked for and ends with a 20 minute walk, over the limit.
+    // B boards at 12 h 40 min and gets there 5 minutes after A, within the limit.
+    const nearTheLine = fakeTransit((query) =>
+      query.from.stopId
+        ? [
+            journeyWithFinalWalk(query.from, query.to, addMinutes(NOW, 11 * 60 + 45), 40, 20, 'A'),
+            journeyWithFinalWalk(query.from, query.to, addMinutes(NOW, 12 * 60 + 40), 5, 5, 'B'),
+          ]
+        : [],
+    );
+    const response = await planTrip(request(), deps({ transit: nearTheLine }));
+    const parkAndRide = response.itineraries.filter((it) => it.strategy === 'park-and-ride');
+
+    expect(parkAndRide.length).toBeGreaterThan(0);
+    for (const itinerary of parkAndRide) {
+      expect(transitLegsOf(itinerary.legs).map((leg) => leg.service.name)).toEqual(['A']);
+    }
   });
 
   it('takes public transport from the nearby car park when it gets there sooner', async () => {
@@ -1592,6 +1653,41 @@ describe('getting home', () => {
       streetWalkBetween(nearTheCar.coordinate, parkedAt.coordinate, 'normal').durationSeconds,
     );
     expect(response.unavailable).toEqual([]);
+  });
+
+  it('does not reach the car more than 12 hours before an arrive-by time', async () => {
+    const arriveBy = addMinutes(evening, 30 * 60);
+    // TfNSW's latest journey back to the car gets there 20 hours before it is needed.
+    const dayEarly = fakeTransit((query) =>
+      query.time.type === 'arrive'
+        ? [
+            journeyWithFinalWalk(
+              query.from,
+              query.to,
+              addMinutes(query.time.at, -(20 * 60 + 40)),
+              30,
+              5,
+              'EARLY',
+            ),
+          ]
+        : [],
+    );
+    const response = await planTrip(
+      homeThroughCar({ time: { type: 'arrive', at: arriveBy } }),
+      atEvening({ transit: dayEarly }),
+    );
+
+    expect(response.itineraries).toEqual([]);
+    expect(response.rejected).toEqual([{ reason: 'arrives-long-before-target', count: 1 }]);
+    // Home by Wed 28 Oct 11.30 pm: back at the car by 11.13 pm, after the 12 minute drive and the
+    // 5 minutes to get going. The service gets there 20 h 10 min before that.
+    expect(response.unavailable).toEqual([
+      {
+        strategy: 'return-via-car',
+        reason:
+          'The latest way back to your car found arrives Wed 28 Oct 3:03\u00a0am, more than 12 hours before the time asked for.',
+      },
+    ]);
   });
 
   it('still goes home through the car when the drive home is longer than the driving limit', async () => {

@@ -601,7 +601,9 @@ async function planTransitThroughPoint(
     (journey) =>
       transitLegsOf(journey.legs).length > 0 &&
       (time.type === 'depart' || arrivesBy(journey, time.at)) &&
-      keepJourney(context, journey),
+      keepJourney(context, journey) &&
+      // Rejected once planned anyway, so never chosen over one that can be taken.
+      keepWithinReachOfTimeAskedFor(context, journey.legs),
   );
   const choose = (candidates: readonly TransitJourney[]) =>
     preferredOption(candidates, time.type, (candidate) => ({
@@ -1514,7 +1516,7 @@ function itineraryProblem(context: PlanContext, itinerary: Itinerary): Rejection
   if (time.type === 'depart' && secondsBetween(time.at, itinerary.departAt) < -TIME_GRACE_SECONDS) {
     return 'departs-before-requested';
   }
-  const tooFarOff = farFromTimeAskedFor(context, itinerary);
+  const tooFarOff = farFromTimeAskedFor(context, itinerary.legs);
   if (tooFarOff) return tooFarOff;
   if (time.type === 'arrive' && secondsBetween(time.at, itinerary.arriveAt) > TIME_GRACE_SECONDS) {
     return 'arrives-after-target';
@@ -1522,24 +1524,35 @@ function itineraryProblem(context: PlanContext, itinerary: Itinerary): Rejection
   return null;
 }
 
+// Measured to the first service when leaving at a time, and from the last service when arriving by
+// one, so a trip that leaves on time and then waits a day for its bus counts as far off too. For a
+// trip home, the last service is the one that reaches the car.
+function timeMeasuredFromAskedFor(context: PlanContext, legs: readonly Leg[]): string {
+  const { time } = context.request;
+  const rides = transitLegsOf(legs);
+  if (time.type === 'depart') return rides[0]?.start ?? legs[0]?.start ?? time.at;
+  return rides.at(-1)?.end ?? legs.at(-1)?.end ?? time.at;
+}
+
 function farFromTimeAskedFor(
   context: PlanContext,
-  itinerary: Itinerary,
+  legs: readonly Leg[],
 ): 'departs-long-after-requested' | 'arrives-long-before-target' | null {
   const { time } = context.request;
-  if (
-    time.type === 'depart' &&
-    secondsBetween(time.at, itinerary.departAt) > MAX_SECONDS_FROM_TIME_ASKED_FOR
-  ) {
-    return 'departs-long-after-requested';
+  const measured = timeMeasuredFromAskedFor(context, legs);
+  if (time.type === 'depart') {
+    return secondsBetween(time.at, measured) > MAX_SECONDS_FROM_TIME_ASKED_FOR
+      ? 'departs-long-after-requested'
+      : null;
   }
-  if (
-    time.type === 'arrive' &&
-    secondsBetween(itinerary.arriveAt, time.at) > MAX_SECONDS_FROM_TIME_ASKED_FOR
-  ) {
-    return 'arrives-long-before-target';
-  }
-  return null;
+  return secondsBetween(measured, time.at) > MAX_SECONDS_FROM_TIME_ASKED_FOR
+    ? 'arrives-long-before-target'
+    : null;
+}
+
+function keepWithinReachOfTimeAskedFor(context: PlanContext, legs: readonly Leg[]): boolean {
+  const reason = farFromTimeAskedFor(context, legs);
+  return reason ? reject(context, reason) : true;
 }
 
 // When everything a strategy found is too far from the time asked for, it says when the nearest
@@ -1552,18 +1565,17 @@ function explainFarOffOptions(
   whatWasFound: string,
 ): void {
   if (itineraries.length === 0) return;
-  if (itineraries.some((itinerary) => farFromTimeAskedFor(context, itinerary) === null)) return;
+  if (itineraries.some((itinerary) => farFromTimeAskedFor(context, itinerary.legs) === null)) {
+    return;
+  }
+  // The time named is the one that was measured, so the sentence never contradicts itself.
+  const measured = itineraries
+    .map((itinerary) => timeMeasuredFromAskedFor(context, itinerary.legs))
+    .sort((a, b) => Date.parse(a) - Date.parse(b));
   const reason =
     context.request.time.type === 'depart'
-      ? `The first ${whatWasFound} found leaves ${formatSydneyDayAndTime(
-          itineraries.map((itinerary) => itinerary.departAt).sort()[0]!,
-        )}, more than 12 hours after the time asked for.`
-      : `The latest ${whatWasFound} found arrives ${formatSydneyDayAndTime(
-          itineraries
-            .map((itinerary) => itinerary.arriveAt)
-            .sort()
-            .at(-1)!,
-        )}, more than 12 hours before the time asked for.`;
+      ? `The first ${whatWasFound} found leaves ${formatSydneyDayAndTime(measured[0]!)}, more than 12 hours after the time asked for.`
+      : `The latest ${whatWasFound} found arrives ${formatSydneyDayAndTime(measured.at(-1)!)}, more than 12 hours before the time asked for.`;
   context.unavailable.push({ strategy, reason });
 }
 
