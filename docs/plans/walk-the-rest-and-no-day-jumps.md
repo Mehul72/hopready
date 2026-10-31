@@ -33,19 +33,19 @@ Verifiable by:
 
 ## Steps
 
-- [ ] 1. API: stop sending the walking preference to TfNSW
+- [x] 1. API: stop sending the walking preference to TfNSW (commit 92124dc; the walking limit left the provider query entirely, and the demo world now walks a fixed 15 minute reach at normal pace, as TfNSW does)
       files: apps/api/src/providers/tfnsw/transit.ts, transit.test.ts
       done when: the request test asserts no `trITMOT` parameters; a staging plan of the Anson St trip has no Monday journeys
-- [ ] 2. Core: from each car park, the journey that arrives first (leaves last for arrive-by) is used; one within the preferences only wins when it arrives at most 10 minutes later
+- [x] 2. Core: from each car park, the journey that arrives first (leaves last for arrive-by) is used; one within the preferences only wins when it arrives at most 10 minutes later
       files: packages/core/src/planner.ts, planner.test.ts
       done when: a test with a within-preferences journey hours later picks the earlier one, and one 5 minutes later picks the within-preferences one
-- [ ] 3. Core: walk the rest from a car park near the destination (drive, park, walk), compared with the public transport journeys from that car park; the estimate counts it; a note says parking without a public transport trip is not free
+- [x] 3. Core: walk the rest from a car park near the destination (drive, park, walk), compared with the public transport journeys from that car park; the estimate counts it; a note says parking without a public transport trip is not free
       files: packages/core/src/planner.ts, estimate.ts or planner helpers, planner.test.ts, planner-scenarios.test.ts
       done when: a car park 1 km from the destination with only a much later bus offers drive, park, walk with the fee note
-- [ ] 4. Core: depart-at options that leave more than 12 hours after the time asked for are rejected with their own reason; the app explains it
+- [x] 4. Core: depart-at options that leave more than 12 hours after the time asked for are rejected with their own reason; the app explains it
       files: packages/core/src/planner.ts, model.ts, apps/mobile/src/features/results/plan-explanations.ts, tests
       done when: a journey 42 hours later is rejected and counted; older apps drop the unknown reason (tested since build 3)
-- [ ] 5. App: times on a different day from the time asked for show the day ("Mon 2:32 pm")
+- [x] 5. App: times on a different day from the time asked for show the day ("Mon 2:32 pm")
       files: apps/mobile route card, trip summary, steps, followed trip card, alternatives; tests
       done when: a card for a next-day option shows the day, a same-day one does not
 - [ ] 6. Deploy staging; re-run Anson St, Kellyville to Central and Parramatta; record in docs/research/park-and-ride.md and PROGRESS
@@ -62,3 +62,6 @@ Verifiable by:
 
 - 2026-10-31 20:27 Reproduced on staging (version 63e4d5b4) with walking limits 15 and 8: every option leaves Monday between 13:37 and 14:33 and ends on school bus 6627; drive-only arrives 20:44 Saturday.
 - 2026-10-31 Direct TfNSW probes (scratchpad probes/): Schofields Station to Anson St, Saturday 20:51: none, walk 16 min; 15, Monday school buses plus the walk; 8, Monday only; 30, walk only. Home: none, 8 Saturday journeys; 15, 2 Monday journeys. Tallawong: none, 6 Saturday journeys; 15, Monday only; 15 without school buses, none.
+- 2026-10-31 Steps 2 to 4 landed as 04a5dac (mutation-checked: removing the tolerance, the walk, the 12 hour limit, the fee note or the estimate change each fails a new test), step 5 as 6c5030e, step 1 as 92124dc. Core 258, API 329, app 714 tests pass.
+- 2026-10-31 The vendor's EFA JSON training (EN 2.9, page 74) defines trITMOTvalue as "the maximum time from the starting point to the first stop and also from the destination stop to the destination point" (default 10), which is the cap behaviour seen, not a preference.
+- 2026-10-31 20:52 Staging c6228927, Anson St trip at 20:52 Saturday, walking limit 15 and 8: drive 17 min; drive, park at Schofields, walk 15 min (arrive 21:30, fee note); Tallawong P1 bus 748 then an 18 min walk (21:57, marked long-walk); Kellyville, Bella Vista, Hills Showground and four public transport options, all Saturday night; nothing rejected. Kellyville to Central Monday 08:00 and Parramatta to Carrington St (limit 8) give the same options as on 2026-10-31 afternoon.
