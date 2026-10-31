@@ -1,6 +1,6 @@
 # Plan: walk from a nearby car park, and no options days after the time asked for
 
-Status: in progress
+Status: done; Apple's processing of build 6 is the last thing outstanding
 Branch: feat/hopready-v1
 
 ## Goal
@@ -54,7 +54,8 @@ Verifiable by:
       done: ADR-0009, ADR-0010 and ADR-0011, routing.md and providers.md
 - [x] 8. Adversarial review of the diff; fix what it confirms
       done: two review workflows; every confirmed finding fixed with a test that fails without it (log)
-- [ ] 9. TestFlight build 6
+- [x] 9. TestFlight build 6
+      done: EAS 200365e5 from b0e955b, submitted 2026-10-31 23:53 after the XCUITest walk-through (6 passed, 1 skipped)
 
 ## Open questions
 
