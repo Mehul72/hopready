@@ -59,8 +59,8 @@ Constraints:
 ### Rank by a full generalised cost (walking 1.5, waiting 1.4, bus against rail, transfers)
 
 - Pros: matches how people choose, as the appraisal guidance and the lot-choice studies measure it.
-- Cons: a weighted score is not a time, and the list must show times.
-- Adopted for choosing which car parks to check (the weights decide the 5), while the estimate shown to people stays in plain minutes.
+- Cons: a weighted score is not a time, and the list must show times. The bus constant and the transfer penalties need the mode and the number of changes on each hub route, which the hub table does not record. The lot-choice studies put car time at about 4 times transit time, but their weights rest on free-flow drive times, and a heavy car weight favours the nearest car park, which is the bias the owner reported.
+- Adopted in part: waiting counts 1.4 and walking 1.5 when choosing which car parks to check (`packages/core/src/estimate.ts`), the drive counts once, and the estimate shown to people stays in plain minutes. The bus constant and transfer penalties wait for a hub table that records them.
 
 ## Consequences
 
