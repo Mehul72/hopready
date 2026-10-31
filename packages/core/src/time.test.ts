@@ -135,6 +135,23 @@ describe('times with their day', () => {
     expect(formatSydneyTimeOnDay('2026-10-26T13:40:00.000Z', null)).toBe('12:40\u00a0am');
   });
 
+  it('finds the Sydney day with the offset in force that day, either side of daylight saving', () => {
+    // Saturday 3 October 2026, on standard time (UTC+10): 10 pm and 11.30 pm are the same day. A
+    // fixed UTC+11 would put 11.30 pm on Sunday.
+    expect(formatSydneyTimeOnDay('2026-10-03T13:30:00.000Z', '2026-10-03T12:00:00.000Z')).toBe(
+      '11:30\u00a0pm',
+    );
+    // Sunday 4 October, after the clocks went forward (UTC+11): 11 pm to 12.30 am crosses into
+    // Monday. A fixed UTC+10 would keep it on Sunday.
+    expect(formatSydneyTimeOnDay('2026-10-04T13:30:00.000Z', '2026-10-04T12:00:00.000Z')).toBe(
+      'Mon 12:30\u00a0am',
+    );
+    // Saturday 13 June 2026, in winter.
+    expect(formatSydneyTimeOnDay('2026-06-13T13:30:00.000Z', '2026-06-13T12:00:00.000Z')).toBe(
+      '11:30\u00a0pm',
+    );
+  });
+
   it('words a time days away for messages', () => {
     expect(formatSydneyDayAndTime('2026-11-01T20:07:00.000Z')).toBe('Mon 2 Nov 7:07\u00a0am');
   });

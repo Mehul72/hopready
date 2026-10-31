@@ -34,6 +34,20 @@ describe('describeTripTime', () => {
     expect(describeTripTime('2026-10-26T19:40:00.000Z', null).text).toBe('6:40 am');
   });
 
+  it('uses the offset in force on the day, either side of daylight saving', () => {
+    // 10 pm and 11.30 pm on Saturday 3 October 2026, on standard time (UTC+10). A fixed UTC+11
+    // would put 11.30 pm on Sunday.
+    expect(describeTripTime('2026-10-03T13:30:00.000Z', '2026-10-03T12:00:00.000Z').text).toBe(
+      '11:30 pm',
+    );
+    // 11 pm on Sunday 4 October, after the clocks went forward, to 12.30 am on Monday. A fixed
+    // UTC+10 would keep it on Sunday.
+    expect(describeTripTime('2026-10-04T13:30:00.000Z', '2026-10-04T12:00:00.000Z')).toEqual({
+      text: 'Mon 12:30 am',
+      spoken: 'Monday 12:30 am',
+    });
+  });
+
   it('keeps the Sydney day across the start of daylight saving', () => {
     // 1:30 am AEST on Sunday 4 October 2026, then 4:30 am AEDT the same Sunday.
     expect(describeTripTime('2026-10-03T17:30:00.000Z', '2026-10-03T15:30:00.000Z').text).toBe(
