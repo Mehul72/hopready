@@ -510,7 +510,7 @@ describe('a followed trip checked just before midnight', () => {
     await act(() => jest.advanceTimersByTime(13 * 60_000));
     expect(screen.getByLabelText(spoken)).toBeOnTheScreen();
     const changed = announce.mock.calls.filter(([text]) => text.includes('Your trip changed'));
-    expect(changed).toHaveLength(1);
+    expect(changed).toEqual([[spoken]]);
   });
 
   it('says the day of the options offered instead, and of the check once it is yesterday', async () => {
@@ -528,10 +528,16 @@ describe('a followed trip checked just before midnight', () => {
     const offered = describeTripSummary(firstBus, null, checkedAt);
     expect(offered).toContain('Leave Tuesday 5:10\u00a0am');
     expect(screen.getByRole('button', { name: offered })).toBeOnTheScreen();
+    expect(screen.getByText(/^Leave Tue 5:10\sam · Arrive 6:\d\d\sam$/)).toBeOnTheScreen();
     expect(screen.getByLabelText('Times checked at 11:52\u00a0pm')).toBeOnTheScreen();
 
     await act(() => jest.advanceTimersByTime(13 * 60_000));
 
+    // Now that it is Tuesday, the option offered instead needs no day.
+    const offeredToday = describeTripSummary(firstBus, null, new Date(addMinutes(checkedAt, 13)));
+    expect(offeredToday).toContain('Leave 5:10\u00a0am');
+    expect(screen.getByRole('button', { name: offeredToday })).toBeOnTheScreen();
+    expect(screen.getByText(/^Leave 5:10\sam · Arrive 6:\d\d\sam$/)).toBeOnTheScreen();
     expect(screen.getByLabelText('Times checked at Monday 11:52\u00a0pm')).toBeOnTheScreen();
     expect(screen.getByTestId('times-checked-at')).toHaveTextContent('Checked Mon 11:52\u00a0pm');
   });
