@@ -540,6 +540,7 @@ async function planThroughPoint(
       rankedDriveSeconds,
       bufferSeconds,
       occupancy,
+      walkRest,
     ),
     walkRest
       ? planWalkFromCarPark(context, driving, point, walkRest, bufferSeconds, occupancy)
@@ -609,6 +610,7 @@ async function planTransitThroughPoint(
   rankedDriveSeconds: number,
   bufferSeconds: number,
   occupancy: Map<string, Occupancy>,
+  walkRest: Walk | null,
 ): Promise<Itinerary | null> {
   const { origin, destination, time } = context.request;
   const toBoarding = walkToBoarding(context, point);
@@ -630,13 +632,33 @@ async function planTransitThroughPoint(
       // Rejected once planned anyway, so never chosen over one that can be taken.
       keepWithinReachOfTimeAskedFor(context, journey.legs),
   );
-  const choose = (candidates: readonly TransitJourney[]) =>
-    preferredOption(candidates, time.type, (candidate) => ({
-      start: journeyStart(candidate),
-      end: journeyEnd(candidate),
-      concernCount: concernsFor(context, candidate.legs, strategy).length,
+  // Public transport with a change that gets there after walking from this car park would is never
+  // listed next to the walk (waysOnWorthListing), so it is chosen only when nothing else is left,
+  // and a direct one that would be listed is not passed over for it. Measured on the drive
+  // estimate, which both share. The car park the traveller asked for keeps every way on.
+  const walkingGetsThereFirst = (candidate: TransitJourney): boolean => {
+    if (!walkRest || point.preferred) return false;
+    return time.type === 'depart'
+      ? isBefore(
+          addSeconds(time.at, rankedDriveSeconds + bufferSeconds + walkRest.durationSeconds),
+          journeyEnd(candidate),
+        )
+      : isBefore(
+          addSeconds(journeyStart(candidate), -toBoarding.durationSeconds),
+          addSeconds(time.at, -walkRest.durationSeconds),
+        );
+  };
+  const listable = journeys.filter(
+    (candidate) => transitLegsOf(candidate.legs).length < 2 || !walkingGetsThereFirst(candidate),
+  );
+  const candidates = listable.length > 0 ? listable : journeys;
+  const choose = (choices: readonly TransitJourney[]) =>
+    preferredOption(choices, time.type, (choice) => ({
+      start: journeyStart(choice),
+      end: journeyEnd(choice),
+      concernCount: concernsFor(context, choice.legs, strategy).length,
     }));
-  let journey = choose(journeys);
+  let journey = choose(candidates);
   if (!journey) return null;
 
   let arriveAt = addSeconds(journeyStart(journey), -accessSeconds);
@@ -653,7 +675,7 @@ async function planTransitThroughPoint(
     const missed = journey;
     const driveSeconds = route.durationSeconds;
     const reachable = choose(
-      journeys.filter(
+      candidates.filter(
         (candidate) =>
           candidate !== missed &&
           !isBefore(
@@ -684,7 +706,7 @@ async function planTransitThroughPoint(
     arriveAt = addSeconds(time.at, route.durationSeconds);
     const onPlatformFrom = addSeconds(arriveAt, accessSeconds);
     journey = choose(
-      journeys.filter((candidate) => !isBefore(journeyStart(candidate), onPlatformFrom)),
+      candidates.filter((candidate) => !isBefore(journeyStart(candidate), onPlatformFrom)),
     );
     if (!journey) {
       reject(context, 'departs-before-requested');

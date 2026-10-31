@@ -1362,14 +1362,16 @@ describe('walking the rest from a car park near the destination', () => {
           streetWalkBetween(BELLA_VISTA.coordinate, destination.coordinate, 'normal')
             .durationSeconds,
       );
-    const fromBellaVista = (journeyArriving: (from: Place, to: Place) => TransitJourney) =>
+    type JourneyArriving = (from: Place, to: Place) => TransitJourney;
+    const fromBellaVista = (...journeysArriving: JourneyArriving[]) =>
       fakeTransit((query) =>
         query.from.stopId === BELLA_VISTA.station!.stopId
-          ? [journeyArriving(query.from, query.to)]
+          ? journeysArriving.map((journeyArriving) => journeyArriving(query.from, query.to))
           : [],
       );
-    const directBus = (destination: Place, minutesAfterWalking: number) =>
-      fromBellaVista((from, to) =>
+    const directBusArriving =
+      (destination: Place, minutesAfterWalking: number): JourneyArriving =>
+      (from, to) =>
         journeyWithFinalWalk(
           from,
           to,
@@ -1377,12 +1379,14 @@ describe('walking the rest from a car park near the destination', () => {
           2,
           3,
           '735',
-        ),
-      );
+        );
+    const directBus = (destination: Place, minutesAfterWalking: number) =>
+      fromBellaVista(directBusArriving(destination, minutesAfterWalking));
     // Two buses with a change, the shape TfNSW gave from Schofields on the owner's trip (Monday
     // 2 November, 2.32 pm): bus, walk to another stop, wait, bus, walk. 12 minutes in all.
-    const twoBuses = (destination: Place, minutesAfterWalking: number) =>
-      fromBellaVista((from, to) => {
+    const twoBusesArriving =
+      (destination: Place, minutesAfterWalking: number): JourneyArriving =>
+      (from, to) => {
         const arrives = addMinutes(walkingArrives(destination), minutesAfterWalking);
         const at = (minutesBefore: number) => addMinutes(arrives, -minutesBefore);
         const firstStop = place(
@@ -1413,7 +1417,9 @@ describe('walking the rest from a car park near the destination', () => {
           fare: { status: 'unknown' },
           alerts: [],
         };
-      });
+      };
+    const twoBuses = (destination: Place, minutesAfterWalking: number) =>
+      fromBellaVista(twoBusesArriving(destination, minutesAfterWalking));
     const waysOn = (response: PlanResponse) =>
       response.itineraries
         .filter((it) => it.parking?.carPark.id === BELLA_VISTA.id)
@@ -1440,6 +1446,55 @@ describe('walking the rest from a car park near the destination', () => {
       // Free parking comes with the bus; walking from a Park&Ride car park may be charged.
       expect(walking!.notes).toEqual([PARK_AND_WALK_FEE_NOTE]);
       expect(riding!.notes).toEqual([]);
+    });
+
+    it('lists a direct bus within 10 minutes of the walk when buses with a change get there sooner', async () => {
+      const response = await planTrip(
+        request({ destination: NEAR_BELLA_VISTA }),
+        deps({
+          transit: fromBellaVista(
+            twoBusesArriving(NEAR_BELLA_VISTA, 3),
+            directBusArriving(NEAR_BELLA_VISTA, 8),
+          ),
+        }),
+      );
+
+      expect(waysOn(response)).toEqual(['walk', '735']);
+    });
+
+    it('keeps buses with a change from the car park asked for, so a followed trip still finds them', async () => {
+      const response = await planTrip(
+        request({ destination: NEAR_BELLA_VISTA, preferredCarParkId: BELLA_VISTA.id }),
+        deps({
+          transit: fromBellaVista(
+            twoBusesArriving(NEAR_BELLA_VISTA, 3),
+            directBusArriving(NEAR_BELLA_VISTA, 8),
+          ),
+        }),
+      );
+
+      expect(waysOn(response)).toEqual(['walk', '5642+6627']);
+    });
+
+    it('arriving by a time, lists a direct bus over buses with a change that leave before walking would', async () => {
+      // Walking from Bella Vista gets there 51 minutes after leaving Box Hill: arriving by NOW + 90
+      // it leaves at NOW + 39. The buses with a change get there 3 minutes early and mean leaving 3
+      // minutes before walking would; the direct bus gets there 11 minutes early and means leaving
+      // 4 minutes before.
+      const response = await planTrip(
+        request({
+          destination: NEAR_BELLA_VISTA,
+          time: { type: 'arrive', at: addMinutes(NOW, 90) },
+        }),
+        deps({
+          transit: fromBellaVista(
+            twoBusesArriving(NEAR_BELLA_VISTA, 36),
+            directBusArriving(NEAR_BELLA_VISTA, 28),
+          ),
+        }),
+      );
+
+      expect(waysOn(response)).toEqual(['walk', '735']);
     });
 
     it('walks alone when the bus gets there more than 10 minutes later', async () => {
