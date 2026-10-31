@@ -13,7 +13,7 @@ import {
 import { DEMO_PLACES } from '@hopready/core/fixtures';
 import { userEvent } from '@testing-library/react-native';
 import { act, screen, waitFor, within } from 'expo-router/testing-library';
-import { ActionSheetIOS, Linking } from 'react-native';
+import { AccessibilityInfo, ActionSheetIOS, Linking } from 'react-native';
 
 import { ApiError } from '@/api';
 import { planSession } from '@/state';
@@ -455,6 +455,66 @@ describe('the followed trip after a refresh', () => {
       ),
     ).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+  });
+});
+
+describe('a followed trip checked just before midnight', () => {
+  // 11:50 pm on Monday 26 October 2026 in Sydney. The last train of the night leaves at 11:59 pm.
+  const lateMonday = new Date('2026-10-26T12:50:00.000Z');
+  const checkedAt = new Date(addMinutes(lateMonday, 2));
+  const lastTrain = transitItinerary({ departAt: '2026-10-26T12:59:00.000Z' });
+
+  async function followLastTrain() {
+    freezeClockAt(lateMonday);
+    appStorage.settings.setDemoMode(false);
+    const plan = jest.spyOn(tripService, 'planTrip').mockResolvedValue(planResponse([lastTrain]));
+    await planSession.plan(planRequest({ time: { type: 'depart', at: lateMonday.toISOString() } }));
+    planSession.select(lastTrain.id);
+    await renderApp(`/itinerary/${lastTrain.id}`);
+    jest.setSystemTime(checkedAt);
+    return plan;
+  }
+
+  it('follows the first run in the morning, says its day, and says so only once', async () => {
+    const plan = await followLastTrain();
+    // 5:09 am on Tuesday.
+    plan.mockResolvedValue(planResponse([laterRunOf(lastTrain, 5 * 60 + 10)]));
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+
+    await act(() => planSession.refreshActiveTrip());
+
+    const spoken =
+      "Warning. Your trip changed. The 11:59\u00a0pm option is no longer running, so you're now following the same option leaving at Tuesday 5:09\u00a0am.";
+    expect(screen.getByLabelText(spoken)).toBeOnTheScreen();
+    expect(screen.getByText(/leaving at Tue 5:09\sam\.$/)).toBeOnTheScreen();
+    // Past midnight the banner reads as before, so VoiceOver is not told again.
+    await act(() => jest.advanceTimersByTime(13 * 60_000));
+    expect(screen.getByLabelText(spoken)).toBeOnTheScreen();
+    const changed = announce.mock.calls.filter(([text]) => text.includes('Your trip changed'));
+    expect(changed).toHaveLength(1);
+  });
+
+  it('says the day of the options offered instead, and of the check once it is yesterday', async () => {
+    const plan = await followLastTrain();
+    // The first bus, at 5:10 am on Tuesday.
+    const firstBus = transitItinerary({
+      departAt: '2026-10-26T18:10:00.000Z',
+      service: 'N70',
+      mode: 'bus',
+    });
+    plan.mockResolvedValue(planResponse([firstBus]));
+
+    await act(() => planSession.refreshActiveTrip());
+
+    const offered = describeTripSummary(firstBus, null, checkedAt);
+    expect(offered).toContain('Leave Tuesday 5:10\u00a0am');
+    expect(screen.getByRole('button', { name: offered })).toBeOnTheScreen();
+    expect(screen.getByLabelText('Times checked at 11:52\u00a0pm')).toBeOnTheScreen();
+
+    await act(() => jest.advanceTimersByTime(13 * 60_000));
+
+    expect(screen.getByLabelText('Times checked at Monday 11:52\u00a0pm')).toBeOnTheScreen();
+    expect(screen.getByTestId('times-checked-at')).toHaveTextContent('Checked Mon 11:52\u00a0pm');
   });
 });
 

@@ -13,6 +13,8 @@ export interface BannerProps {
   tone: BannerTone;
   title?: string;
   message: string;
+  // What VoiceOver reads instead of `message`, such as times with the weekday in full.
+  spokenMessage?: string;
   action?: { label: string; onPress: () => void; accessibilityHint?: string };
   // Speaks the banner when it appears, for news that arrives without the person asking, such as
   // a failed refresh. Leave off for banners that are part of the screen from the start.
@@ -73,6 +75,7 @@ export function Banner({
   tone,
   title,
   message,
+  spokenMessage,
   action,
   announce = false,
   style: containerStyle,
@@ -80,7 +83,7 @@ export function Banner({
 }: BannerProps) {
   const { colours } = useTheme();
   const style = TONES[tone];
-  const spoken = bannerAccessibilityLabel(tone, title, message);
+  const spoken = bannerAccessibilityLabel(tone, title, spokenMessage ?? message);
 
   useEffect(() => {
     if (announce) AccessibilityInfo.announceForAccessibility(spoken);

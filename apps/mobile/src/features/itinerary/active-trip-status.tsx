@@ -66,9 +66,11 @@ function planAgain(request: PlanRequest) {
 function AlternativeCard({
   alternative,
   refresh,
+  nowMs,
 }: {
   alternative: Itinerary;
   refresh: ActiveTripRefresh;
+  nowMs: number;
 }) {
   const total = duration(shownDurationSeconds(alternative));
   // Once the trip has started, an option leaves from the stop of its next service, not from where
@@ -77,7 +79,7 @@ function AlternativeCard({
   // The alternatives are only as fresh as the check that found them.
   const staleCheckAt = useStaleCheckAt(refresh.checkedAt);
   // Alternatives are offered now, whatever day the trip was asked for.
-  const now = new Date();
+  const now = new Date(nowMs);
   const summary = describeTripSummary(alternative, staleCheckAt, now);
   const times = tripTimes(alternative, now);
   return (
@@ -111,10 +113,12 @@ function CheckForChanges({
   checkedAt,
   canCheck,
   checking,
+  nowMs,
 }: {
   checkedAt: string | null;
   canCheck: boolean;
   checking: boolean;
+  nowMs: number;
 }) {
   const [note, setNote] = useState<CheckNote | null>(null);
 
@@ -130,18 +134,20 @@ function CheckForChanges({
   }
 
   if (!checkedAt && !canCheck) return null;
+  // A check from yesterday says so.
+  const checked = checkedAt ? describeTripTime(checkedAt, new Date(nowMs)) : null;
   return (
     <>
       <View style={styles.checkRow}>
-        {checkedAt ? (
+        {checked ? (
           <AppText
             variant="subheadline"
             tone="secondary"
             tabularNumbers
-            accessibilityLabel={`Times checked at ${describeTripTime(checkedAt, new Date()).spoken}`}
+            accessibilityLabel={`Times checked at ${checked.spoken}`}
             style={styles.checkedAt}
             testID="times-checked-at">
-            {`Checked ${describeTripTime(checkedAt, new Date()).text}`}
+            {`Checked ${checked.text}`}
           </AppText>
         ) : null}
         {canCheck ? (
@@ -178,13 +184,22 @@ export function ActiveTripStatus({ trip, nowMs }: { trip: DisplayedTrip; nowMs: 
         checkedAt={checkedAt}
         canCheck={canCheck}
         checking={trip.activeTripRefresh.status === 'refreshing'}
+        nowMs={nowMs}
       />
-      <CheckResult trip={trip} canCheck={canCheck} />
+      <CheckResult trip={trip} canCheck={canCheck} nowMs={nowMs} />
     </>
   );
 }
 
-function CheckResult({ trip, canCheck }: { trip: DisplayedTrip; canCheck: boolean }) {
+function CheckResult({
+  trip,
+  canCheck,
+  nowMs,
+}: {
+  trip: DisplayedTrip;
+  canCheck: boolean;
+  nowMs: number;
+}) {
   const { activeTripRefresh: refresh, itinerary, request } = trip;
   switch (refresh.status) {
     case 'idle':
@@ -204,15 +219,24 @@ function CheckResult({ trip, canCheck }: { trip: DisplayedTrip; canCheck: boolea
           }
         />
       );
-    case 'replaced':
+    case 'replaced': {
+      // Worded against the check that found the change, so the announced text stays the same
+      // when the clock passes midnight.
+      const checkedOn = new Date(refresh.checkedAt ?? nowMs);
+      const was = refresh.previous ? describeTripTime(refresh.previous.departAt, checkedOn) : null;
+      const leaving = describeTripTime(itinerary.departAt, checkedOn);
+      const wording = (part: 'text' | 'spoken') =>
+        `The ${was ? `${was[part]} ` : ''}option is no longer running, so you're now following the same option leaving at ${leaving[part]}.`;
       return (
         <Banner
           tone="warning"
           title="Your trip changed"
-          message={`The ${refresh.previous ? `${describeTripTime(refresh.previous.departAt, new Date()).text} ` : ''}option is no longer running, so you're now following the same option leaving at ${describeTripTime(itinerary.departAt, new Date()).text}.`}
+          message={wording('text')}
+          spokenMessage={wording('spoken')}
           announce
         />
       );
+    }
     case 'no-longer-offered': {
       if (refresh.alternatives.length === 0) {
         const searched = refresh.request ?? request;
@@ -237,7 +261,12 @@ function CheckResult({ trip, canCheck }: { trip: DisplayedTrip; canCheck: boolea
             announce
           />
           {refresh.alternatives.map((alternative) => (
-            <AlternativeCard key={alternative.id} alternative={alternative} refresh={refresh} />
+            <AlternativeCard
+              key={alternative.id}
+              alternative={alternative}
+              refresh={refresh}
+              nowMs={nowMs}
+            />
           ))}
         </View>
       );
