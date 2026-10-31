@@ -1049,6 +1049,35 @@ describe('walking the rest from a car park near the destination', () => {
     );
   });
 
+  it('never offers an option arriving more than 12 hours before an arrive-by time', async () => {
+    // Asked to arrive by Sunday 10:00, a capped TfNSW answered with Friday arrivals (2026-10-31).
+    // Here: arrive by 30 hours from now; one journey gets there 20 hours early, one 2 hours early.
+    const arriveBy = addMinutes(NOW, 30 * 60);
+    const earlyOrNear = fakeTransit((query) => [
+      journeyWithFinalWalk(
+        query.from,
+        query.to,
+        addMinutes(query.time.at, -20 * 60),
+        30,
+        5,
+        'EARLY',
+      ),
+      journeyWithFinalWalk(query.from, query.to, addMinutes(query.time.at, -2 * 60), 30, 5, 'NEAR'),
+    ]);
+    const response = await planTrip(
+      request({
+        time: { type: 'arrive', at: arriveBy },
+        access: { transit: true, drive: false, dropOff: false },
+      }),
+      deps({ transit: earlyOrNear }),
+    );
+
+    expect(
+      response.itineraries.map((it) => transitLegsOf(it.legs).map((leg) => leg.service.name)),
+    ).toEqual([['NEAR']]);
+    expect(response.rejected).toEqual([{ reason: 'arrives-long-before-target', count: 1 }]);
+  });
+
   it('keeps a public transport option that leaves within 12 hours, such as the first train', async () => {
     const firstTrainTomorrow = fakeTransit((query) => [
       journeyWithFinalWalk(query.from, query.to, addMinutes(query.time.at, 11 * 60), 30, 5),

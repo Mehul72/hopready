@@ -313,7 +313,7 @@ export type PlanRequest = z.infer<typeof planRequestSchema>;
 // buffer. transfer-too-short now means a change that cannot be made at all, because the walk
 // between the services ends after the next one has left. departs-long-after-requested (added
 // after build 5; older apps leave out reasons they do not know) is a depart-at option leaving more
-// than 12 hours after the time asked for.
+// than 12 hours after the time asked for; arrives-long-before-target is its arrive-by twin.
 export const REJECTION_REASONS = [
   'transfer-too-short',
   'walk-too-long',
@@ -323,6 +323,7 @@ export const REJECTION_REASONS = [
   'departs-before-requested',
   'departs-long-after-requested',
   'arrives-after-target',
+  'arrives-long-before-target',
   'discontinuous',
   'duplicate',
 ] as const;

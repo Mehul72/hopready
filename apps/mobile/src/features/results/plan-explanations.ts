@@ -127,6 +127,11 @@ function explain(
       };
     case 'arrives-after-target':
       return { text: 'Some options would have arrived after your arrive-by time.', remedy: 'time' };
+    case 'arrives-long-before-target':
+      return {
+        text: 'Some options would have got you there more than 12 hours before your arrive-by time.',
+        remedy: 'time',
+      };
     case 'discontinuous':
       return {
         text: "Some options had steps that didn't join up, so they were left out.",

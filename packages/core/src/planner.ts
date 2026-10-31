@@ -93,9 +93,9 @@ const PREFERENCE_TOLERANCE_SECONDS = 10 * 60;
 // Walking from the car park to the destination is offered when the walk takes at most this long,
 // or the traveller's walking limit when that is longer. Further than that is a drive to the door.
 const WALK_THE_REST_MAX_MINUTES = 20;
-// An option that leaves this long after the time asked for answers a different question: a plan
-// for Saturday evening should not offer Monday afternoon.
-const MAX_LEAVE_AFTER_REQUESTED_SECONDS = 12 * 60 * 60;
+// An option this far from the time asked for answers a different question: a plan for Saturday
+// evening should not offer Monday afternoon, nor "arrive by Sunday 10 am" a Friday arrival.
+const MAX_SECONDS_FROM_TIME_ASKED_FOR = 12 * 60 * 60;
 // Shown on a drive, park, walk option at a Transport Park&Ride car park, whose parking is free only
 // with a public transport trip (transportnsw.info/parkandride, read 2026-10-31).
 export const PARK_AND_WALK_FEE_NOTE =
@@ -1449,9 +1449,15 @@ function itineraryProblem(context: PlanContext, itinerary: Itinerary): Rejection
   }
   if (
     time.type === 'depart' &&
-    secondsBetween(time.at, itinerary.departAt) > MAX_LEAVE_AFTER_REQUESTED_SECONDS
+    secondsBetween(time.at, itinerary.departAt) > MAX_SECONDS_FROM_TIME_ASKED_FOR
   ) {
     return 'departs-long-after-requested';
+  }
+  if (
+    time.type === 'arrive' &&
+    secondsBetween(itinerary.arriveAt, time.at) > MAX_SECONDS_FROM_TIME_ASKED_FOR
+  ) {
+    return 'arrives-long-before-target';
   }
   if (time.type === 'arrive' && secondsBetween(time.at, itinerary.arriveAt) > TIME_GRACE_SECONDS) {
     return 'arrives-after-target';
