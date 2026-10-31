@@ -554,7 +554,11 @@ async function planThroughPoint(
   // An option that cannot be taken is only returned when nothing else can be, so the caller counts
   // why the car park gave nothing.
   const workable = options.filter((option) => itineraryProblem(context, option) === null);
-  if (workable.length === 0) return { options: [options[0]!], transitFailure };
+  if (workable.length === 0) {
+    // Public transport was never checked here, which says more than why the walk cannot be taken.
+    if (byTransit.status === 'rejected') throw byTransit.reason;
+    return { options: [options[0]!], transitFailure };
+  }
   const best = preferredOption(workable, context.request.time.type, (option) => ({
     start: option.departAt,
     end: option.arriveAt,

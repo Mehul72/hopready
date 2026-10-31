@@ -1384,6 +1384,25 @@ describe('walking the rest from a car park near the destination', () => {
     );
   });
 
+  it('says public transport failed at a car park whose walk cannot be taken either', async () => {
+    const failing = fakeTransit(() => {
+      throw new ProviderError('demo-fixture', 'unavailable', 'TfNSW is down');
+    });
+    // Arriving 20 minutes from now, the drive to Bella Vista and the walk from it would already
+    // have had to start.
+    const response = await planTrip(
+      request({
+        destination: NEAR_BELLA_VISTA,
+        time: { type: 'arrive', at: addMinutes(NOW, 20) },
+      }),
+      deps({ transit: failing }),
+    );
+
+    expect(response.checkedCarParks.find((carPark) => carPark.id === BELLA_VISTA.id)?.outcome).toBe(
+      'provider-error',
+    );
+  });
+
   it('leaves out drop-off stations a short walk from the destination', async () => {
     const transit = fakeTransit();
     await planTrip(
