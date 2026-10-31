@@ -95,6 +95,12 @@ const PREFERENCE_TOLERANCE_SECONDS = 10 * 60;
 // minutes at normal pace by HopReady's measure, 27 by TfNSW's. Further is a drive to the door. A
 // distance rather than a time, so slow walkers keep the option, marked against their own limit.
 const WALK_THE_REST_MAX_STRAIGHT_METRES = 1_200;
+// A car park past the destination means driving by it and walking back. Measured as the share of
+// the walk that heads back toward the start: 0.95 to 0.99 for the Kellyville car parks from the
+// owner's house to Windsor Rd at Samantha Riley Dr, 0.09 for Schofields to Anson St, 0.29 for the
+// demo Dee Why car park beside the office. Drive times cannot tell these apart: 15 seconds longer
+// than the drive to the door for one Kellyville car park, 8 for Dee Why.
+const MAX_SHARE_OF_WALK_BACK_TOWARD_START = 0.5;
 // An option this far from the time asked for answers a different question: a plan for Saturday
 // evening should not offer Monday afternoon, nor "arrive by Sunday 10 am" a Friday arrival.
 const MAX_SECONDS_FROM_TIME_ASKED_FOR = 12 * 60 * 60;
@@ -819,13 +825,18 @@ async function planWalkFromCarPark(
 
 // The walk from a car park to the destination, when it is short enough to offer instead of public
 // transport, timed as TfNSW times street walks. A car park at the destination itself is no
-// different from driving there, and from a start no farther away than the car park, driving there
-// to walk the same way is no help.
+// different from driving there; from a start no farther away than the car park, driving there to
+// walk the same way is no help; and from a car park past the destination, the walk goes back the
+// way the car came.
 function walkTheRest(context: PlanContext, point: TransferPoint): Walk | null {
   if (!point.facility || !isWalkFromDestination(context, point.place)) return null;
   const { origin, destination, preferences } = context.request;
   const fromCarPark = haversineMetres(point.place.coordinate, destination.coordinate);
-  if (haversineMetres(origin.coordinate, destination.coordinate) <= fromCarPark) return null;
+  const startToDestination = haversineMetres(origin.coordinate, destination.coordinate);
+  if (startToDestination <= fromCarPark) return null;
+  const backTowardStartMetres =
+    haversineMetres(origin.coordinate, point.place.coordinate) - startToDestination;
+  if (backTowardStartMetres > fromCarPark * MAX_SHARE_OF_WALK_BACK_TOWARD_START) return null;
   const walk = streetWalkBetween(
     point.place.coordinate,
     destination.coordinate,
