@@ -1591,6 +1591,23 @@ describe('walking the rest from a car park near the destination', () => {
       expect(outcomeAtBellaVista(noRoom)).toBe('used');
     });
 
+    it('gives a used car park the minutes of its option still listed', async () => {
+      // The bus gets there with the walk and leaves later, so the walk is hidden behind it.
+      const response = await planTrip(
+        request({ destination: NEAR_BELLA_VISTA }),
+        deps({ transit: directBus(NEAR_BELLA_VISTA, 0) }),
+      );
+      const listed = response.itineraries.find((it) => it.parking?.carPark.id === BELLA_VISTA.id)!;
+
+      expect(waysOn(response)).toEqual(['735']);
+      expect(
+        response.checkedCarParks.find((carPark) => carPark.id === BELLA_VISTA.id),
+      ).toMatchObject({
+        outcome: 'used',
+        estimatedMinutes: Math.round(listed.durationSeconds / 60),
+      });
+    });
+
     it('arriving by a time, lists the bus by how much earlier it means leaving', async () => {
       const arriveBy = addMinutes(NOW, 90);
       // The walk takes 14 minutes and the bus 5, from a platform 2 minutes from the car park.

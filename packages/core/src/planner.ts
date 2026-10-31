@@ -1774,7 +1774,8 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
 }
 
 // A car park whose option worked but is not listed says why, rather than reading as used when the
-// traveller cannot find its card. One with another way on still listed is used.
+// traveller cannot find its card. One with another way on still listed is used, with that card's
+// minutes.
 function recordUnlistedCarPark(
   context: PlanContext,
   option: Itinerary,
@@ -1783,7 +1784,12 @@ function recordUnlistedCarPark(
 ) {
   const checked = option.parking && context.checkedCarParks.get(option.parking.carPark.id);
   if (!checked) return;
-  if (stillListed.some((other) => other.parking?.carPark.id === checked.id)) return;
+  const listedHere = stillListed.find((other) => other.parking?.carPark.id === checked.id);
+  if (listedHere) {
+    const estimatedMinutes = Math.round(listedHere.durationSeconds / 60);
+    context.checkedCarParks.set(checked.id, { ...checked, estimatedMinutes });
+    return;
+  }
   context.checkedCarParks.set(checked.id, { ...checked, outcome });
 }
 
