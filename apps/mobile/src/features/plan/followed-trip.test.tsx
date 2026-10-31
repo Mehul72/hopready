@@ -62,6 +62,24 @@ describe('the followed trip on the Plan tab', () => {
     expect(screen.getByLabelText(/^Your trip\..*Your trip changed\./)).toBeOnTheScreen();
   });
 
+  it('says the day and date of a trip a week away', async () => {
+    // Seen at 8 pm on Saturday 31 October 2026, for 8:30 pm on Saturday 7 November.
+    freezeClockAt(new Date('2026-10-31T09:00:00.000Z'));
+    appStorage.activeTrip.start({
+      request: planRequest(),
+      itinerary: parkAndRideItinerary({ departAt: '2026-11-07T09:30:00.000Z' }),
+      plannedAt: '2026-10-31T09:00:00.000Z',
+      mode: 'demo',
+    });
+
+    await renderApp('/');
+
+    expect(screen.getByText(/^Leave Sat 7 Nov 8:30\spm · /)).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(/^Your trip\..*Leave Saturday 7 November 8:30\spm, arrive /),
+    ).toBeOnTheScreen();
+  });
+
   it('drops off the Plan tab an hour after arriving', async () => {
     const itinerary = followTrip();
     jest.setSystemTime(

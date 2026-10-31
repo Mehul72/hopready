@@ -117,6 +117,25 @@ describe('itinerary screen', () => {
     );
   });
 
+  it('says the day of a trip tomorrow morning, measured from today', async () => {
+    // Planned at 10:30 pm on Monday for 6:40 am on Tuesday: the time asked for is the same day as
+    // the trip, so only today tells the trip screen to say which day it leaves.
+    const mondayNight = '2026-10-26T11:30:00.000Z';
+    freezeClockAt(new Date(mondayNight));
+    appStorage.settings.setDemoMode(false);
+    const tomorrowMorning = transitItinerary({ departAt: '2026-10-26T19:40:00.000Z' });
+    jest.spyOn(tripService, 'planTrip').mockResolvedValue(planResponse([tomorrowMorning]));
+    await planSession.plan(
+      planRequest({ time: { type: 'depart', at: '2026-10-26T19:40:00.000Z' } }),
+    );
+
+    await renderApp(`/itinerary/${tomorrowMorning.id}`);
+
+    expect(
+      within(screen.getByTestId('trip-summary')).getByText('Tue 6:40\u00a0am'),
+    ).toBeOnTheScreen();
+  });
+
   it('shows the leave and arrive times, the map, every step and the data sources', async () => {
     const itinerary = firstWithStrategy(await planDemoCommute(), 'park-and-ride');
     await renderApp(`/itinerary/${itinerary.id}`);

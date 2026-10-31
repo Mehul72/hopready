@@ -42,6 +42,29 @@ describe('explainRejections', () => {
     expect(explanation?.remedy).toBe('time');
   });
 
+  it('says when options were more than 12 hours from the time asked for', () => {
+    expect(
+      explainRejections(
+        [
+          { reason: 'departs-long-after-requested', count: 2 },
+          { reason: 'arrives-long-before-target', count: 1 },
+        ],
+        PREFERENCES,
+      ),
+    ).toEqual([
+      {
+        reason: 'departs-long-after-requested',
+        text: 'Some options would have needed you to leave more than 12 hours after your chosen time.',
+        remedy: 'time',
+      },
+      {
+        reason: 'arrives-long-before-target',
+        text: 'Some options would have got you there more than 12 hours before your arrive-by time.',
+        remedy: 'time',
+      },
+    ]);
+  });
+
   it('leaves out duplicates, which explain nothing about what is missing', () => {
     expect(explainRejections([{ reason: 'duplicate', count: 3 }], PREFERENCES)).toEqual([]);
   });
