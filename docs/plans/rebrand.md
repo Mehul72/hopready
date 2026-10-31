@@ -1,6 +1,6 @@
 # Plan: HopReady rebrand
 
-Status: in progress
+Status: done
 Branch: feat/rebrand
 
 ## Goal
@@ -32,7 +32,7 @@ Give the iPhone app a calm, minimal visual identity and make planning understand
 - [x] 3. Verify and document the finished interface.
       files: affected flow tests, iOS UI tests, design notes, screenshots
       done when: pnpm check passes, simulator journeys pass, light/dark and large-text screens visually inspected.
-- [ ] 4. Commit, push and deliver TestFlight.
+- [x] 4. Commit, push and deliver TestFlight.
       done when: reviewed commit is on origin, production build uploaded, App Store Connect reports Testing or Ready to Submit (not Processing).
 
 ## Open questions
@@ -40,6 +40,8 @@ Give the iPhone app a calm, minimal visual identity and make planning understand
 - Expo and App Store Connect access verified through the existing release setup. No input is needed from the owner.
 
 ## Log
+
+- 2026-11-01: Committed and pushed `db7f2b7` (`feat: rebrand HopReady`) on `feat/rebrand`; GitHub CI passed. Production build 0.1.0 (7), EAS `73512ecf-896b-47c7-8b91-63f993a677ba`, uploaded through submission `208fe6cc-d617-4279-9382-5894b4fa4254`. Apple reports `VALID` and `IN_BETA_TESTING`, confirming availability to the existing internal testers. The optional CLI changelog field was rejected as Enterprise-only; the standard submission succeeded.
 
 - 2026-11-01: Final accessibility run passed at the largest Dynamic Type size in dark mode. Visually inspected all four captures: full-width place fields, vertically stacked time choices, wrapping travel chips and the complete Plan trip button above the tab bar. Simulator settings restored to light/large. `pnpm check` passed again on the final app code (1,385 tests total); physical-device GPS and spoken VoiceOver remain device checks.
 
