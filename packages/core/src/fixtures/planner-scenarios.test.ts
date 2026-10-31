@@ -242,11 +242,13 @@ describe('drive, park, then metro', () => {
       )!.station;
       expect(transit[0]!.from.stopId).toBe(station.stopId);
       expect(transit[0]!.to.name).toBe('Chatswood Station');
-      expect(response.checkedCarParks).toContainEqual({
-        id: carPark.id,
-        name: carPark.name,
-        outcome: 'used',
-      });
+      expect(response.checkedCarParks).toContainEqual(
+        expect.objectContaining({
+          id: carPark.id,
+          name: carPark.name,
+          outcome: 'used',
+        }),
+      );
     }
   });
 
@@ -791,7 +793,7 @@ describe('only real choices', () => {
     expect(checkedOutcomes(response)).toMatchObject({
       'Tallawong P2': 'used',
       'Kellyville (north)': 'used',
-      'Kellyville (south)': 'matched-by-another',
+      'Kellyville (south)': 'not-tried',
     });
   });
 
@@ -859,13 +861,13 @@ describe('only real choices', () => {
     expectSoundResponse(response);
     const tallawong = byStrategy(response, 'park-and-ride')[0]!.parking!.occupancy;
 
-    // P3 reports no count, which still beats P2's nearly full one at the same station, and a car
-    // park with no count cannot hide Kellyville at another station.
+    // P3 reports no count, which still beats P2's nearly full one at the same station, so P3 is
+    // the Tallawong car park tried; Kellyville is another station and is listed anyway.
     expect(carParksListed(response)).toEqual(['Tallawong P3', 'Kellyville (north)']);
     expect(tallawong.status).toBe('unknown');
     expect(
       response.checkedCarParks.find((carPark) => carPark.name === 'Tallawong P2')?.outcome,
-    ).toBe('matched-by-another');
+    ).toBe('not-tried');
   });
 
   it('drops off at both stations on the line, the quicker one first', async () => {

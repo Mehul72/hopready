@@ -1,4 +1,5 @@
 import { combineSignals, mapSettled } from './async';
+import { estimateTransitMinutes, hubPeriodFor } from './estimate';
 import { haversineMetres } from './geo';
 import {
   buildItinerary,
@@ -53,9 +54,9 @@ export interface PlannerLimits {
 }
 
 export const DEFAULT_PLANNER_LIMITS: PlannerLimits = {
-  // Apple's ETA endpoint takes at most 10 destinations in one call.
-  maxEtaCandidates: 8,
-  maxTransferCandidates: 4,
+  // Apple's ETA endpoint takes at most 10 destinations in one call; two calls run together.
+  maxEtaCandidates: 20,
+  maxTransferCandidates: 5,
   journeysPerQuery: 4,
   maxItineraries: 10,
   providerTimeoutMs: 8_000,
@@ -74,21 +75,13 @@ export interface PlannerDeps {
 
 // Straight-line distance never beats the road, so 90 km/h is a safe ceiling for a first cut.
 const MAX_STRAIGHT_LINE_METRES_PER_DRIVE_MINUTE = 1_500;
-// Rough speeds used only to choose which candidates to ask providers about. Never shown to people.
+// A rough road speed, used only to rank candidates before the drive times come back and to tell a
+// long shot from a car park within reach. Never shown to people.
 const ROAD_DISTANCE_FACTOR = 1.35;
 const ROUGH_DRIVE_METRES_PER_MINUTE = 667;
-const ROUGH_TRANSIT_METRES_PER_MINUTE = 583;
-const ROUGH_TRANSIT_OVERHEAD_MINUTES = 8;
-const MIN_PROGRESS_METRES = 1_000;
-// Driving a few minutes back to the local station is normal, so a car park this close to the start
-// may lie in any direction. Beyond it, a car park must bring the traveller closer to the destination.
-const ANY_DIRECTION_WITHIN_METRES = 5_000;
-const MAX_DETOUR_RATIO = 1.6;
-const MAX_EXPLAINED_SKIPPED_CAR_PARKS = 3;
-// The local stations are the first places most people would think of, so the quickest drives to
-// this many different stations are always tried, whatever the rough estimate says about car parks
-// nearer the destination.
-const QUICKEST_DRIVES_ALWAYS_TRIED = 2;
+// The local station is the first place most people would think of, so the quickest drive is always
+// tried, whatever the estimate says about car parks nearer the destination.
+const QUICKEST_DRIVES_ALWAYS_TRIED = 1;
 // Provider times are whole minutes; allow that much slack before calling something early or late.
 const TIME_GRACE_SECONDS = 60;
 // A count with no more than this share of the spaces free could easily be full by the time the
@@ -119,6 +112,21 @@ interface TransferPoint {
   // drop-off station. Null when there is none, as for a spot the traveller saved.
   station: string | null;
   preferred: boolean;
+}
+
+// A transfer point with its door-to-door estimate, which decides what the providers are asked about.
+interface Candidate {
+  point: TransferPoint;
+  roughDriveMinutes: number;
+  // Parking or drop-off, the walk to the platform and the public transport from there: everything a
+  // drive time does not change.
+  beyondDriveMinutes: number;
+  // Door to door: the rough drive at first, the provider's drive time once it is known.
+  estimatedMinutes: number;
+}
+
+interface RankedCandidate extends Candidate {
+  driveSeconds: number;
 }
 
 interface PlanContext {
@@ -369,8 +377,8 @@ async function planViaTransferPoints(
       : request.preferences.dropOffBufferMinutes);
 
   const { points, listFailure } = await transferPoints(context, strategy);
-  const shortlist = shortlistByGeometry(context, strategy, points);
-  // Without the car park list, "none on the way" would be a guess.
+  const shortlist = shortlistByEstimate(context, strategy, points, bufferSeconds);
+  // Without the car park list, "none within reach" would be a guess.
   if (shortlist.length === 0 && listFailure) {
     context.unavailable.push({
       strategy,
@@ -383,32 +391,36 @@ async function planViaTransferPoints(
       strategy,
       reason:
         strategy === 'park-and-ride'
-          ? 'No documented car parks are on the way to your destination within your driving limit.'
-          : 'No stations with drop-off access are on the way to your destination within your driving limit.',
+          ? 'No documented car parks are within your driving limit.'
+          : 'No stations with drop-off access are within your driving limit.',
     });
     return { itineraries: [] };
   }
 
-  let reachable: { point: TransferPoint; driveSeconds: number }[];
-  try {
-    reachable = await rankByDriveTime(context, driving, strategy, shortlist, bufferSeconds);
-  } catch (error) {
-    const failure = asProviderError(error, driving.name);
-    shortlist.forEach((point) => recordCarPark(context, strategy, point, 'provider-error'));
-    context.unavailable.push({ strategy, reason: describeFailure(failure, 'Drive times') });
-    return { itineraries: [], failure };
-  }
-
-  const occupancy =
+  // Drive times and car park counts come from different providers, so they are asked for together.
+  const [ranking, occupancy] = await Promise.all([
+    rankByDriveTime(context, driving, strategy, shortlist).then(
+      (reachable) => ({ reachable }),
+      (error: unknown) => ({ failure: asProviderError(error, driving.name) }),
+    ),
     strategy === 'park-and-ride'
-      ? await occupancyFor(
+      ? occupancyFor(
           context,
-          reachable.map(({ point }) => point),
+          shortlist.map(({ point }) => point),
         )
-      : new Map<string, Occupancy>();
+      : Promise.resolve(new Map<string, Occupancy>()),
+  ]);
+  if ('failure' in ranking) {
+    shortlist.forEach((candidate) =>
+      recordCarPark(context, strategy, candidate.point, 'provider-error', candidate),
+    );
+    context.unavailable.push({ strategy, reason: describeFailure(ranking.failure, 'Drive times') });
+    return { itineraries: [], failure: ranking.failure };
+  }
+  const chosen = chooseCandidates(context, strategy, ranking.reachable, occupancy);
 
   const outcomes = await mapSettled(
-    reachable,
+    chosen,
     context.limits.providerConcurrency,
     ({ point, driveSeconds }) =>
       planThroughPoint(context, driving, strategy, point, driveSeconds, bufferSeconds, occupancy),
@@ -417,15 +429,16 @@ async function planViaTransferPoints(
   const itineraries: Itinerary[] = [];
   let firstFailure: ProviderError | undefined;
   outcomes.forEach((outcome, index) => {
-    const point = reachable[index]!.point;
+    const candidate = chosen[index]!;
+    const { point } = candidate;
     if (outcome.status === 'rejected') {
       firstFailure ??= asProviderError(outcome.reason, context.deps.transit.name);
-      recordCarPark(context, strategy, point, 'provider-error');
+      recordCarPark(context, strategy, point, 'provider-error', candidate);
       return;
     }
     const itinerary = outcome.value;
     if (!itinerary) {
-      recordCarPark(context, strategy, point, 'no-workable-connection');
+      recordCarPark(context, strategy, point, 'no-workable-connection', candidate);
       return;
     }
     // Checked here as well as when options are chosen, so a car park reads as used only when its
@@ -438,13 +451,16 @@ async function planViaTransferPoints(
         strategy,
         point,
         problem === 'drive-too-long' ? 'too-far-to-drive' : 'no-workable-connection',
+        candidate,
       );
       return;
     }
     itineraries.push(itinerary);
     if (point.preferred) context.preferredOptions.add(itinerary.id);
     if (point.station) context.optionStations.set(itinerary.id, point.station);
-    recordCarPark(context, strategy, point, 'used');
+    recordCarPark(context, strategy, point, 'used', {
+      estimatedMinutes: itinerary.durationSeconds / 60,
+    });
   });
 
   if (itineraries.length === 0 && firstFailure) {
@@ -456,7 +472,7 @@ async function planViaTransferPoints(
     context.unavailable.push({
       strategy,
       reason:
-        reachable.length === 0
+        ranking.reachable.length === 0
           ? `No stations with drop-off access are within your ${request.preferences.maxDriveMinutes} min driving limit.`
           : 'No public transport connection worked from the stations checked.',
     });
@@ -846,11 +862,6 @@ function stationKey(station: Place): string {
   return station.stopId ?? station.name;
 }
 
-function roughTransitMinutes(fromPlace: Place, toPlace: Place): number {
-  const metres = haversineMetres(fromPlace.coordinate, toPlace.coordinate) * ROAD_DISTANCE_FACTOR;
-  return metres / ROUGH_TRANSIT_METRES_PER_MINUTE + ROUGH_TRANSIT_OVERHEAD_MINUTES;
-}
-
 function roughDriveMinutes(fromPlace: Place, toPlace: Place): number {
   return (
     (haversineMetres(fromPlace.coordinate, toPlace.coordinate) * ROAD_DISTANCE_FACTOR) /
@@ -858,106 +869,106 @@ function roughDriveMinutes(fromPlace: Place, toPlace: Place): number {
   );
 }
 
-function shortlistByGeometry(
+// Every car park within the driving limit gets a door-to-door estimate: a rough drive, the time to
+// reach the platform, and the public transport from there as the hub table knows it. The best
+// estimates go on to the drive-time provider. Direction never rules a car park out on its own: one
+// a few minutes behind the start, or on another line, earns its place or loses it on the estimate.
+function shortlistByEstimate(
   context: PlanContext,
   strategy: TransferStrategy,
   points: TransferPoint[],
-): TransferPoint[] {
-  const { origin, destination, preferences } = context.request;
-  const directMetres = haversineMetres(origin.coordinate, destination.coordinate);
+  bufferSeconds: number,
+): Candidate[] {
+  const { origin, destination, time, preferences } = context.request;
   const maxStraightLineMetres =
     preferences.maxDriveMinutes * MAX_STRAIGHT_LINE_METRES_PER_DRIVE_MINUTE;
+  const period = hubPeriodFor(time.at);
 
-  const wrongWay: { point: TransferPoint; fromOrigin: number }[] = [];
-  const plausible = points.filter((point) => {
-    const fromOrigin = haversineMetres(origin.coordinate, point.place.coordinate);
-    const toDestination = haversineMetres(point.place.coordinate, destination.coordinate);
-    if (fromOrigin > maxStraightLineMetres) {
+  const candidates: Candidate[] = [];
+  for (const point of points) {
+    if (haversineMetres(origin.coordinate, point.place.coordinate) > maxStraightLineMetres) {
       if (point.preferred) recordCarPark(context, strategy, point, 'too-far-to-drive');
-      return false;
+      continue;
     }
-    if (point.preferred) return true;
-    const makesProgress =
-      fromOrigin <= ANY_DIRECTION_WITHIN_METRES ||
-      toDestination <= directMetres - MIN_PROGRESS_METRES;
-    const reasonableDetour =
-      (fromOrigin + toDestination) / Math.max(directMetres, 1) <= MAX_DETOUR_RATIO;
-    if (!makesProgress || !reasonableDetour) wrongWay.push({ point, fromOrigin });
-    return makesProgress && reasonableDetour;
-  });
+    const rough = roughDriveMinutes(origin, point.place);
+    const beyondDriveMinutes =
+      bufferSeconds / 60 +
+      walkToBoarding(context, point).durationSeconds / 60 +
+      estimateTransitMinutes(
+        point.boarding,
+        destination.coordinate,
+        period,
+        preferences.walkingSpeed,
+      );
+    candidates.push({
+      point,
+      roughDriveMinutes: rough,
+      beyondDriveMinutes,
+      estimatedMinutes: rough + beyondDriveMinutes,
+    });
+  }
 
-  // Name the nearby car parks that were skipped for direction, so a missing local car park is explained
-  // without listing every facility in Sydney. Only ones within a realistic drive count as nearby.
-  wrongWay
-    .filter(({ point }) => roughDriveMinutes(origin, point.place) <= preferences.maxDriveMinutes)
-    .sort((a, b) => a.fromOrigin - b.fromOrigin)
-    .slice(0, MAX_EXPLAINED_SKIPPED_CAR_PARKS)
-    .forEach(({ point }) => recordCarPark(context, strategy, point, 'not-towards-destination'));
-
-  // The straight-line bound above never wrongly excludes a car park, but it lets far ones in. Those
-  // often look quick overall (a short train ride after a long drive), so ranking on the estimate alone
-  // can fill every ETA slot with car parks that then fail the driving limit. Likely reachable ones go
-  // first.
-  const likelyOverDriveLimit = (point: TransferPoint) =>
-    roughDriveMinutes(origin, point.place) > preferences.maxDriveMinutes ? 1 : 0;
-  const estimate = (point: TransferPoint) =>
-    roughDriveMinutes(origin, point.place) + roughTransitMinutes(point.place, destination);
-  const ranked = plausible.sort(
-    (a, b) => likelyOverDriveLimit(a) - likelyOverDriveLimit(b) || estimate(a) - estimate(b),
+  // A long drive to a short ride can look quick overall, so car parks likely beyond the driving
+  // limit go last, after every one likely within it, or they would take the estimate slots and then
+  // fail the limit. The car park asked for always keeps its place.
+  const likelyOverLimit = (candidate: Candidate) =>
+    candidate.roughDriveMinutes > preferences.maxDriveMinutes ? 1 : 0;
+  const ranked = candidates.sort(
+    (a, b) =>
+      Number(b.point.preferred) - Number(a.point.preferred) ||
+      likelyOverLimit(a) - likelyOverLimit(b) ||
+      a.estimatedMinutes - b.estimatedMinutes,
   );
-  const preferred = ranked.filter((point) => point.preferred);
-  const others = ranked.filter((point) => !point.preferred);
-  const shortlisted = [...preferred, ...others].slice(
-    0,
-    Math.max(context.limits.maxEtaCandidates, preferred.length),
-  );
-  // Car parks that were on the way but lost their place say so, so none goes missing from the list.
-  for (const point of others.slice(shortlisted.length - preferred.length)) {
-    if (roughDriveMinutes(origin, point.place) <= preferences.maxDriveMinutes) {
-      recordCarPark(context, strategy, point, 'not-tried');
+  const preferredCount = ranked.filter((candidate) => candidate.point.preferred).length;
+  const shortlisted = ranked.slice(0, Math.max(context.limits.maxEtaCandidates, preferredCount));
+  // Car parks within reach that lost their place say so, with the estimate, so none goes missing.
+  for (const candidate of ranked.slice(shortlisted.length)) {
+    if (candidate.roughDriveMinutes <= preferences.maxDriveMinutes) {
+      recordCarPark(context, strategy, candidate.point, 'not-tried', candidate);
     }
   }
   return shortlisted;
 }
 
+// One drive-time call for the whole shortlist, then each estimate is refined with the real drive.
+// Car parks whose drive runs past the limit are left out, and said so for those that looked within
+// reach. A long shot that then fails the limit is not worth a line in the list.
 async function rankByDriveTime(
   context: PlanContext,
   driving: DrivingProvider,
   strategy: TransferStrategy,
-  shortlist: TransferPoint[],
-  bufferSeconds: number,
-): Promise<{ point: TransferPoint; driveSeconds: number }[]> {
-  const { origin, destination, time, preferences } = context.request;
+  shortlist: Candidate[],
+): Promise<RankedCandidate[]> {
+  const { origin, time, preferences } = context.request;
   // For arrive-by, ask for traffic around when the drive would happen, using the closest candidate.
-  const roughLeadMinutes = Math.min(
-    ...shortlist.map(
-      (point) =>
-        roughDriveMinutes(origin, point.place) + roughTransitMinutes(point.place, destination),
-    ),
-  );
+  const roughLeadMinutes = Math.min(...shortlist.map((candidate) => candidate.estimatedMinutes));
   const rankingTime: DriveTime =
     time.type === 'depart'
       ? time
-      : {
-          type: 'depart',
-          at: laterOfIso(context.now, addMinutes(time.at, -roughLeadMinutes - bufferSeconds / 60)),
-        };
+      : { type: 'depart', at: laterOfIso(context.now, addMinutes(time.at, -roughLeadMinutes)) };
 
   const estimates = await withProviderTimeout(context, (signal) =>
     driving.estimateDrives(
       origin.coordinate,
-      shortlist.map((point) => point.place.coordinate),
+      shortlist.map((candidate) => candidate.point.place.coordinate),
       rankingTime,
       signal,
     ),
   );
 
   const maxDriveSeconds = preferences.maxDriveMinutes * 60;
-  const reachable: { point: TransferPoint; driveSeconds: number; score: number }[] = [];
-  shortlist.forEach((point, index) => {
+  const reachable: RankedCandidate[] = [];
+  shortlist.forEach((candidate, index) => {
+    const { point } = candidate;
     const estimate = estimates[index];
     if (!estimate || estimate.durationSeconds > maxDriveSeconds) {
-      recordCarPark(context, strategy, point, 'too-far-to-drive');
+      if (point.preferred || candidate.roughDriveMinutes <= preferences.maxDriveMinutes) {
+        recordCarPark(context, strategy, point, 'too-far-to-drive', {
+          estimatedMinutes: estimate
+            ? estimate.durationSeconds / 60 + candidate.beyondDriveMinutes
+            : candidate.estimatedMinutes,
+        });
+      }
       if (point.preferred) {
         context.notices.push(
           `${point.name} is outside your ${preferences.maxDriveMinutes} min driving limit.`,
@@ -965,33 +976,74 @@ async function rankByDriveTime(
       }
       return;
     }
-    const score = estimate.durationSeconds / 60 + roughTransitMinutes(point.place, destination);
     reachable.push({
-      point,
+      ...candidate,
       driveSeconds: estimate.durationSeconds,
-      score: point.preferred ? -1 : score,
+      estimatedMinutes: estimate.durationSeconds / 60 + candidate.beyondDriveMinutes,
     });
   });
+  return reachable.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
+}
 
-  // Two car parks at one station share its services, so the second would only repeat the first.
-  const quickestDrives: typeof reachable = [];
-  for (const candidate of [...reachable].sort((a, b) => a.driveSeconds - b.driveSeconds)) {
-    if (quickestDrives.length === QUICKEST_DRIVES_ALWAYS_TRIED) break;
-    const station = candidate.point.station;
-    if (station && quickestDrives.some((kept) => kept.point.station === station)) continue;
-    quickestDrives.push(candidate);
-  }
-  const byScore = reachable.sort((a, b) => a.score - b.score);
-  const kept = [
-    ...quickestDrives,
-    ...byScore.filter((candidate) => !quickestDrives.includes(candidate)),
-  ].slice(0, context.limits.maxTransferCandidates);
+// Which of the reachable car parks are asked for journeys: the ones asked for by name or station,
+// the quickest drive, then the best estimates, one car park per station. Two car parks at one station
+// get the same services, so the one surer of a space, then the quicker one, speaks for both. The
+// rest are listed with their estimates, so the traveller can see what was not tried and why.
+function chooseCandidates(
+  context: PlanContext,
+  strategy: TransferStrategy,
+  reachable: RankedCandidate[],
+  occupancy: ReadonlyMap<string, Occupancy>,
+): RankedCandidate[] {
+  const outlook = (candidate: RankedCandidate) => {
+    const { facility } = candidate.point;
+    if (!facility) return 1;
+    return countOutlook(freshOccupancy(context, facility, occupancy.get(facility.id)));
+  };
+  const forStation = new Map<string, RankedCandidate>();
+  const spokenFor: RankedCandidate[] = [];
+  const standalone: RankedCandidate[] = [];
   for (const candidate of reachable) {
-    if (!kept.includes(candidate)) recordCarPark(context, strategy, candidate.point, 'not-tried');
+    const { station, preferred } = candidate.point;
+    if (preferred || station === null) {
+      standalone.push(candidate);
+      continue;
+    }
+    const kept = forStation.get(station);
+    if (!kept) {
+      forStation.set(station, candidate);
+    } else if (outlook(candidate) > outlook(kept)) {
+      forStation.set(station, candidate);
+      spokenFor.push(kept);
+    } else {
+      spokenFor.push(candidate);
+    }
   }
-  return kept
-    .sort((a, b) => a.score - b.score)
-    .map(({ point, driveSeconds }) => ({ point, driveSeconds }));
+
+  const contenders = [...standalone, ...forStation.values()];
+  const quickestDrives = [...contenders]
+    .filter((candidate) => !candidate.point.preferred)
+    .sort((a, b) => a.driveSeconds - b.driveSeconds)
+    .slice(0, QUICKEST_DRIVES_ALWAYS_TRIED);
+  const ordered = [
+    ...contenders.filter((candidate) => candidate.point.preferred),
+    ...quickestDrives,
+    ...contenders
+      .filter((candidate) => !candidate.point.preferred && !quickestDrives.includes(candidate))
+      .sort((a, b) => a.estimatedMinutes - b.estimatedMinutes),
+  ];
+  const preferredCount = ordered.filter((candidate) => candidate.point.preferred).length;
+  const chosen = ordered.slice(0, Math.max(context.limits.maxTransferCandidates, preferredCount));
+  for (const candidate of [...ordered.slice(chosen.length), ...spokenFor]) {
+    recordCarPark(context, strategy, candidate.point, 'not-tried', candidate);
+  }
+  return chosen.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
+}
+
+// Room beats no count or a stale one, which beats nearly full.
+function countOutlook(occupancy: Occupancy): number {
+  if (occupancy.status !== 'known') return 1;
+  return hasRoom(occupancy) ? 2 : 0;
 }
 
 async function occupancyFor(
@@ -1047,12 +1099,22 @@ function recordCarPark(
   strategy: TransferStrategy,
   point: TransferPoint,
   outcome: CarParkOutcome,
+  estimate?: { estimatedMinutes: number },
 ) {
   if (strategy !== 'park-and-ride') return;
   const existing = context.checkedCarParks.get(point.id);
   // 'used' wins over anything recorded earlier for the same car park.
   if (existing?.outcome === 'used') return;
-  context.checkedCarParks.set(point.id, { id: point.id, name: point.name, outcome });
+  const estimatedMinutes = estimate ? Math.round(estimate.estimatedMinutes) : undefined;
+  context.checkedCarParks.set(point.id, {
+    id: point.id,
+    name: point.name,
+    outcome,
+    stationName: point.facility?.stationName ?? null,
+    ...((estimatedMinutes ?? existing?.estimatedMinutes) !== undefined && {
+      estimatedMinutes: estimatedMinutes ?? existing?.estimatedMinutes,
+    }),
+  });
 }
 
 // ---------- leg helpers ----------

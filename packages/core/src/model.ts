@@ -339,7 +339,15 @@ export const planResponseSchema = z.object({
     z.object({ reason: z.enum(REJECTION_REASONS), count: z.number().int().positive() }),
   ),
   checkedCarParks: z.array(
-    z.object({ id: z.string(), name: z.string(), outcome: z.enum(CAR_PARK_OUTCOMES) }),
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      outcome: z.enum(CAR_PARK_OUTCOMES),
+      // Added after build 4; an older app ignores them.
+      stationName: z.string().nullable().optional(),
+      // Door to door, as estimated when the car park was ranked; the trip's own time once tried.
+      estimatedMinutes: z.number().int().nonnegative().optional(),
+    }),
   ),
   unavailable: z.array(z.object({ strategy: z.enum(STRATEGIES), reason: z.string() })),
   notices: z.array(z.string()),

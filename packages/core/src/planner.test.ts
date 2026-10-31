@@ -12,6 +12,7 @@ import {
   type ServiceAlert,
   type Strategy,
 } from './model';
+import { findCataloguedCarPark } from './data/park-and-ride';
 import { DEFAULT_PLANNER_LIMITS, planTrip, type PlannerDeps } from './planner';
 import {
   ProviderError,
@@ -350,11 +351,13 @@ describe('drive, park, then metro', () => {
     // Tallawong is about 1.6 km behind Rouse Hill on the way to Chatswood.
     const response = await planTrip(request({ origin: ROUSE_HILL }), deps());
 
-    expect(response.checkedCarParks).toContainEqual({
-      id: TALLAWONG.id,
-      name: TALLAWONG.name,
-      outcome: 'used',
-    });
+    expect(response.checkedCarParks).toContainEqual(
+      expect.objectContaining({
+        id: TALLAWONG.id,
+        name: TALLAWONG.name,
+        outcome: 'used',
+      }),
+    );
   });
 
   it('always tries the quickest drive, even when further car parks score better', async () => {
@@ -410,16 +413,19 @@ describe('drive, park, then metro', () => {
     expect(outcomeOf(tallawongP2.id)).toBe('not-tried');
   });
 
-  it('skips car parks well behind the traveller and explains which car parks it checked', async () => {
-    // From Bella Vista, Kellyville is 2.1 km back and Tallawong 5.6 km back, both on a modest
-    // detour, so only the 5 km rule tells them apart.
+  it('tries car parks behind the traveller too, since the estimate decides, not the direction', async () => {
+    // From Bella Vista, Kellyville is 2.1 km back and Tallawong 5.6 km back. Driving back to a
+    // station is a real choice, so both are tried and listed.
     const response = await planTrip(request({ origin: BELLA_VISTA_HOME }), deps());
     const outcomeOf = (id: string) =>
       response.checkedCarParks.find((carPark) => carPark.id === id)?.outcome;
 
-    expect(outcomeOf(TALLAWONG.id)).toBe('not-towards-destination');
+    expect(outcomeOf(TALLAWONG.id)).toBe('used');
     expect(outcomeOf(KELLYVILLE.id)).toBe('used');
     expect(outcomeOf(BELLA_VISTA.id)).toBe('used');
+    expect(response.checkedCarParks.map((carPark) => carPark.outcome)).not.toContain(
+      'not-towards-destination',
+    );
   });
 
   it('labels fresh, stale and missing occupancy honestly', async () => {
@@ -576,11 +582,13 @@ describe('choosing which car parks to check', () => {
       deps({ carParks: fakeCarParks(new Map(), [TALLAWONG, ...farButShortRide]) }),
     );
 
-    expect(response.checkedCarParks).toContainEqual({
-      id: TALLAWONG.id,
-      name: TALLAWONG.name,
-      outcome: 'used',
-    });
+    expect(response.checkedCarParks).toContainEqual(
+      expect.objectContaining({
+        id: TALLAWONG.id,
+        name: TALLAWONG.name,
+        outcome: 'used',
+      }),
+    );
   });
 
   it('only names wrong-way car parks that are within a realistic drive', async () => {
@@ -664,16 +672,20 @@ describe('listing car parks as real choices', () => {
         deps({ carParks: tallawongAndBellaVista(count(60)) }),
       );
 
-      expect(response.checkedCarParks).toContainEqual({
-        id: BELLA_VISTA.id,
-        name: BELLA_VISTA.name,
-        outcome: 'used',
-      });
-      expect(response.checkedCarParks).toContainEqual({
-        id: TALLAWONG.id,
-        name: TALLAWONG.name,
-        outcome: 'used',
-      });
+      expect(response.checkedCarParks).toContainEqual(
+        expect.objectContaining({
+          id: BELLA_VISTA.id,
+          name: BELLA_VISTA.name,
+          outcome: 'used',
+        }),
+      );
+      expect(response.checkedCarParks).toContainEqual(
+        expect.objectContaining({
+          id: TALLAWONG.id,
+          name: TALLAWONG.name,
+          outcome: 'used',
+        }),
+      );
     });
 
     it('lists both when only one has an alert, or only one has live times', async () => {
@@ -834,37 +846,37 @@ describe('listing car parks as real choices', () => {
       expect(walkToPlatform.to).toEqual(TALLAWONG.station);
     });
 
-    it('leaves one out only behind a twin no less likely to have a space, however old the counts', async () => {
+    it('tries one car park per station: the one surer of a space, then the one nearer the platform', async () => {
       const shownWith = async (p1Count: Occupancy | null, p2Count: Occupancy | null) =>
         shownCarParks(await planWith(twoMinutesFromPlatform, p1Count, p2Count));
       const withRoom = count(60);
       const nearlyFull = count(12);
       const stale = count(60, 45);
 
-      // P2 leaves later for the same train, so it hides P1 unless P1 is surer of a space. Listed
-      // options are in order of arrival, then total time, so P2 comes first when both are listed.
+      // Both get the same train, so only one is asked for journeys: room beats no count or an old
+      // one, which beats nearly full; all else equal, the shorter walk to the platform wins.
       expect(await shownWith(null, null)).toEqual([TALLAWONG_P2.id]);
       expect(await shownWith(nearlyFull, withRoom)).toEqual([TALLAWONG_P2.id]);
       expect(await shownWith(nearlyFull, null)).toEqual([TALLAWONG_P2.id]);
       expect(await shownWith(null, stale)).toEqual([TALLAWONG_P2.id]);
-      expect(await shownWith(withRoom, nearlyFull)).toEqual([TALLAWONG_P2.id, '26']);
-      expect(await shownWith(withRoom, null)).toEqual([TALLAWONG_P2.id, '26']);
-      expect(await shownWith(stale, nearlyFull)).toEqual([TALLAWONG_P2.id, '26']);
+      expect(await shownWith(withRoom, nearlyFull)).toEqual(['26']);
+      expect(await shownWith(withRoom, null)).toEqual(['26']);
+      expect(await shownWith(stale, nearlyFull)).toEqual(['26']);
     });
 
-    it('says the hidden twin is matched by the shown one, rather than used', async () => {
+    it('lists the twin it did not try with its station and an estimate, never as used', async () => {
       const response = await planWith(twoMinutesFromPlatform, null, null);
+      const notTried = response.checkedCarParks.find((carPark) => carPark.id === '26');
 
-      expect(response.checkedCarParks).toContainEqual({
-        id: '26',
+      expect(notTried).toMatchObject({
         name: 'Tallawong P1',
-        outcome: 'matched-by-another',
+        outcome: 'not-tried',
+        stationName: 'Tallawong Station',
       });
-      expect(response.checkedCarParks).toContainEqual({
-        id: TALLAWONG_P2.id,
-        name: TALLAWONG_P2.name,
-        outcome: 'used',
-      });
+      expect(notTried?.estimatedMinutes).toBeGreaterThan(0);
+      expect(response.checkedCarParks).toContainEqual(
+        expect.objectContaining({ id: TALLAWONG_P2.id, outcome: 'used' }),
+      );
     });
 
     it('still lists the car park asked for, next to its better twin', async () => {
@@ -1441,7 +1453,11 @@ describe('no valid route', () => {
     );
 
     expect(response.itineraries.filter((it) => it.strategy !== 'drive-only')).toEqual([]);
-    expect(response.unavailable.map((entry) => entry.strategy)).toContain('park-and-ride');
+    // Every car park was tried and found no connection; that is the explanation, car park by car park.
+    expect(response.checkedCarParks.length).toBeGreaterThan(0);
+    expect(new Set(response.checkedCarParks.map((carPark) => carPark.outcome))).toEqual(
+      new Set(['no-workable-connection']),
+    );
     expect(response.unavailable).toContainEqual({
       strategy: 'transit-only',
       reason: 'No public transport journeys were found for this time.',
@@ -1489,5 +1505,76 @@ describe('late night', () => {
     expect(addSeconds(itinerary.departAt, itinerary.durationSeconds)).toBe(
       new Date(itinerary.arriveAt).toISOString(),
     );
+  });
+});
+
+describe('ranking car parks by the estimated door-to-door time', () => {
+  // Real car parks around Kellyville, placed at their stations, so the hub table applies: Seven
+  // Hills is on the T1 Western line (33 minutes to Central every 8), the metro stations 39 to 47
+  // minutes every 4, and North Rocks is a bus car park (50 minutes every 3).
+  const catalogued = (id: string): CarParkFacility => {
+    const entry = findCataloguedCarPark(id)!;
+    return facility(
+      id,
+      entry.name,
+      entry.station.coordinate.lat,
+      entry.station.coordinate.lon - 0.001,
+      entry.station.name,
+      entry.station.stopId,
+    );
+  };
+  const AROUND_KELLYVILLE = ['32', '29', '31', '33', '488', '38'].map(catalogued);
+  const WRIGHTS_ROAD = place('Wrights Rd after Ardley Ave, Kellyville', -33.714906, 150.970669);
+  const CENTRAL = place('Central Station', -33.884024, 151.206203, 'stop');
+
+  it('tries Seven Hills from Kellyville, and lists the bus car park it did not try with an estimate', async () => {
+    const response = await planTrip(
+      request({ origin: WRIGHTS_ROAD, destination: CENTRAL }),
+      deps({ carParks: fakeCarParks(new Map(), AROUND_KELLYVILLE) }),
+    );
+    const outcomeOf = (id: string) => response.checkedCarParks.find((carPark) => carPark.id === id);
+
+    expect(outcomeOf('488')).toMatchObject({ outcome: 'used', stationName: 'Seven Hills Station' });
+    expect(outcomeOf('32')).toMatchObject({ outcome: 'used' });
+    expect(outcomeOf('29')).toMatchObject({ outcome: 'used' });
+    expect(outcomeOf('38')).toMatchObject({
+      outcome: 'not-tried',
+      stationName: 'North Rocks Park&Ride stop',
+    });
+    expect(outcomeOf('38')?.estimatedMinutes).toBeGreaterThan(outcomeOf('32')!.estimatedMinutes!);
+    expect(response.checkedCarParks).toHaveLength(AROUND_KELLYVILLE.length);
+    for (const carPark of response.checkedCarParks) {
+      expect(carPark.estimatedMinutes).toBeGreaterThan(0);
+    }
+  });
+
+  it('reports a used car park with the time of its own option', async () => {
+    const response = await planTrip(
+      request({ origin: WRIGHTS_ROAD, destination: CENTRAL }),
+      deps({ carParks: fakeCarParks(new Map(), AROUND_KELLYVILLE) }),
+    );
+    const sevenHills = response.itineraries.find((it) => it.parking?.carPark.id === '488')!;
+
+    expect(response.checkedCarParks.find((carPark) => carPark.id === '488')?.estimatedMinutes).toBe(
+      Math.round(sevenHills.durationSeconds / 60),
+    );
+  });
+
+  it('asks the drive-time provider about every car park within the driving limit, in one go', async () => {
+    const driving = fakeDriving();
+    const calls: number[] = [];
+    const counting: DrivingProvider = {
+      ...driving,
+      estimateDrives: async (origin, destinations, time, signal) => {
+        calls.push(destinations.length);
+        return driving.estimateDrives(origin, destinations, time, signal);
+      },
+    };
+    await planTrip(
+      request({ origin: WRIGHTS_ROAD, destination: CENTRAL }),
+      deps({ driving: counting, carParks: fakeCarParks(new Map(), AROUND_KELLYVILLE) }),
+    );
+
+    expect(calls).toEqual([AROUND_KELLYVILLE.length]);
   });
 });
