@@ -120,6 +120,11 @@ function explain(
         text: 'Some options would have needed you to leave before your chosen time.',
         remedy: 'time',
       };
+    case 'departs-long-after-requested':
+      return {
+        text: 'Some options would have needed you to leave more than 12 hours after your chosen time.',
+        remedy: 'time',
+      };
     case 'arrives-after-target':
       return { text: 'Some options would have arrived after your arrive-by time.', remedy: 'time' };
     case 'discontinuous':

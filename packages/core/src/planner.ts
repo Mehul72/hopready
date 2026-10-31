@@ -86,6 +86,20 @@ const ROUGH_DRIVE_METRES_PER_MINUTE = 667;
 const QUICKEST_DRIVES_ALWAYS_TRIED = 1;
 // Provider times are whole minutes; allow that much slack before calling something early or late.
 const TIME_GRACE_SECONDS = 60;
+// A way on from a car park within the traveller's preferences is worth a short wait, not hours: it
+// is taken over a quicker one only when it gets there at most this much later (or, arriving by a
+// time, leaves at most this much earlier).
+const PREFERENCE_TOLERANCE_SECONDS = 10 * 60;
+// Walking from the car park to the destination is offered when the walk takes at most this long,
+// or the traveller's walking limit when that is longer. Further than that is a drive to the door.
+const WALK_THE_REST_MAX_MINUTES = 20;
+// An option that leaves this long after the time asked for answers a different question: a plan
+// for Saturday evening should not offer Monday afternoon.
+const MAX_LEAVE_AFTER_REQUESTED_SECONDS = 12 * 60 * 60;
+// Shown on a drive, park, walk option at a Transport Park&Ride car park, whose parking is free only
+// with a public transport trip (transportnsw.info/parkandride, read 2026-10-31).
+export const PARK_AND_WALK_FEE_NOTE =
+  'Park&Ride parking is free only with a public transport trip. Walking from here instead, you pay the car park rate at the exit.';
 // A count with no more than this share of the spaces free could easily be full by the time the
 // traveller gets there.
 const NEARLY_FULL_FREE_SHARE = 0.1;
@@ -483,7 +497,55 @@ async function planViaTransferPoints(
   return { itineraries };
 }
 
+// One option per car park or station: public transport from its platform, or, from a car park a
+// short walk from the destination, walking the rest. Whichever gets there first is used (see
+// preferredOption), so a nearby car park is never sent round on buses days later.
 async function planThroughPoint(
+  context: PlanContext,
+  driving: DrivingProvider,
+  strategy: TransferStrategy,
+  point: TransferPoint,
+  rankedDriveSeconds: number,
+  bufferSeconds: number,
+  occupancy: Map<string, Occupancy>,
+): Promise<Itinerary | null> {
+  const walkRest = strategy === 'park-and-ride' ? walkTheRest(context, point) : null;
+  const [byTransit, byWalking] = await Promise.allSettled([
+    planTransitThroughPoint(
+      context,
+      driving,
+      strategy,
+      point,
+      rankedDriveSeconds,
+      bufferSeconds,
+      occupancy,
+    ),
+    walkRest
+      ? planWalkFromCarPark(context, driving, point, walkRest, bufferSeconds, occupancy)
+      : Promise.resolve(null),
+  ]);
+  const options = [byTransit, byWalking].flatMap((outcome) =>
+    outcome.status === 'fulfilled' && outcome.value ? [outcome.value] : [],
+  );
+  if (options.length === 0) {
+    if (byTransit.status === 'rejected') throw byTransit.reason;
+    if (byWalking.status === 'rejected') throw byWalking.reason;
+    return null;
+  }
+  // An option that cannot be taken is only returned when nothing else can be, so the caller counts
+  // why the car park gave nothing.
+  const workable = options.filter((option) => itineraryProblem(context, option) === null);
+  if (workable.length === 0) return options[0]!;
+  return (
+    preferredOption(workable, context.request.time.type, (option) => ({
+      start: option.departAt,
+      end: option.arriveAt,
+      concernCount: option.concerns.length,
+    })) ?? null
+  );
+}
+
+async function planTransitThroughPoint(
   context: PlanContext,
   driving: DrivingProvider,
   strategy: TransferStrategy,
@@ -501,24 +563,22 @@ async function planThroughPoint(
     time.type === 'depart'
       ? { type: 'depart' as const, at: addSeconds(time.at, rankedDriveSeconds + accessSeconds) }
       : time;
-  // Parking or being dropped off only makes sense with a public transport leg after it, and
-  // Park&Ride is only free with one. A walk-only answer means the destination is simply nearby.
+  // A walk-only answer starts at the platform, which is the wrong place to walk from: walking the
+  // rest from the car park itself is planWalkFromCarPark's option. Being dropped off only makes
+  // sense with a public transport leg after it, since the driver could go to the door instead.
   const journeys = (await queryTransit(context, point.boarding, destination, transitTime)).filter(
     (journey) =>
       transitLegsOf(journey.legs).length > 0 &&
       (time.type === 'depart' || arrivesBy(journey, time.at)) &&
       keepJourney(context, journey),
   );
-  // Journeys within the traveller's preferences first; among those, depart-at wants the one that
-  // arrives first and arrive-by the one that leaves last.
-  const concernCount = (journey: TransitJourney) =>
-    concernsFor(context, journey.legs, strategy).length;
-  const ranked = [...journeys].sort(
-    (a, b) =>
-      concernCount(a) - concernCount(b) ||
-      (time.type === 'depart' ? byArrival(a, b) : byLatestStart(a, b)),
-  );
-  let journey: TransitJourney | undefined = ranked[0];
+  const choose = (candidates: readonly TransitJourney[]) =>
+    preferredOption(candidates, time.type, (candidate) => ({
+      start: journeyStart(candidate),
+      end: journeyEnd(candidate),
+      concernCount: concernsFor(context, candidate.legs, strategy).length,
+    }));
+  let journey = choose(journeys);
   if (!journey) return null;
 
   const mustArriveAt = addSeconds(journeyStart(journey), -accessSeconds);
@@ -539,7 +599,9 @@ async function planThroughPoint(
     leaveAt = time.at;
     arriveAt = addSeconds(time.at, route.durationSeconds);
     const onPlatformFrom = addSeconds(arriveAt, accessSeconds);
-    journey = ranked.find((candidate) => !isBefore(journeyStart(candidate), onPlatformFrom));
+    journey = choose(
+      journeys.filter((candidate) => !isBefore(journeyStart(candidate), onPlatformFrom)),
+    );
     if (!journey) {
       reject(context, 'departs-before-requested');
       return null;
@@ -609,6 +671,128 @@ async function planThroughPoint(
     alerts: journey.alerts,
     concerns: concernsFor(context, legs, strategy),
   });
+}
+
+// Drive, park, then walk from the car park to the destination. Depart-at leaves when asked;
+// arrive-by parks early enough to walk in by the time. Park&Ride parking is free only with a public
+// transport trip, so a Transport car park says so.
+async function planWalkFromCarPark(
+  context: PlanContext,
+  driving: DrivingProvider,
+  point: TransferPoint,
+  walk: Walk,
+  bufferSeconds: number,
+  occupancy: Map<string, Occupancy>,
+): Promise<Itinerary | null> {
+  const { origin, destination, time } = context.request;
+  const facility = point.facility;
+  if (!facility) return null;
+  let leaveAt: string;
+  let arriveAt: string;
+  let route: DriveRoute;
+  if (time.type === 'depart') {
+    route = await routeDrive(context, driving, origin, point.place, time);
+    leaveAt = time.at;
+    arriveAt = addSeconds(time.at, route.durationSeconds);
+  } else {
+    arriveAt = addSeconds(time.at, -(walk.durationSeconds + bufferSeconds));
+    route = await routeDrive(context, driving, origin, point.place, {
+      type: 'arrive',
+      at: arriveAt,
+    });
+    leaveAt = addSeconds(arriveAt, -route.durationSeconds);
+  }
+  const readyAt = addSeconds(arriveAt, bufferSeconds);
+  const parking = parkingFor(context, facility, occupancy.get(facility.id));
+  const legs: Leg[] = [
+    driveLeg(driving, 'drive', origin, point.place, leaveAt, arriveAt, route),
+    {
+      id: `park-${point.id}`,
+      kind: 'park',
+      from: point.place,
+      to: point.place,
+      start: arriveAt,
+      end: readyAt,
+      source: 'hopready',
+      timing: 'buffer',
+      parking,
+    },
+    {
+      id: `walk-from-car-park-${point.id}`,
+      kind: 'walk',
+      from: point.place,
+      to: destination,
+      start: readyAt,
+      end: addSeconds(readyAt, walk.durationSeconds),
+      source: 'hopready',
+      timing: 'estimated',
+      distanceMetres: walk.distanceMetres,
+      path: [point.place.coordinate, destination.coordinate],
+    },
+  ];
+  return buildItinerary({
+    strategy: 'park-and-ride',
+    legs,
+    parking,
+    notes: facility.kind === 'transport-park-and-ride' ? [PARK_AND_WALK_FEE_NOTE] : [],
+    concerns: concernsFor(context, legs, 'park-and-ride'),
+  });
+}
+
+// The walk from a car park to the destination, when it is short enough to offer instead of public
+// transport. A car park at the destination itself is no different from driving there.
+function walkTheRest(context: PlanContext, point: TransferPoint): Walk | null {
+  if (!point.facility) return null;
+  const { destination, preferences } = context.request;
+  const walk = walkBetween(
+    point.place.coordinate,
+    destination.coordinate,
+    preferences.walkingSpeed,
+  );
+  const ceilingSeconds = 60 * Math.max(WALK_THE_REST_MAX_MINUTES, preferences.maxWalkMinutes);
+  if (walk.durationSeconds === 0 || walk.durationSeconds > ceilingSeconds) return null;
+  return walk;
+}
+
+interface OptionTimes {
+  start: string;
+  end: string;
+  concernCount: number;
+}
+
+// The option that gets there first (depart-at) or leaves last (arrive-by). One with fewer marks is
+// taken instead when it is at most PREFERENCE_TOLERANCE_SECONDS worse, so a preference shapes the
+// choice without ever trading a walk tonight for a bus days later. Of two that tie, depart-at
+// leaves later (less waiting) and arrive-by gets there sooner (more slack).
+function preferredOption<T>(
+  options: readonly T[],
+  timeType: 'depart' | 'arrive',
+  timesOf: (option: T) => OptionTimes,
+): T | undefined {
+  const scored = options.map((option) => {
+    const times = timesOf(option);
+    const startSeconds = Date.parse(times.start) / 1000;
+    const endSeconds = Date.parse(times.end) / 1000;
+    return {
+      option,
+      concernCount: times.concernCount,
+      // Smaller is better either way: arriving sooner, or leaving later.
+      lateness: timeType === 'depart' ? endSeconds : -startSeconds,
+      tieBreak: timeType === 'depart' ? -startSeconds : endSeconds,
+    };
+  });
+  scored.sort((a, b) => a.lateness - b.lateness || a.tieBreak - b.tieBreak);
+  const best = scored[0];
+  if (!best) return undefined;
+  // The sort is stable, so of two with as few marks the better time stays first.
+  const withFewerMarks = scored
+    .filter(
+      (candidate) =>
+        candidate.concernCount < best.concernCount &&
+        candidate.lateness - best.lateness <= PREFERENCE_TOLERANCE_SECONDS,
+    )
+    .sort((a, b) => a.concernCount - b.concernCount);
+  return (withFewerMarks[0] ?? best).option;
 }
 
 // The walk from a car park to the platform it serves is HopReady's own estimate, from the car
@@ -913,8 +1097,19 @@ function shortlistByEstimate(
       period,
       preferences.walkingSpeed,
     );
-    const beyondDriveMinutes = bufferMinutes + walkMinutes + transit.minutes;
-    const beyondDriveCost = bufferMinutes + walkCost(walkMinutes) + transit.cost;
+    const byTransit = {
+      minutes: walkMinutes + transit.minutes,
+      cost: walkCost(walkMinutes) + transit.cost,
+    };
+    // A car park a short walk from the destination is estimated by the walk, as it is planned.
+    const walkRest = strategy === 'park-and-ride' ? walkTheRest(context, point) : null;
+    const walkRestMinutes = walkRest ? walkRest.durationSeconds / 60 : null;
+    const onward =
+      walkRestMinutes !== null && walkCost(walkRestMinutes) < byTransit.cost
+        ? { minutes: walkRestMinutes, cost: walkCost(walkRestMinutes) }
+        : byTransit;
+    const beyondDriveMinutes = bufferMinutes + onward.minutes;
+    const beyondDriveCost = bufferMinutes + onward.cost;
     candidates.push({
       point,
       roughDriveMinutes: rough,
@@ -1252,6 +1447,12 @@ function itineraryProblem(context: PlanContext, itinerary: Itinerary): Rejection
     return 'departs-in-past';
   if (time.type === 'depart' && secondsBetween(time.at, itinerary.departAt) < -TIME_GRACE_SECONDS) {
     return 'departs-before-requested';
+  }
+  if (
+    time.type === 'depart' &&
+    secondsBetween(time.at, itinerary.departAt) > MAX_LEAVE_AFTER_REQUESTED_SECONDS
+  ) {
+    return 'departs-long-after-requested';
   }
   if (time.type === 'arrive' && secondsBetween(time.at, itinerary.arriveAt) > TIME_GRACE_SECONDS) {
     return 'arrives-after-target';

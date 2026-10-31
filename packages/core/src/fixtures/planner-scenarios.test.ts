@@ -13,7 +13,7 @@ import {
   type Strategy,
   type TransitLeg,
 } from '../model';
-import { planTrip, type PlannerLimits } from '../planner';
+import { PARK_AND_WALK_FEE_NOTE, planTrip, type PlannerLimits } from '../planner';
 import { ProviderError } from '../providers';
 import {
   addMinutes,
@@ -983,7 +983,17 @@ describe('when the public transport provider fails', () => {
     );
     expectSoundResponse(response);
 
-    expect(response.itineraries.map((itinerary) => itinerary.strategy)).toEqual(['drive-only']);
+    // Driving the whole way, or to the Dee Why car park and walking from there, needs no answer
+    // from the public transport provider.
+    expect(response.itineraries.map((itinerary) => itinerary.strategy).sort()).toEqual([
+      'drive-only',
+      'park-and-ride',
+    ]);
+    const parkAndWalk = response.itineraries.find(
+      (itinerary) => itinerary.strategy === 'park-and-ride',
+    )!;
+    expect(parkAndWalk.legs.map((leg) => leg.kind)).toEqual(['drive', 'park', 'walk']);
+    expect(parkAndWalk.notes).toEqual([PARK_AND_WALK_FEE_NOTE]);
     expect(response.unavailable).toContainEqual({
       strategy: 'transit-only',
       reason: 'Public transport times are busy right now. Try again shortly.',

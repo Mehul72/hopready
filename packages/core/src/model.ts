@@ -311,7 +311,9 @@ export type PlanRequest = z.infer<typeof planRequestSchema>;
 // walk-too-long and drive-too-long are no longer sent: a walk or drive over the preference marks
 // the option (see CONCERNS) instead of removing it; so does a change shorter than the transfer
 // buffer. transfer-too-short now means a change that cannot be made at all, because the walk
-// between the services ends after the next one has left.
+// between the services ends after the next one has left. departs-long-after-requested (added
+// after build 5; older apps leave out reasons they do not know) is a depart-at option leaving more
+// than 12 hours after the time asked for.
 export const REJECTION_REASONS = [
   'transfer-too-short',
   'walk-too-long',
@@ -319,6 +321,7 @@ export const REJECTION_REASONS = [
   'cancelled-service',
   'departs-in-past',
   'departs-before-requested',
+  'departs-long-after-requested',
   'arrives-after-target',
   'discontinuous',
   'duplicate',
