@@ -48,16 +48,16 @@ function tripFacts(itinerary: Itinerary): Wording[] {
   return facts;
 }
 
-// `requestedAt` is the time the trip was asked for, so a time on another day says which.
+// `sameDayAs` is today, so a time on another day says which.
 export function describeTripSummary(
   itinerary: Itinerary,
   staleCheckAt: string | null = null,
-  requestedAt: string | null = null,
+  sameDayAs: Date | null = null,
 ): string {
   const total = duration(shownDurationSeconds(itinerary));
   const facts = tripFacts(itinerary).map((fact) => fact.spoken);
-  const coverage = describeRealtimeCoverage(itinerary, staleCheckAt);
-  const times = tripTimes(itinerary, requestedAt);
+  const coverage = describeRealtimeCoverage(itinerary, staleCheckAt, sameDayAs ?? new Date());
+  const times = tripTimes(itinerary, sameDayAs);
   return [
     `${optionLabel(itinerary)}.`,
     `Leave ${times.leave.spoken}, arrive ${times.arrive.spoken}.`,
@@ -70,21 +70,22 @@ export function describeTripSummary(
 
 // The top of the trip: big leave and arrive times, then the totals and how live the times are.
 // VoiceOver reads it as one sentence. `staleCheckAt` is set once live times are too old to call
-// live (staleCheckOf). `requestedAt` is the time the trip was asked for.
+// live (staleCheckOf). `sameDayAs` is today: the trip screen has no header naming the day asked
+// for, so a trip tomorrow morning says so.
 export function TripSummaryCard({
   itinerary,
   staleCheckAt = null,
-  requestedAt = null,
+  sameDayAs = null,
 }: {
   itinerary: Itinerary;
   staleCheckAt?: string | null;
-  requestedAt?: string | null;
+  sameDayAs?: Date | null;
 }) {
   const { colours } = useTheme();
-  const times = tripTimes(itinerary, requestedAt);
+  const times = tripTimes(itinerary, sameDayAs);
   const total = duration(shownDurationSeconds(itinerary));
   const facts = tripFacts(itinerary);
-  const coverage = describeRealtimeCoverage(itinerary, staleCheckAt);
+  const coverage = describeRealtimeCoverage(itinerary, staleCheckAt, sameDayAs ?? new Date());
   // Old live times lose the live colour with the word. Sample times keep theirs.
   const coverageStyle =
     COVERAGE_STYLES[staleCheckAt && !isSampleItinerary(itinerary) ? 'none' : itinerary.realtime];
@@ -93,7 +94,7 @@ export function TripSummaryCard({
     <Card testID="trip-summary">
       <View
         accessible
-        accessibilityLabel={describeTripSummary(itinerary, staleCheckAt, requestedAt)}
+        accessibilityLabel={describeTripSummary(itinerary, staleCheckAt, sameDayAs)}
         style={styles.body}>
         <AppText variant="subheadline" tone="secondary" weight="semibold">
           {optionLabel(itinerary)}

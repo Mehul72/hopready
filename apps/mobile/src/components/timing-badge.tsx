@@ -1,4 +1,4 @@
-import { formatSydneyTime, type Timing } from '@hopready/core';
+import { formatSydneyTimeOnDay, type Timing } from '@hopready/core';
 import { type SFSymbol, SymbolView } from 'expo-symbols';
 import { StyleSheet, View } from 'react-native';
 
@@ -12,6 +12,8 @@ export interface TimingBadgeProps {
   sample?: boolean;
   // When a "realtime" time was checked, once that is too long ago to call it "Live".
   staleCheckAt?: string | null;
+  // Today, for whether a checked time needs its day; the current time when left out.
+  now?: Date;
   testID?: string;
 }
 
@@ -66,36 +68,38 @@ export const SAMPLE_REALTIME_STYLE: TimingStyle = {
 };
 
 // An operator's live time from a check long ago may have changed since, so it says when it was
-// checked instead of claiming to be live.
-function checkedRealtimeStyle(checkedAt: string): TimingStyle {
-  const time = formatSydneyTime(checkedAt);
+// checked instead of claiming to be live, with the day once that is not today.
+function checkedRealtimeStyle(checkedAt: string, now: Date): TimingStyle {
   return {
-    label: `Checked ${time}`,
-    spoken: `Time checked at ${time}`,
+    label: `Checked ${formatSydneyTimeOnDay(checkedAt, now)}`,
+    spoken: `Time checked at ${formatSydneyTimeOnDay(checkedAt, now, 'long')}`,
     symbol: 'clock',
     background: 'surfaceMuted',
     tone: 'secondary',
   };
 }
 
+// `now` decides whether a checked time needs its day.
 export function timingStyleFor(
   timing: Timing,
   sample = false,
   staleCheckAt: string | null = null,
+  now: Date = new Date(),
 ): TimingStyle {
   if (timing !== 'realtime') return TIMING_STYLES[timing];
   if (sample) return SAMPLE_REALTIME_STYLE;
-  return staleCheckAt ? checkedRealtimeStyle(staleCheckAt) : TIMING_STYLES.realtime;
+  return staleCheckAt ? checkedRealtimeStyle(staleCheckAt, now) : TIMING_STYLES.realtime;
 }
 
 export function TimingBadge({
   timing,
   sample = false,
   staleCheckAt = null,
+  now,
   testID,
 }: TimingBadgeProps) {
   const { colours } = useTheme();
-  const style = timingStyleFor(timing, sample, staleCheckAt);
+  const style = timingStyleFor(timing, sample, staleCheckAt, now);
   const foreground = colourForTone(colours, style.tone);
 
   return (

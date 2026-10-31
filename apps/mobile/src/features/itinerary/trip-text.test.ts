@@ -447,9 +447,14 @@ describe('how live the times are', () => {
       text: 'Live times',
       spoken: 'Public transport times are live.',
     });
-    expect(describeRealtimeCoverage(live, checkedAt)).toEqual({
+    expect(describeRealtimeCoverage(live, checkedAt, new Date(checkedAt))).toEqual({
       text: 'Checked 7:30 am',
       spoken: 'Public transport times were checked at 7:30 am and may have changed.',
+    });
+    // A check from yesterday says so, or it reads as this morning.
+    expect(describeRealtimeCoverage(live, checkedAt, new Date(minutesLater(24 * 60)))).toEqual({
+      text: 'Checked Tue 7:30\u00a0am',
+      spoken: 'Public transport times were checked at Tuesday 7:30\u00a0am and may have changed.',
     });
   });
 

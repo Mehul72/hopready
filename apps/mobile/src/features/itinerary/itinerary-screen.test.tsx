@@ -110,9 +110,9 @@ describe('itinerary screen', () => {
     expect(within(screen.getByTestId('leg-transit')).getByText('Tue 12:00 am')).toBeOnTheScreen();
     expect(within(screen.getByTestId('arrival')).getByText('Tue 12:45 am')).toBeOnTheScreen();
     expect(
-      screen.getByLabelText(describeTripSummary(overnight, null, mondayNight)),
+      screen.getByLabelText(describeTripSummary(overnight, null, new Date(mondayNight))),
     ).toBeOnTheScreen();
-    expect(describeTripSummary(overnight, null, mondayNight)).toContain(
+    expect(describeTripSummary(overnight, null, new Date(mondayNight))).toContain(
       'Leave 11:50\u00a0pm, arrive Tuesday 12:45\u00a0am.',
     );
   });

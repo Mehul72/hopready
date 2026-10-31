@@ -1,6 +1,5 @@
 import {
   formatDurationMinutes,
-  formatSydneyTime,
   type Itinerary,
   type Leg,
   legSeconds,
@@ -172,11 +171,18 @@ export const TIMING_SUMMARY_WORDING: Readonly<Record<TimingSummary, Wording>> = 
 
 // Live times from a check too long ago (staleCheckOf) may have changed, so they are described by
 // when they were checked instead of being called live.
-export function timingWording(summary: TimingSummary, staleCheckAt: string | null): Wording {
+export function timingWording(
+  summary: TimingSummary,
+  staleCheckAt: string | null,
+  now: Date = new Date(),
+): Wording {
   const live = summary === 'live' || summary === 'partly-live';
   if (!live || staleCheckAt === null) return TIMING_SUMMARY_WORDING[summary];
-  const time = formatSydneyTime(staleCheckAt);
-  return { text: `Checked ${time}`, spoken: `Times checked at ${time} and may have changed` };
+  const checked = describeTripTime(staleCheckAt, now);
+  return {
+    text: `Checked ${checked.text}`,
+    spoken: `Times checked at ${checked.spoken} and may have changed`,
+  };
 }
 
 export interface AlertSummary {
@@ -263,14 +269,14 @@ export function parkingSummary(itinerary: Itinerary, now: Date): ParkingSummary 
   };
 }
 
-// Leave and arrive times, each with its day when that differs: leaving from the time asked for,
-// arriving from leaving.
+// Leave and arrive times, each with its day when that differs: leaving from `sameDayAs` (the time
+// asked for on the results, today on the trip screen), arriving from leaving.
 export function tripTimes(
   itinerary: Pick<Itinerary, 'departAt' | 'arriveAt'>,
-  requestedAt: string | null,
+  sameDayAs: string | Date | null,
 ): { leave: Wording; arrive: Wording } {
   return {
-    leave: describeTripTime(itinerary.departAt, requestedAt),
+    leave: describeTripTime(itinerary.departAt, sameDayAs),
     arrive: describeTripTime(itinerary.arriveAt, itinerary.departAt),
   };
 }
@@ -305,7 +311,7 @@ export function describeItinerary(
     parking ? `Parking at ${parking.carParkName}: ${parking.occupancy.spoken}` : null,
     parking ? parking.note.replace(/\.$/, '') : null,
     parking?.rulesNote ? parking.rulesNote.replace(/\.$/, '') : null,
-    timingWording(timingSummary(itinerary), staleCheckAt).spoken,
+    timingWording(timingSummary(itinerary), staleCheckAt, now).spoken,
     alerts?.wording.spoken ?? null,
     ...itinerary.notes.map((note) => note.replace(/\.$/, '')),
   ];

@@ -230,7 +230,7 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
       <TripSummaryCard
         itinerary={itinerary}
         staleCheckAt={staleCheckAt}
-        requestedAt={trip.request?.time.at ?? null}
+        sameDayAs={new Date(nowMs)}
       />
       {concerns.map((concern) => (
         <Banner

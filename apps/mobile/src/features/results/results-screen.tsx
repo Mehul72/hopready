@@ -1,10 +1,4 @@
-import {
-  formatSydneyTime,
-  type Itinerary,
-  type PlanRequest,
-  type PlanResponse,
-  type Strategy,
-} from '@hopready/core';
+import { type Itinerary, type PlanRequest, type PlanResponse, type Strategy } from '@hopready/core';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
@@ -40,6 +34,7 @@ import { MANUAL_REFRESH_MIN_INTERVAL_SECONDS, replanRequest, useTripHomeOutOfDat
 
 import { useStaleCheckAt } from '../itinerary/use-stale-check-at';
 import { TripHomeOutOfDate } from '../shared/trip-home-out-of-date';
+import { describeTripTime } from '../shared/trip-time';
 import { optionsChangedSince, withCurrentOptions } from './current-options';
 import { defaultOrderFor, orderItineraries, ordersFor, type ResultOrder } from './itinerary-order';
 import { NoOptions } from './no-options';
@@ -160,7 +155,7 @@ export function ResultsScreen() {
   // The same limit as the trip screen, so an option is not called live here but not there.
   // Refreshing could only plan back to the car as it was, so the banner asks for Take me home.
   const canRefresh = response !== null && !tripHomeOutOfDate;
-  const checkedAt = plannedAt ? `Checked ${formatSydneyTime(plannedAt)}` : null;
+  const checkedAt = plannedAt ? `Checked ${describeTripTime(plannedAt, now).text}` : null;
   const currentRefreshNote =
     refreshNote && refreshNote.plannedAt === plannedAt ? refreshNote.text : null;
 
@@ -259,7 +254,7 @@ export function ResultsScreen() {
           <Banner
             tone="error"
             title="Couldn't refresh"
-            message={`${error.message} These options are from ${plannedAt ? formatSydneyTime(plannedAt) : 'earlier'}.`}
+            message={`${error.message} These options are from ${plannedAt ? describeTripTime(plannedAt, now).text : 'earlier'}.`}
             announce
             testID="refresh-failed"
           />

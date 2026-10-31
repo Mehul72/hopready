@@ -87,16 +87,20 @@ function Pill({ style, wording }: { style: PillStyle; wording: Wording }) {
 function TimingPill({
   summary,
   staleCheckAt,
+  now,
 }: {
   summary: TimingSummary;
   staleCheckAt: string | null;
+  now: Date;
 }) {
-  if (summary === 'live') return <TimingBadge timing="realtime" staleCheckAt={staleCheckAt} />;
+  if (summary === 'live') {
+    return <TimingBadge timing="realtime" staleCheckAt={staleCheckAt} now={now} />;
+  }
   if (summary === 'sample-live') return <TimingBadge timing="realtime" sample />;
   if (summary === 'timetable') return <TimingBadge timing="scheduled" />;
   if (summary === 'estimate') return <TimingBadge timing="estimated" />;
   // Old partly live times say when they were checked, as old live ones do.
-  if (staleCheckAt) return <TimingBadge timing="realtime" staleCheckAt={staleCheckAt} />;
+  if (staleCheckAt) return <TimingBadge timing="realtime" staleCheckAt={staleCheckAt} now={now} />;
   // Partly live is not a single leg timing, so it borrows the live badge's look with its own words.
   return <Pill style={TIMING_STYLES.realtime} wording={TIMING_SUMMARY_WORDING[summary]} />;
 }
@@ -179,7 +183,7 @@ export function RouteCard({
           <AppText variant="footnote" tone="secondary" tabularNumbers style={styles.shrink}>
             {factLine}
           </AppText>
-          <TimingPill summary={timingSummary(itinerary)} staleCheckAt={staleCheckAt} />
+          <TimingPill summary={timingSummary(itinerary)} staleCheckAt={staleCheckAt} now={now} />
         </View>
         {parking ? (
           <View style={styles.parking}>

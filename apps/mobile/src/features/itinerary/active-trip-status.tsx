@@ -1,4 +1,4 @@
-import { formatSydneyTime, type Itinerary, type PlanRequest, toIso } from '@hopready/core';
+import { type Itinerary, type PlanRequest, toIso } from '@hopready/core';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -20,6 +20,7 @@ import {
 import { showResultsFor } from '../saved/plan-requests';
 import { writeOrAlert } from '../saved/storage-writes';
 import { tripTimes } from '../results/route-summary';
+import { describeTripTime } from '../shared/trip-time';
 import { shownDurationSeconds } from '../shared/shown-duration';
 import { describeTripSummary } from './trip-summary-card';
 import { optionLabel } from '../shared/option-labels';
@@ -75,9 +76,10 @@ function AlternativeCard({
   const from = refresh.restOfTrip ? (refresh.request?.origin.name ?? null) : null;
   // The alternatives are only as fresh as the check that found them.
   const staleCheckAt = useStaleCheckAt(refresh.checkedAt);
-  const requestedAt = refresh.request?.time.at ?? null;
-  const summary = describeTripSummary(alternative, staleCheckAt, requestedAt);
-  const times = tripTimes(alternative, requestedAt);
+  // Alternatives are offered now, whatever day the trip was asked for.
+  const now = new Date();
+  const summary = describeTripSummary(alternative, staleCheckAt, now);
+  const times = tripTimes(alternative, now);
   return (
     <Card
       onPress={() => followAlternative(alternative, refresh)}
@@ -136,10 +138,10 @@ function CheckForChanges({
             variant="subheadline"
             tone="secondary"
             tabularNumbers
-            accessibilityLabel={`Times checked at ${formatSydneyTime(checkedAt)}`}
+            accessibilityLabel={`Times checked at ${describeTripTime(checkedAt, new Date()).spoken}`}
             style={styles.checkedAt}
             testID="times-checked-at">
-            {`Checked ${formatSydneyTime(checkedAt)}`}
+            {`Checked ${describeTripTime(checkedAt, new Date()).text}`}
           </AppText>
         ) : null}
         {canCheck ? (
@@ -207,7 +209,7 @@ function CheckResult({ trip, canCheck }: { trip: DisplayedTrip; canCheck: boolea
         <Banner
           tone="warning"
           title="Your trip changed"
-          message={`The ${refresh.previous ? `${formatSydneyTime(refresh.previous.departAt)} ` : ''}option is no longer running, so you're now following the same option leaving at ${formatSydneyTime(itinerary.departAt)}.`}
+          message={`The ${refresh.previous ? `${describeTripTime(refresh.previous.departAt, new Date()).text} ` : ''}option is no longer running, so you're now following the same option leaving at ${describeTripTime(itinerary.departAt, new Date()).text}.`}
           announce
         />
       );

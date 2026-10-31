@@ -78,7 +78,7 @@ function LegRowContent({
     case 'walk':
       return <WalkRow leg={leg} notes={notes} />;
     case 'transit':
-      return <TransitRow leg={leg} notes={notes} staleCheckAt={staleCheckAt} />;
+      return <TransitRow leg={leg} notes={notes} staleCheckAt={staleCheckAt} nowMs={nowMs} />;
     case 'park':
       return <ParkRow leg={leg} nowMs={nowMs} />;
     case 'drop-off':
@@ -329,11 +329,14 @@ function TransitRow({
   leg,
   notes,
   staleCheckAt,
+  nowMs,
 }: {
   leg: TransitLeg;
   notes: StepNotes;
   staleCheckAt: string | null;
+  nowMs: number;
 }) {
+  const now = new Date(nowMs);
   const modeName = LEG_VISUALS[leg.mode].label;
   const title = serviceTitle(leg);
   const platform = platformToAdd(leg.from.name, departurePlatformOf(leg));
@@ -346,7 +349,7 @@ function TransitRow({
   const arriveTime = describeTripTime(leg.end, use(TripStartContext));
   const arrive = arriveTime.spoken;
   const sample = isSampleLeg(leg);
-  const timing = timingStyleFor(leg.timing, sample, staleCheckAt).spoken;
+  const timing = timingStyleFor(leg.timing, sample, staleCheckAt, now).spoken;
   const spokenParts = [
     `${modeName} ${title}`,
     `From ${leg.from.name}${platform ? `, ${platform}` : ''}`,
@@ -371,7 +374,12 @@ function TransitRow({
             {[`To ${arrival}, arrive ${arriveTime.text}`, stops].filter(Boolean).join(' · ')}
           </Detail>
           <View style={styles.badges}>
-            <TimingBadge timing={leg.timing} sample={sample} staleCheckAt={staleCheckAt} />
+            <TimingBadge
+              timing={leg.timing}
+              sample={sample}
+              staleCheckAt={staleCheckAt}
+              now={now}
+            />
             {delay ? (
               <AppText variant="footnote" weight="semibold">
                 {delay.text}

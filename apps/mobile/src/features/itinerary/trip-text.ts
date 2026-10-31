@@ -1,6 +1,6 @@
 import {
   formatDurationMinutes,
-  formatSydneyTime,
+  formatSydneyTimeOnDay,
   type Itinerary,
   type Leg,
   type ParkingRules,
@@ -307,6 +307,7 @@ export function staleCheckOf(checkedAt: string | null, nowMs: number): string | 
 export function describeRealtimeCoverage(
   itinerary: Itinerary,
   staleCheckAt: string | null = null,
+  now: Date = new Date(),
 ): Wording | null {
   const hasTransit = itinerary.legs.some((leg) => leg.kind === 'transit');
   if (!hasTransit) return null;
@@ -315,10 +316,9 @@ export function describeRealtimeCoverage(
     return { text: 'Sample live times', spoken: 'Sample times for demo mode, not live.' };
   }
   if (staleCheckAt && itinerary.realtime !== 'none') {
-    const time = formatSydneyTime(staleCheckAt);
     return {
-      text: `Checked ${time}`,
-      spoken: `Public transport times were checked at ${time} and may have changed.`,
+      text: `Checked ${formatSydneyTimeOnDay(staleCheckAt, now)}`,
+      spoken: `Public transport times were checked at ${formatSydneyTimeOnDay(staleCheckAt, now, 'long')} and may have changed.`,
     };
   }
   switch (itinerary.realtime) {
