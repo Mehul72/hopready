@@ -46,6 +46,15 @@ const HUB_QUERIES: readonly { id: string; query: string }[] = [
   { id: 'chatswood', query: 'Chatswood Station' },
   { id: 'macquarie-park', query: 'Macquarie Park Station' },
   { id: 'parramatta', query: 'Parramatta Station' },
+  // Suburban centres, so trips that end away from the city centre are estimated from a hub near
+  // them rather than from a straight line.
+  { id: 'strathfield', query: 'Strathfield Station' },
+  { id: 'epping', query: 'Epping Station' },
+  { id: 'blacktown', query: 'Blacktown Station' },
+  { id: 'liverpool', query: 'Liverpool Station' },
+  { id: 'hurstville', query: 'Hurstville Station' },
+  { id: 'bondi-junction', query: 'Bondi Junction Station' },
+  { id: 'sydenham', query: 'Sydenham Station' },
 ];
 
 const PERIODS = ['weekday-peak', 'weekday-evening', 'weekend'] as const;

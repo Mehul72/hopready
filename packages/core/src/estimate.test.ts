@@ -71,11 +71,20 @@ describe('estimateTransitMinutes', () => {
   });
 
   it('never beats the straight-line ride for a destination back near the station', () => {
-    // Blacktown is a few kilometres from Seven Hills; no city hub helps.
+    // Toongabbie is a few kilometres from Seven Hills; no hub helps.
+    const toongabbie = { lat: -33.7877, lon: 150.9516 };
+    const minutes = estimateTransitMinutes(SEVEN_HILLS, toongabbie, 'weekday-peak', 'normal');
+
+    expect(minutes).toBe(roughRideMinutes(SEVEN_HILLS.coordinate, toongabbie));
+  });
+
+  it('uses a suburban hub directly when the destination is one', () => {
+    // Blacktown is one stop from Seven Hills and a hub in the table.
     const blacktown = { lat: -33.7686, lon: 150.9065 };
     const minutes = estimateTransitMinutes(SEVEN_HILLS, blacktown, 'weekday-peak', 'normal');
 
-    expect(minutes).toBe(roughRideMinutes(SEVEN_HILLS.coordinate, blacktown));
+    expect(minutes).toBeLessThan(10);
+    expect(minutes).toBeLessThan(roughRideMinutes(SEVEN_HILLS.coordinate, blacktown));
   });
 
   it('falls back to the straight-line ride for a place with no row in the table', () => {
