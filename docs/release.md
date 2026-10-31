@@ -51,6 +51,8 @@ Before the first upload, list `Frameworks/` inside the production build (`unzip 
    - dark mode;
    - the largest text size;
    - VoiceOver on the results and trip screens.
+   - an option over a limit (set the walking limit to 5 minutes): it is listed with a mark on the results and trip screens, not hidden;
+   - Car parks considered on the results screen, with a station and estimate for each car park.
 9. Do not invite external testers or submit for review without the owner's approval.
 
 Before the first public release, also:
