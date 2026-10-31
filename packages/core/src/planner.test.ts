@@ -1429,6 +1429,27 @@ describe('walking the rest from a car park near the destination', () => {
       expect(waysOn(await plan(twoBuses(farther, -11)))).toEqual(['5642+6627']);
     });
 
+    it('reads used for a car park while one of its ways on is listed', async () => {
+      const outcomeAtBellaVista = (response: PlanResponse) =>
+        response.checkedCarParks.find((carPark) => carPark.id === BELLA_VISTA.id)?.outcome;
+
+      // The bus gets there sooner and keeps parking free, so the walk is hidden behind it.
+      const busFirst = await planTrip(
+        request({ destination: farther }),
+        deps({ transit: directBus(farther, -5) }),
+      );
+      expect(waysOn(busFirst)).toEqual(['735']);
+      expect(outcomeAtBellaVista(busFirst)).toBe('used');
+
+      // Room for two options: driving the whole way, then the walk; the bus is cut.
+      const noRoom = await planTrip(
+        request({ destination: NEAR_BELLA_VISTA }),
+        deps({ transit: directBus(NEAR_BELLA_VISTA, 6), limits: { maxItineraries: 2 } }),
+      );
+      expect(waysOn(noRoom)).toEqual(['walk']);
+      expect(outcomeAtBellaVista(noRoom)).toBe('used');
+    });
+
     it('arriving by a time, lists the bus by how much earlier it means leaving', async () => {
       const arriveBy = addMinutes(NOW, 90);
       // The walk takes 14 minutes and the bus 5, from a platform 2 minutes from the car park.

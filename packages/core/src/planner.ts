@@ -1688,7 +1688,7 @@ function selectItineraries(context: PlanContext, candidates: Itinerary[]): Itine
         );
   const listed = ordered.slice(0, context.limits.maxItineraries);
   for (const option of ordered.slice(listed.length)) {
-    recordUnlistedCarPark(context, option, 'left-out-for-space');
+    recordUnlistedCarPark(context, option, 'left-out-for-space', listed);
   }
   return listed;
 }
@@ -1737,19 +1737,24 @@ function withoutDominatedOptions(context: PlanContext, options: Itinerary[]): It
     if (dominated) hidden.add(option);
     else shown.push(option);
   }
-  for (const option of hidden) recordUnlistedCarPark(context, option, 'matched-by-another');
-  return options.filter((option) => !hidden.has(option));
+  const shownOptions = options.filter((option) => !hidden.has(option));
+  for (const option of hidden) {
+    recordUnlistedCarPark(context, option, 'matched-by-another', shownOptions);
+  }
+  return shownOptions;
 }
 
 // A car park whose option worked but is not listed says why, rather than reading as used when the
-// traveller cannot find its card.
+// traveller cannot find its card. One with another way on still listed is used.
 function recordUnlistedCarPark(
   context: PlanContext,
   option: Itinerary,
   outcome: Extract<CarParkOutcome, 'matched-by-another' | 'left-out-for-space'>,
+  stillListed: readonly Itinerary[],
 ) {
   const checked = option.parking && context.checkedCarParks.get(option.parking.carPark.id);
   if (!checked) return;
+  if (stillListed.some((other) => other.parking?.carPark.id === checked.id)) return;
   context.checkedCarParks.set(checked.id, { ...checked, outcome });
 }
 
