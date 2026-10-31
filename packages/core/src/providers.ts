@@ -56,7 +56,9 @@ export interface TransitQuery {
   to: Place;
   time: { type: 'depart' | 'arrive'; at: string };
   maxJourneys: number;
-  maxWalkMinutes: number;
+  // The traveller's pace, for timing walks. Their walking limit is not passed on: a provider asked
+  // to keep walks under it searches days ahead for a journey that does (TfNSW, 2026-10-31), so the
+  // limit only marks options (concernsFor).
   walkingSpeed: 'slow' | 'normal' | 'fast';
   excludedModes: readonly TransitMode[];
 }

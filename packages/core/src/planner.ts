@@ -294,7 +294,6 @@ async function queryTransit(
           to,
           time: { type: time.type, at },
           maxJourneys: context.limits.journeysPerQuery,
-          maxWalkMinutes: preferences.maxWalkMinutes,
           walkingSpeed: preferences.walkingSpeed,
           excludedModes: preferences.excludedTransitModes,
         },

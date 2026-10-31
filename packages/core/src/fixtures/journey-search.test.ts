@@ -217,7 +217,6 @@ function query(from: Place, to: Place, at: string, type: 'depart' | 'arrive'): T
     to,
     time: { type, at },
     maxJourneys: 3,
-    maxWalkMinutes: MAX_WALK_MINUTES,
     walkingSpeed: SPEED,
     excludedModes: [],
   };

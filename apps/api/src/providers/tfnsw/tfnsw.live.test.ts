@@ -51,7 +51,6 @@ describe.skipIf(!apiKey)('TfNSW live', () => {
           to: chatswood!.place,
           time: { type: 'depart', at: nextWeekdayAt(systemClock.now(), 8, 0) },
           maxJourneys: 4,
-          maxWalkMinutes: 15,
           walkingSpeed: 'normal',
           excludedModes: [],
         },

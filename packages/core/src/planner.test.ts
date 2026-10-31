@@ -1540,7 +1540,6 @@ describe('connections people cannot make', () => {
       to: CHATSWOOD_OFFICE,
       time: { type: 'depart', at: NOW },
       maxJourneys: 1,
-      maxWalkMinutes: 15,
       walkingSpeed: 'normal',
       excludedModes: [],
     }).slice(0, 1);

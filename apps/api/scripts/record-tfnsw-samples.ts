@@ -122,7 +122,6 @@ function summariseTrip(file: string, body: unknown, from: Place, to: Place, at: 
     to,
     time: { type: 'depart', at },
     maxJourneys: 20,
-    maxWalkMinutes: 60,
     walkingSpeed: 'normal',
     excludedModes: [],
   });
@@ -179,7 +178,6 @@ async function main(): Promise<void> {
       to: chatswood,
       time: { type: 'depart', at: departAt },
       maxJourneys: 6,
-      maxWalkMinutes: 15,
       walkingSpeed: 'normal',
       excludedModes: [],
     }),
@@ -193,7 +191,6 @@ async function main(): Promise<void> {
       to: barangaroo,
       time: { type: 'arrive', at: arriveBy },
       maxJourneys: 6,
-      maxWalkMinutes: 15,
       walkingSpeed: 'normal',
       excludedModes: [],
     }),

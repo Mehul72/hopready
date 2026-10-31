@@ -71,7 +71,6 @@ function query(overrides: Partial<TransitQuery> = {}): TransitQuery {
     // 08:00 on Monday 26 October 2026 in Sydney (AEDT).
     time: { type: 'depart', at: '2026-10-25T21:00:00.000Z' },
     maxJourneys: 4,
-    maxWalkMinutes: 15,
     walkingSpeed: 'normal',
     excludedModes: [],
     ...overrides,
@@ -144,29 +143,15 @@ describe('TfNSW trip request', () => {
       name_destination: '206710',
       calcNumberOfTrips: '4',
       TfNSWTR: 'true',
-      itOptionsActive: '1',
-      trITMOT: '100',
-      trITMOTvalue100: '15',
     });
   });
 
-  it("gives TfNSW a slow walker's limit in its own walking time", async () => {
-    const { params } = await plan(
-      { journeys: [] },
-      query({ maxWalkMinutes: 15, walkingSpeed: 'slow' }),
+  it('never sends a walking limit, which TfNSW would treat as a cap on every walk', async () => {
+    const { params } = await plan({ journeys: [] }, query({ walkingSpeed: 'slow' }));
+
+    expect(Object.keys(params).filter((name) => /^(itOptionsActive|trITMOT)/.test(name))).toEqual(
+      [],
     );
-
-    // 15 minutes at 0.9 m/s covers what TfNSW walks in about 10 at 1.3 m/s.
-    expect(params.trITMOTvalue100).toBe('10');
-  });
-
-  it('never asks TfNSW for a walking limit under a minute', async () => {
-    const { params } = await plan(
-      { journeys: [] },
-      query({ maxWalkMinutes: 1, walkingSpeed: 'slow' }),
-    );
-
-    expect(params.trITMOTvalue100).toBe('1');
   });
 
   it('asks for arrive-by trips in winter with AEST date and time', async () => {

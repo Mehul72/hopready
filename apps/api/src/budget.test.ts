@@ -214,7 +214,6 @@ describe('budget guard and counted fetch together', () => {
       to: request.destination,
       time: request.time,
       maxJourneys: 4,
-      maxWalkMinutes: 15,
       walkingSpeed: 'normal' as const,
       excludedModes: [],
     };

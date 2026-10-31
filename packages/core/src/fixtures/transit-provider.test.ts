@@ -28,7 +28,6 @@ function query(overrides: Partial<TransitQuery> = {}): TransitQuery {
     to: DEMO_PLACES.barangarooOffice,
     time: { type: 'depart', at: TUESDAY_0740 },
     maxJourneys: 4,
-    maxWalkMinutes: 15,
     walkingSpeed: 'normal',
     excludedModes: [],
     ...overrides,
@@ -131,7 +130,7 @@ describe('arrive by', () => {
 describe('walking', () => {
   it('times walks at the chosen speed over 1.3 times the straight-line distance', async () => {
     const fast = await plan(query({ walkingSpeed: 'fast' }));
-    const slow = await plan(query({ walkingSpeed: 'slow', maxWalkMinutes: 20 }));
+    const slow = await plan(query({ walkingSpeed: 'slow' }));
     const walkTo = (journey: TransitJourney) => walksOf(journey)[0]!;
     const straightMetres = haversineMetres(
       DEMO_PLACES.rouseHillHome.coordinate,
@@ -143,10 +142,18 @@ describe('walking', () => {
     expect(legSeconds(walkTo(slow[0]!))).toBe(Math.ceil((straightMetres * 1.3) / 0.9 / 60) * 60);
   });
 
-  it('finds nothing when every stop is further than the walking limit', async () => {
-    expect(await plan(query({ maxWalkMinutes: 5 }))).toEqual([]);
-    expect(await plan(query({ walkingSpeed: 'slow' }))).toEqual([]);
+  it('finds nothing when every stop is further than the demo world walks', async () => {
     expect(await plan(query({ from: DEMO_PLACES.boxHillHome }))).toEqual([]);
+  });
+
+  it('reaches the same stops at any pace, as TfNSW does, and times the walks at that pace', async () => {
+    const normal = await plan(query());
+    const slow = await plan(query({ walkingSpeed: 'slow' }));
+
+    expect(slow.length).toBeGreaterThan(0);
+    expect(slow.map((journey) => walksOf(journey)[0]!.to.name)).toEqual(
+      normal.map((journey) => walksOf(journey)[0]!.to.name),
+    );
   });
 
   it('starts at the stop itself, without a walk, when the origin is a stop', async () => {

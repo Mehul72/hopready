@@ -287,7 +287,6 @@ describe('failure scenarios', () => {
     to: DEMO_PLACES.barangarooOffice,
     time: { type: 'depart' as const, at: TUESDAY_0800 },
     maxJourneys: 4,
-    maxWalkMinutes: 15,
     walkingSpeed: 'normal' as const,
     excludedModes: [],
   };

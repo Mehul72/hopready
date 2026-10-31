@@ -92,20 +92,11 @@ export function tripRequestParams(query: TransitQuery): Record<string, string> {
     ...placeParams('origin', query.from),
     ...placeParams('destination', query.to),
     calcNumberOfTrips: String(query.maxJourneys),
+    // No walking limit (itOptionsActive, trITMOT=100, trITMOTvalue100): the engine treats it as
+    // the most each walk to or from a stop may take and searches days ahead for a journey that
+    // fits, so a Saturday evening plan came back as Monday's school bus (2026-10-31). TfNSW's own
+    // reach applies, and the traveller's limit marks options instead.
     TfNSWTR: 'true',
-    // Steers TfNSW towards journeys whose walks fit the traveller's limit. Not in the TfNSW swagger,
-    // but honoured (checked 2026-10-31: walks fell to the limit when another service allowed it). It
-    // is a preference inside TfNSW, not a cap: a longer walk still comes back when it is the only
-    // way to a service. A slow walker's limit is given in TfNSW's own walking time, since their
-    // walks are stretched afterwards.
-    itOptionsActive: '1',
-    trITMOT: '100',
-    trITMOTvalue100: String(
-      Math.max(
-        1,
-        Math.round(query.maxWalkMinutes / Math.max(walkingPaceRatio(query.walkingSpeed), 1)),
-      ),
-    ),
   };
   const exclusions = [...new Set(query.excludedModes)].flatMap(
     (mode) => EXCLUSION_PARAM_BY_MODE[mode] ?? [],

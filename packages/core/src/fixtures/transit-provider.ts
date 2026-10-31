@@ -54,6 +54,11 @@ const RATE_LIMIT_RETRY_AFTER_SECONDS = 30;
 // Searches look this far past the requested time, enough to reach the first services of the morning.
 const SEARCH_HORIZON_MS = 12 * 60 * MS_PER_MINUTE;
 const MAX_JOURNEYS_PER_QUERY = 10;
+// How far the demo world walks to, from and between stops, in minutes at normal pace. TfNSW
+// decides this for itself and is not told the traveller's walking limit (its answers on 2026-10-31
+// included 18 minute walks); 15 keeps the demo connections as they were tuned. Like TfNSW's, the
+// reach is a distance: a slow walker reaches the same stops, and the walks take longer.
+const WALK_REACH_MINUTES = 15;
 
 const MORNING_CANCELLATION_ALERT: ServiceAlert = {
   id: 'demo-m1-morning-cancellations',
@@ -68,7 +73,6 @@ const transitQuerySchema = z.object({
   to: placeSchema,
   time: z.object({ type: z.enum(['depart', 'arrive']), at: z.iso.datetime({ offset: true }) }),
   maxJourneys: z.number().int().min(1).max(MAX_JOURNEYS_PER_QUERY),
-  maxWalkMinutes: z.number().int().min(0).max(120),
   walkingSpeed: z.enum(WALKING_SPEEDS),
   excludedModes: z.array(transitModeSchema),
 });
@@ -120,7 +124,7 @@ function planDemoJourneys(
   // Already there: no journey makes sense.
   if (directWalk.durationSeconds === 0) return [];
 
-  const walkable = directWalk.durationSeconds <= query.maxWalkMinutes * SECONDS_PER_MINUTE;
+  const walkable = withinReach(query.from, query.to);
   const rides = planRides(query, settings, nowMs, walkable ? directWalk : null);
   if (!walkable || rides.length > 0) return rides;
 
@@ -139,8 +143,8 @@ function planRides(
   walkToBeat: Walk | null,
 ): TransitJourney[] {
   const atMs = Date.parse(query.time.at);
-  const access = stopsWithinWalk(query.from, query.maxWalkMinutes, query.walkingSpeed);
-  const egress = stopsWithinWalk(query.to, query.maxWalkMinutes, query.walkingSpeed);
+  const access = stopsWithinWalk(query.from, query.walkingSpeed);
+  const egress = stopsWithinWalk(query.to, query.walkingSpeed);
   if (access.length === 0 || egress.length === 0) return [];
 
   const window = timetableWindowAround(atMs, settings.timetable);
@@ -150,7 +154,7 @@ function planRides(
     stopCount: NETWORK_STOPS.length,
     access,
     egress,
-    transfers: walkingTransfers(query.maxWalkMinutes, query.walkingSpeed),
+    transfers: walkingTransfers(query.walkingSpeed),
     minimumChangeMs: settings.minimumChangeMinutes * MS_PER_MINUTE,
     isTripAllowed: (trip) => !excludedModes.has(trip.route.mode),
     horizonMs: SEARCH_HORIZON_MS,
@@ -184,27 +188,34 @@ function beatsWalking(plan: JourneyPlan, query: TransitQuery, atMs: number, dire
     : plan.departureMs > atMs - walkMs;
 }
 
-function stopsWithinWalk(place: Place, maxWalkMinutes: number, speed: WalkingSpeed): StopWalk[] {
-  const limitMetres = maxStraightLineMetres(maxWalkMinutes, speed);
+// Within the demo world's walking reach, measured at normal pace whatever the traveller's own.
+function withinReach(from: Pick<Place, 'coordinate'>, to: Pick<Place, 'coordinate'>): boolean {
+  return (
+    walkBetween(from.coordinate, to.coordinate, 'normal').durationSeconds <=
+    WALK_REACH_MINUTES * SECONDS_PER_MINUTE
+  );
+}
+
+function stopsWithinWalk(place: Place, speed: WalkingSpeed): StopWalk[] {
+  const reachMetres = maxStraightLineMetres(WALK_REACH_MINUTES, 'normal');
   const nearby: StopWalk[] = [];
   NETWORK_STOPS.forEach((stop, index) => {
     if (place.stopId === stop.id) {
       nearby.push({ stop: index, walk: NO_WALK });
       return;
     }
-    if (haversineMetres(place.coordinate, stop.coordinate) > limitMetres) return;
-    const walk = walkBetween(place.coordinate, stop.coordinate, speed);
-    if (walk.durationSeconds > maxWalkMinutes * SECONDS_PER_MINUTE) return;
-    nearby.push({ stop: index, walk });
+    if (haversineMetres(place.coordinate, stop.coordinate) > reachMetres) return;
+    if (!withinReach(place, stop)) return;
+    nearby.push({ stop: index, walk: walkBetween(place.coordinate, stop.coordinate, speed) });
   });
   return nearby;
 }
 
-function walkingTransfers(maxWalkMinutes: number, speed: WalkingSpeed): StopWalk[][] {
+function walkingTransfers(speed: WalkingSpeed): StopWalk[][] {
   const transfers: StopWalk[][] = NETWORK_STOPS.map(() => []);
   for (const [first, second] of WALKING_LINKS) {
+    if (!withinReach(first, second)) continue;
     const walk = walkBetween(first.coordinate, second.coordinate, speed);
-    if (walk.durationSeconds > maxWalkMinutes * SECONDS_PER_MINUTE) continue;
     transfers[stopIndexOf(first)]!.push({ stop: stopIndexOf(second), walk });
     transfers[stopIndexOf(second)]!.push({ stop: stopIndexOf(first), walk });
   }

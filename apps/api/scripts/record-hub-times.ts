@@ -148,7 +148,6 @@ async function hubTime(from: Place, to: Place, at: string): Promise<HubTime> {
     to,
     time: { type: 'depart' as const, at },
     maxJourneys: JOURNEYS_PER_QUERY,
-    maxWalkMinutes: 60,
     walkingSpeed: 'normal' as const,
     excludedModes: [],
   };

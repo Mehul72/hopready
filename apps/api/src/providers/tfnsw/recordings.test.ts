@@ -53,7 +53,6 @@ describe.skipIf(!anyRecorded)('TfNSW recorded responses', () => {
         to: RECORDED_END,
         time: { type: 'depart', at: '2026-10-25T21:00:00.000Z' },
         maxJourneys: 20,
-        maxWalkMinutes: 60,
         walkingSpeed: 'normal',
         excludedModes: [],
       });
