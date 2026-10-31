@@ -7,6 +7,7 @@ import { appStorage, isSamePlace, useFavouriteRoutes } from '@/storage';
 import { SPACING } from '@/theme';
 import { useTripHomeOutOfDate } from '@/trip';
 
+import { concernSummaries } from '../results/route-summary';
 import { routeLabelFor } from '../saved/place-labels';
 import { writeOrAlert } from '../saved/storage-writes';
 import { TripHomeOutOfDate } from '../shared/trip-home-out-of-date';
@@ -208,6 +209,8 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
     itinerary.legs,
     trip.request?.preferences.transferBufferMinutes ?? null,
   );
+  // The marks the option carried in the list, so the caution is not lost on opening it.
+  const concerns = trip.request ? concernSummaries(itinerary, trip.request.preferences) : [];
   const mapHeight = Math.round(
     Math.min(MAP_MAX_HEIGHT, Math.max(MAP_MIN_HEIGHT, height * MAP_SHARE_OF_WINDOW)),
   );
@@ -225,6 +228,14 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
       testID="itinerary-screen">
       {status}
       <TripSummaryCard itinerary={itinerary} staleCheckAt={staleCheckAt} />
+      {concerns.map((concern) => (
+        <Banner
+          key={concern.text}
+          tone="warning"
+          message={`${concern.spoken}.`}
+          testID="trip-concern"
+        />
+      ))}
       {itinerary.notes.map((note, index) => (
         <Banner key={`${index}:${note}`} tone="info" message={note} />
       ))}

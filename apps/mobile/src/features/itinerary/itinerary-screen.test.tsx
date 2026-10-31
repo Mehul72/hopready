@@ -82,6 +82,17 @@ describe('itinerary screen', () => {
     expect(await screen.findByTestId('itinerary-screen')).toBeOnTheScreen();
   });
 
+  it('keeps the marks the option carried in the list, worded against the limits', async () => {
+    const driveOnly = firstWithStrategy(await planDemoCommute(), 'drive-only');
+    expect(driveOnly.concerns).toEqual(['long-drive']);
+    const limit = planSession.getState().request?.preferences.maxDriveMinutes;
+    await renderApp(`/itinerary/${driveOnly.id}`);
+
+    expect(screen.getByTestId('trip-concern')).toHaveTextContent(
+      new RegExp(`driving, over your ${limit} minute driving limit\\.$`),
+    );
+  });
+
   it('shows the leave and arrive times, the map, every step and the data sources', async () => {
     const itinerary = firstWithStrategy(await planDemoCommute(), 'park-and-ride');
     await renderApp(`/itinerary/${itinerary.id}`);
