@@ -1337,8 +1337,10 @@ async function rankByDriveTime(
 
 // Which of the reachable car parks are asked for journeys: the ones asked for by name or station,
 // the quickest drive, then the best scores, one car park per station. Two car parks at one station
-// get the same services, so the one surer of a space, then the better scored, speaks for both. The
-// rest are listed with their estimates, so the traveller can see what was not tried and why.
+// get the same services, so the one surer of a space, then the better scored, speaks for both. Of
+// two that are a walk from the destination, the one surer of a space, then the one that gets there
+// sooner on foot. The rest are listed with their estimates, so the traveller can see what was not
+// tried and why.
 function chooseCandidates(
   context: PlanContext,
   strategy: TransferStrategy,
@@ -1350,22 +1352,31 @@ function chooseCandidates(
     if (!facility) return 1;
     return countOutlook(freshOccupancy(context, facility, occupancy.get(facility.id)));
   };
+  const onFootSeconds = (candidate: RankedCandidate) =>
+    candidate.driveSeconds + (walkTheRest(context, candidate.point)?.durationSeconds ?? 0);
+  const speaksForStation = (candidate: RankedCandidate, kept: RankedCandidate, walks: boolean) =>
+    outlook(candidate) > outlook(kept) ||
+    (walks &&
+      outlook(candidate) === outlook(kept) &&
+      onFootSeconds(candidate) < onFootSeconds(kept));
   const forStation = new Map<string, RankedCandidate>();
   const spokenFor: RankedCandidate[] = [];
   const standalone: RankedCandidate[] = [];
   for (const candidate of reachable) {
     const { station, preferred } = candidate.point;
-    // A car park a short walk from the destination is chosen for the walk, which its twin across
-    // the station cannot stand in for.
-    if (preferred || station === null || walkTheRest(context, candidate.point)) {
+    if (preferred || station === null) {
       standalone.push(candidate);
       continue;
     }
-    const kept = forStation.get(station);
+    // A car park a short walk from the destination is chosen for the walk, which a twin across the
+    // station cannot stand in for; two such twins are one choice, like two that cannot walk.
+    const walks = walkTheRest(context, candidate.point) !== null;
+    const choice = `${station}|${walks ? 'walk' : 'ride'}`;
+    const kept = forStation.get(choice);
     if (!kept) {
-      forStation.set(station, candidate);
-    } else if (outlook(candidate) > outlook(kept)) {
-      forStation.set(station, candidate);
+      forStation.set(choice, candidate);
+    } else if (speaksForStation(candidate, kept, walks)) {
+      forStation.set(choice, candidate);
       spokenFor.push(kept);
     } else {
       spokenFor.push(candidate);

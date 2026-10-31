@@ -1511,6 +1511,67 @@ describe('walking the rest from a car park near the destination', () => {
     ).toEqual(['drive', 'park', 'walk']);
   });
 
+  it('tries one of two car parks at a station when both are a walk from the destination', async () => {
+    // A second car park for Bella Vista Station, 300 m from the destination; Bella Vista is 600 m.
+    const south = facility(
+      '310',
+      'Bella Vista (south)',
+      -33.7333,
+      150.944,
+      'Bella Vista Station',
+      '2153478',
+    );
+    const plan = (counts: Map<string, Occupancy>) =>
+      planTrip(
+        request({ destination: NEAR_BELLA_VISTA }),
+        deps({
+          transit: fakeTransit(() => []),
+          carParks: fakeCarParks(counts, [BELLA_VISTA, south]),
+        }),
+      );
+    const outcomes = (response: PlanResponse) =>
+      [BELLA_VISTA, south].map(
+        (carPark) => response.checkedCarParks.find((checked) => checked.id === carPark.id)?.outcome,
+      );
+
+    // With room at both, the shorter walk.
+    expect(outcomes(await plan(new Map()))).toEqual(['not-tried', 'used']);
+    // With the nearer one nearly full, the one surer of a space.
+    const southNearlyFull = new Map<string, Occupancy>([
+      [
+        BELLA_VISTA.id,
+        { status: 'known', spacesAvailable: 300, totalSpaces: 400, observedAt: NOW },
+      ],
+      [south.id, { status: 'known', spacesAvailable: 10, totalSpaces: 400, observedAt: NOW }],
+    ]);
+    expect(outcomes(await plan(southNearlyFull))).toEqual(['used', 'not-tried']);
+  });
+
+  it('lists one walk for two car parks at a station, where neither would hide the other', async () => {
+    // Bella Vista (north) is a minute shorter to drive to from Box Hill and a 4 minute longer walk.
+    const north = facility(
+      '300',
+      'Bella Vista (north)',
+      -33.729,
+      150.944,
+      'Bella Vista Station',
+      '2153478',
+    );
+    const response = await planTrip(
+      request({ destination: NEAR_BELLA_VISTA }),
+      deps({
+        transit: fakeTransit(() => []),
+        carParks: fakeCarParks(new Map(), [BELLA_VISTA, north]),
+      }),
+    );
+
+    expect(
+      response.itineraries
+        .filter((it) => it.strategy === 'park-and-ride')
+        .map((it) => it.parking!.carPark.id),
+    ).toEqual([BELLA_VISTA.id]);
+  });
+
   it('still walks from the car park when public transport fails there', async () => {
     const failing = fakeTransit(() => {
       throw new ProviderError('demo-fixture', 'unavailable', 'TfNSW is down');
