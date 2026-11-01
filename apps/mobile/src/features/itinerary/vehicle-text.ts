@@ -1,9 +1,4 @@
-import {
-  type Coordinate,
-  isTrackedVehicleMode,
-  trackedServiceKey,
-  type TransitMode,
-} from '@hopready/core';
+import { type Coordinate, trackedServiceKey, type TransitMode } from '@hopready/core';
 
 import { LEG_VISUALS } from '@/theme';
 import type { TrackedLeg, VehiclePositions } from '@/trip/vehicle-positions';
@@ -74,6 +69,13 @@ export function vehicleRows(
       mode: tracked.leg.mode,
       title: vehicleTitle(tracked),
     };
+    if (!tracked.hasFeed) {
+      return {
+        ...row,
+        status: wording('Live positions are not available for this service'),
+        place: null,
+      };
+    }
     if (!tracked.due) {
       return { ...row, status: wording('Shows about an hour before it leaves'), place: null };
     }
@@ -91,7 +93,9 @@ export function vehicleRows(
     switch (lookup.status) {
       case 'located': {
         const checkedAtMs = positions.checkedAt ? Date.parse(positions.checkedAt) : nowMs;
-        const ageMs = checkedAtMs - Date.parse(lookup.observedAt);
+        const sinceAnswerMs =
+          positions.receivedAtMs === null ? 0 : Math.max(0, nowMs - positions.receivedAtMs);
+        const ageMs = checkedAtMs - Date.parse(lookup.observedAt) + sinceAnswerMs;
         const age = positionAge(ageMs);
         if (ageMs > VEHICLE_POSITION_FRESH_MS) {
           return {
@@ -124,9 +128,11 @@ export function vehicleRows(
         return {
           ...row,
           status: joined(
-            Date.parse(tracked.leg.start) > nowMs
-              ? wording('Not on its way yet')
-              : wording('Not reporting where it is'),
+            tracked.pastPlannedEnd
+              ? wording('It may have finished its trip')
+              : Date.parse(tracked.leg.start) > nowMs
+                ? wording('Not on its way yet')
+                : wording('Not reporting where it is'),
             ...notUpdated,
           ),
           place: null,
@@ -145,14 +151,14 @@ export function vehicleRows(
 
 // Whether a trip's timeline offers its live map: only when a service runs on a mode with a feed.
 export function hasLiveMap(trackedLegs: readonly TrackedLeg[]): boolean {
-  return trackedLegs.some((tracked) => isTrackedVehicleMode(tracked.leg.mode));
+  return trackedLegs.some((tracked) => tracked.hasFeed);
 }
 
 // The way from a trip's timeline to its live map: "See where your bus is", or for a trip on several
 // modes, "See where your services are".
 export function liveMapLinkLabel(trackedLegs: readonly TrackedLeg[]): string {
   const modes = new Set(
-    trackedLegs.map((tracked) => tracked.leg.mode).filter((mode) => isTrackedVehicleMode(mode)),
+    trackedLegs.filter((tracked) => tracked.hasFeed).map((tracked) => tracked.leg.mode),
   );
   const [only] = modes;
   if (modes.size !== 1 || !only) return 'See where your services are';

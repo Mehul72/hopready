@@ -1,9 +1,13 @@
-import { render, screen, userEvent } from '@testing-library/react-native';
+import { act, render, screen, userEvent } from '@testing-library/react-native';
 import * as Location from 'expo-location';
 import * as ReactNative from 'react-native';
 import { AccessibilityInfo } from 'react-native';
 
-import { animateToRegion, fitToCoordinates } from '@/test-support/mocks/react-native-maps';
+import {
+  animateToRegion,
+  fitToCoordinates,
+  getCamera,
+} from '@/test-support/mocks/react-native-maps';
 import { parkAndRideItinerary } from '@/test-support/trips';
 import { MIN_TOUCH_TARGET } from '@/theme';
 
@@ -381,6 +385,24 @@ describe('TripMap with live vehicles', () => {
       />,
     );
     expect(fitToCoordinates.mock.calls.length).toBe(framedTimes);
+  });
+
+  it('turns a vehicle’s heading arrow against the map once the map has been turned', async () => {
+    await render(<TripMap itinerary={itinerary} vehicles={[bus]} />);
+    const arrow = () => screen.getByTestId(`vehicle-heading-${bus.key}`);
+    expect(arrow()).toHaveStyle({ transform: [{ rotate: '78deg' }] });
+
+    getCamera.mockResolvedValueOnce({
+      center: { latitude: -33.9, longitude: 151.2 },
+      heading: 90,
+      pitch: 0,
+      zoom: 12,
+    });
+    await act(async () => {
+      screen.getByTestId('map-view').props.onRegionChangeComplete();
+    });
+
+    expect(arrow()).toHaveStyle({ transform: [{ rotate: '348deg' }] });
   });
 
   it('moves the camera to a vehicle when asked', async () => {

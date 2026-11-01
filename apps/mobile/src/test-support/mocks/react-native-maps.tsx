@@ -6,6 +6,12 @@ import { View, type ViewProps } from 'react-native';
 
 export const fitToCoordinates = jest.fn();
 export const animateToRegion = jest.fn();
+export const getCamera = jest.fn(async () => ({
+  center: { latitude: 0, longitude: 0 },
+  heading: 0,
+  pitch: 0,
+  zoom: 10,
+}));
 
 interface MockMapProps extends ViewProps {
   children?: ReactNode;
@@ -13,10 +19,14 @@ interface MockMapProps extends ViewProps {
 }
 
 const MapView = forwardRef<
-  { fitToCoordinates: typeof fitToCoordinates; animateToRegion: typeof animateToRegion },
+  {
+    fitToCoordinates: typeof fitToCoordinates;
+    animateToRegion: typeof animateToRegion;
+    getCamera: typeof getCamera;
+  },
   MockMapProps
 >(function MockMapView({ children, onMapReady, ...props }, ref) {
-  useImperativeHandle(ref, () => ({ fitToCoordinates, animateToRegion }));
+  useImperativeHandle(ref, () => ({ fitToCoordinates, animateToRegion, getCamera }));
   // The real map reports ready once MapKit has loaded; here that is straight after mounting.
   useEffect(() => {
     onMapReady?.();

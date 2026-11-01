@@ -1,5 +1,6 @@
 import { formatSydneyTime } from '@hopready/core';
 import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText, ListRow, ModeIcon } from '@/components';
 import { SPACING, useTheme } from '@/theme';
@@ -18,6 +19,8 @@ export interface LivePositionsPanelProps {
 export function LivePositionsPanel({ rows, checkedAt, demo, onShow }: LivePositionsPanelProps) {
   const { colours } = useTheme();
   const { height } = useWindowDimensions();
+  // The map screen leaves the bottom inset to its content, and this panel is the last of it.
+  const { bottom } = useSafeAreaInsets();
   const caption = demo
     ? 'Sample positions from the demo timetable'
     : checkedAt
@@ -26,7 +29,14 @@ export function LivePositionsPanel({ rows, checkedAt, demo, onShow }: LivePositi
 
   return (
     <View
-      style={[styles.panel, { backgroundColor: colours.surface, borderColor: colours.separator }]}
+      style={[
+        styles.panel,
+        {
+          backgroundColor: colours.surface,
+          borderColor: colours.separator,
+          paddingBottom: Math.max(bottom, SPACING.md),
+        },
+      ]}
       testID="live-positions">
       <AppText variant="headline" accessibilityRole="header">
         Live positions

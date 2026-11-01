@@ -9,6 +9,7 @@ import { metroThenBusItinerary, transitItinerary } from '@/test-support/trips';
 
 import { tripService } from './trip-service';
 import {
+  PAST_PLANNED_END_MS,
   trackedLegsOf,
   useVehiclePositions,
   VEHICLE_LOOKAHEAD_MS,
@@ -57,9 +58,18 @@ describe('trackedLegsOf', () => {
     ]);
   });
 
-  it('drops a leg once it has ended, and one without a trip id', () => {
+  it('keeps a leg 15 minutes past its planned end, in case it runs late, then drops it', () => {
     const metroEnds = Date.parse(trip.legs.find((leg) => leg.kind === 'transit')!.end);
-    expect(trackedLegsOf(trip, metroEnds).map(({ service }) => service.mode)).toEqual(['bus']);
+    const late = trackedLegsOf(trip, metroEnds);
+    expect(late.map(({ service, pastPlannedEnd }) => [service.mode, pastPlannedEnd])).toEqual([
+      ['metro', true],
+      ['bus', false],
+    ]);
+    const gone = trackedLegsOf(trip, metroEnds + PAST_PLANNED_END_MS);
+    expect(gone.map(({ service }) => service.mode)).toEqual(['bus']);
+  });
+
+  it('drops a leg without a trip id', () => {
     expect(trackedLegsOf(transitItinerary({ departAt: DEPART }), DEPART_MS)).toEqual([]);
   });
 
@@ -125,6 +135,20 @@ describe('useVehiclePositions', () => {
     }
   });
 
+  it('never sends a service on a mode without a feed, as the live data agreement says', async () => {
+    const locate = jest.spyOn(tripService, 'locateVehicles').mockResolvedValue(answer());
+    const ferry = transitItinerary({
+      departAt: DEPART,
+      mode: 'ferry',
+      service: 'F1',
+      tripId: 'f1',
+    });
+    const both = [...trackedLegsOf(ferry, DEPART_MS), ...tracked];
+    await renderHook(() => useVehiclePositions(both, { active: true }), { wrapper });
+    await waitFor(() => expect(locate).toHaveBeenCalledTimes(1));
+    expect(locate.mock.calls[0]?.[0]).toEqual([{ mode: 'bus', realtimeTripId: '2703224' }]);
+  });
+
   it('asks nothing when no service is due yet', async () => {
     const locate = jest.spyOn(tripService, 'locateVehicles');
     const early = trackedLegsOf(trip, DEPART_MS - 2 * VEHICLE_LOOKAHEAD_MS);
@@ -178,7 +202,9 @@ describe('useVehiclePositions', () => {
     const { result } = await renderHook(() => useVehiclePositions(tracked, { active: true }), {
       wrapper,
     });
-    await waitFor(() => expect(result.current.mode).toBe('demo'));
+    // The mode reads 'demo' from the start, so wait for the answer itself.
+    await waitFor(() => expect(result.current.lookups.size).toBe(1));
+    expect(result.current.mode).toBe('demo');
     expect(result.current.lookups.get('bus|2703224')?.status).toBe('not-located');
     expect(live).not.toHaveBeenCalled();
   });

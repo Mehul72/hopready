@@ -31,6 +31,7 @@ function positionsWith(
   return {
     lookups: new Map(lookups.map((lookup) => [`${lookup.mode}|${lookup.realtimeTripId}`, lookup])),
     checkedAt: CHECKED_AT,
+    receivedAtMs: Date.parse(CHECKED_AT),
     mode: 'live',
     checking: false,
     failed: false,
@@ -107,6 +108,22 @@ describe('vehicleRows', () => {
     expect(row.status.text).toBe('Last seen 6 min ago · it may have moved since');
   });
 
+  it('ages a position by the time since its answer arrived, so a failing map drops it', () => {
+    const answered = positionsWith([locatedBus(20_000)], { failed: true });
+    const sixMinutesLater = Date.parse(CHECKED_AT) + 6 * 60_000;
+    const row = onlyRow(answered, sixMinutesLater);
+    expect(row.place).toBeNull();
+    expect(row.status.text).toMatch(/^Last seen 6 min ago/);
+  });
+
+  it('measures age on the phone’s own clock after the answer, whatever the server’s clock says', () => {
+    // The phone received the answer at its own 09:00:00, while the server said 08:58:00.
+    const receivedAtMs = Date.parse(CHECKED_AT) + 2 * 60_000;
+    const positions = positionsWith([locatedBus(20_000)], { receivedAtMs });
+    const row = onlyRow(positions, receivedAtMs + 30_000);
+    expect(row.status.text).toBe('Updated 50 s ago');
+  });
+
   it('keeps the last position when the latest check failed, and says it was not updated', () => {
     const row = onlyRow(positionsWith([locatedBus(20_000)], { failed: true }));
     expect(row.place).not.toBeNull();
@@ -121,6 +138,22 @@ describe('vehicleRows', () => {
     expect(onlyRow(positionsWith([notLocated]), BOARD_MS + 60_000).status.text).toBe(
       'Not reporting where it is',
     );
+  });
+
+  it('says a service may have finished once its planned end has passed', () => {
+    const notLocated = { mode: 'bus', realtimeTripId: '2703224', status: 'not-located' } as const;
+    // transitItinerary's bus rides 40 minutes from boarding.
+    const afterEnd = BOARD_MS + 45 * 60_000;
+    expect(onlyRow(positionsWith([notLocated]), afterEnd).status.text).toBe(
+      'It may have finished its trip',
+    );
+  });
+
+  it('says a ferry has no live positions without asking anyone', () => {
+    const ferry = transitItinerary({ departAt: DEPART, mode: 'ferry', service: 'F1', tripId: 'f' });
+    const [row] = vehicleRows(trackedLegsOf(ferry, BOARD_MS), positionsWith([]), BOARD_MS);
+    expect(row?.status.text).toBe('Live positions are not available for this service');
+    expect(row?.place).toBeNull();
   });
 
   it('explains a mode with no feed and a feed that could not be read', () => {

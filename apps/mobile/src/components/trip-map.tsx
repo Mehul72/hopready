@@ -89,18 +89,32 @@ export function regionFor(coordinates: readonly Coordinate[]): Region | undefine
 
 // The vehicle in its mode's colour with the mode's symbol, and a small arrow pointing the way it is
 // heading when the feed says. The symbol, not the colour, tells the modes apart, and the symbol's
-// colour on the mode colour is held to WCAG AA by the theme's contrast tests.
-function VehicleBadge({ vehicle }: { vehicle: VehicleMarker }) {
+// colour on the mode colour is held to WCAG AA by the theme's contrast tests. Apple Maps markers
+// do not turn with the map, so the arrow takes off the map's own heading.
+function VehicleBadge({
+  vehicle,
+  mapHeadingDegrees,
+}: {
+  vehicle: VehicleMarker;
+  mapHeadingDegrees: number;
+}) {
   const { modeColours, onModeColour } = useTheme();
   const fill = modeColours[vehicle.mode];
   return (
     <View style={[styles.vehicle, vehicle.onPreviousTrip && styles.previousTrip]}>
       {vehicle.bearingDegrees === null ? null : (
         <View
+          testID={`vehicle-heading-${vehicle.key}`}
           style={[
             StyleSheet.absoluteFill,
             styles.headingTrack,
-            { transform: [{ rotate: `${vehicle.bearingDegrees}deg` }] },
+            {
+              transform: [
+                {
+                  rotate: `${(((vehicle.bearingDegrees - mapHeadingDegrees) % 360) + 360) % 360}deg`,
+                },
+              ],
+            },
           ]}>
           <SymbolView name="arrowtriangle.up.fill" tintColor={fill} size={10} />
         </View>
@@ -150,6 +164,8 @@ export function TripMap(props: TripMapProps) {
   const theme = useTheme();
   const mapRef = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
+  // Degrees the traveller has turned the map from north; vehicle arrows are drawn against it.
+  const [mapHeadingDegrees, setMapHeadingDegrees] = useState(0);
   const showsUserLocation = useHasLocationPermission();
 
   const itinerary = 'itinerary' in props ? props.itinerary : undefined;
@@ -206,7 +222,16 @@ export function TripMap(props: TripMapProps) {
         scrollEnabled={interactive}
         zoomEnabled={interactive}
         rotateEnabled={interactive}
-        onMapReady={() => setMapReady(true)}>
+        onMapReady={() => setMapReady(true)}
+        onRegionChangeComplete={() => {
+          if (vehicles.length === 0) return;
+          // A camera that cannot be read leaves the arrows as they were; they are a hint, and the
+          // markers themselves stay in the right places.
+          mapRef.current
+            ?.getCamera()
+            .then((camera) => setMapHeadingDegrees(camera.heading ?? 0))
+            .catch(() => undefined);
+        }}>
         {model.lines.map((line) => (
           <Polyline
             key={line.id}
@@ -239,7 +264,7 @@ export function TripMap(props: TripMapProps) {
             anchor={{ x: 0.5, y: 0.5 }}
             accessibilityLabel={vehicle.accessibilityLabel}
             testID={`vehicle-${vehicle.key}`}>
-            <VehicleBadge vehicle={vehicle} />
+            <VehicleBadge vehicle={vehicle} mapHeadingDegrees={mapHeadingDegrees} />
           </Marker>
         ))}
       </MapView>
