@@ -80,20 +80,32 @@ Design (recorded in ADR-0013 in step 7):
       files: apps/mobile/src/features/consent/live-data-consent-screen.tsx, apps/mobile/src/storage/settings.ts, site/privacy/index.html, docs/decisions/0013-live-vehicle-positions.md, docs/providers.md, docs/design/routing.md, docs/testing.md, docs/release.md, docs/PROGRESS.md
       done when: the consent screen and the privacy page say the same new line, the version is bumped with its tests updated, ADR-0013 records the design and what would reverse it, and `pnpm check` passes
       verified: `pnpm check` passes (core 347, API 391 with 8 live tests skipped, app 771), formatting clean. LIVE_DATA_CONSENT_VERSION is 2, with a test that an agreement to version 1 is asked again
-- [ ] 8. Staging deploy and live checks
+- [x] 8. Staging deploy and live checks
       done when: staging is deployed; a bus, a Sydney Trains and a Metro service from real plans come back `located`; a bus 20 to 40 minutes out is checked for a trip id and a position; CPU per vehicles request is measured on staging and recorded here, with the Free or Paid answer it implies
+      verified: staging version e8f0323c (584f67f1 redeployed for a cold isolate; previous fa88cec2). Four control plans match the baseline taken before the deploy. Buses (Bondi Junction, Kellyville), a Metro and a T1 from real plans came back `located`; bus 611 30 minutes out was located on its previous trip. Workers tail: vehicles requests 66 ms CPU on a fresh isolate, 33 ms on a second, 9 ms for a warm refresh of three feeds, 1 ms from the copy; plans 5 to 110 ms. All 200, no warnings, no trip id in any log line
 - [ ] 9. Walk-through and TestFlight
       done when: the XCUITest walk-through passes with `-collect-test-diagnostics never`, an EAS build is uploaded, and Apple reports it valid and in beta testing
 
+## Staging rollout (step 8)
+
+Risk: medium. `/v1/vehicles` is new and no shipped build calls it, but the same deploy changes code every plan goes through: the shared retry path in `providers/http.ts`, the TfNSW client's gate, the budget ledger's names and a new rate limit binding. No one-way door: the only new data is ledger rows under the budget name `tfnsw-realtime`, which older code never reads.
+
+- Before: note the current staging Worker version (`wrangler deployments list --env staging`); the airport fix recorded `fa88cec2-8250-494d-a88d-346d2a702e5f`.
+- Advance when: health reports every provider configured, `vehicles` included; Kellyville to Central and the airport trip plan as they did, with no new unavailable strategies; a bus, a Sydney Trains and a Metro service from real plans come back `located`; no 5xx in the request logs.
+- Hold on: a vehicle feed answering `unavailable`, or a plan slower than before by more than a second.
+- Roll back without debate on: any plan that fails or answers 5xx where it did not before, or Error 1102 on `/v1/plan`. From apps/api, `CI=true npx wrangler rollback <previous version> --env staging --message 'Revert live vehicle positions'`, then check health and the Kellyville plan.
+- Turn off only the feeds, keeping the rest: deploy with `--var TFNSW_REALTIME_DAILY_CALL_BUDGET:1`; lookups then answer `unavailable` after the first fetch.
+
 ## Open questions
 
-- Does Workers bill V8 helper-thread CPU, putting a cold bus-feed decode over Free's 10 ms? Blocks the verdict in step 8; if it does, Workers Paid goes back to the owner.
-- Does the Trip Planner give a trip id for a bus 20 to 40 minutes out, and is that bus already in the feed? Checked in step 8. Step 5 does not gate on the live flag, so this does not block it.
+- Closed 2026-11-01: does a cold decode pass Free's 10 ms of CPU? Yes: 66 ms on a fresh isolate, against 5 to 110 ms for trip plans on the same Worker, all answered `ok`. The vehicles route adds no CPU risk that planning does not already carry, so the Free or Paid decision stays where it is (docs/OWNER-ACTIONS.md, item 11).
+- Closed 2026-11-01: a bus 30 minutes out (611 from Kellyville) had a trip id, was flagged live, and was in the feed on its previous trip.
 - How large is the bus feed at a weekday peak? Measured in step 8 if staging runs then; the size cap in step 2 leaves room for ten times the Sunday size.
 
 ## Log
 
 - 2026-11-01 Plan written from the research workflow (wf_9396733f-7ee) and the live probe. Feeds saved under the session scratchpad for the recordings in step 2.
+- 2026-11-01 Step 8: all four Central to Parramatta trains came back `not-located`. Each was a timetable-only leg (not yet tracked), the first 15 minutes out, the same as the T1 that was missing in the probe: a train appears once TfNSW tracks its trip. One located T1 report was 23 minutes old, which the app shows as out of date with no marker.
 - 2026-11-01 Step 7: release.md's App Privacy notes gained the trip map's request; it carries no place and nothing is kept, so neither answer option changes. The PROGRESS log row waits for the staging results in step 8.
 - 2026-11-01 Step 6: the badge uses the theme's onModeColour, which the theme's contrast tests already hold to 4.5:1 on every mode colour in both schemes, instead of a new colour pairing. The live map link is offered only when a service runs on bus, train or metro; the panel still lists other services and says they have no live positions.
 - 2026-11-01 Step 5: legs are asked about whether or not TfNSW marked them live, because buses appear in the feed under their trip id before the trip planner flags them (150 such buses on 2026-11-01). The query does not retry; the next poll 15 s later is the retry.
