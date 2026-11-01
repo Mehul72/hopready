@@ -53,6 +53,9 @@ describe('live data consent', () => {
 
     expect(screen.getByText(FIRST_RUN_TITLE)).toBeOnTheScreen();
     expect(screen.getByText('What is sent')).toBeOnTheScreen();
+    expect(
+      screen.getByText(/Transport for NSW identifiers of its buses, trains and metros/),
+    ).toBeOnTheScreen();
     expect(screen.queryByText('Plan screen')).not.toBeOnTheScreen();
     expect(appStorage.settings.get().liveDataConsent).toBeNull();
   });

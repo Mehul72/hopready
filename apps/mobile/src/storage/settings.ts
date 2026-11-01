@@ -6,7 +6,8 @@ import { type DemoScenario, demoScenarioSchema } from './demo-scenario';
 import { createStoredValue, type ManagedStoredValue } from './stored-value';
 
 // Bump when what HopReady sends, or who it goes to, changes: everyone is then asked again.
-export const LIVE_DATA_CONSENT_VERSION = 1;
+// 2: an open trip map sends its services' Transport for NSW identifiers (live vehicle positions).
+export const LIVE_DATA_CONSENT_VERSION = 2;
 
 const liveDataConsentSchema = z.object({
   version: z.number().int().positive(),

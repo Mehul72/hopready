@@ -117,5 +117,6 @@ This log includes fixture, simulator and live-provider checks. Each row identifi
 - **Apple-sourced places** (saved places, recent trips, the followed trip) are kept on the phone until deleted, which a strict reading of Apple's terms does not allow (owner decision 22).
 - **Hermes** ships without its own privacy manifest, so App Store Connect may reject the first upload (docs/release.md).
 - **Workers Free** may fail slow requests with Error 1102 and caps requests at 100,000 a day (docs/runbook.md). Workers Paid needs the owner's approval.
+- **Live vehicle positions** cover Sydney buses, Sydney Trains and Metro only, and update only while a trip's map is open. Trains and metro may not appear until their trip starts, about 1 in 6 train positions was over 5 minutes old in a sample, and replacement buses and private ferries never have one (docs/decisions/0013).
 - **TfNSW's 5 requests a second** is enforced per Worker isolate only, so busy periods can exceed it across isolates (docs/providers.md).
 - **One real-iPhone session so far** (2026-10-28, build 1): planning and following a trip on live data. GPS, Take me home, offline and VoiceOver on a device are still on the TestFlight checklist (docs/release.md).

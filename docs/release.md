@@ -141,6 +141,7 @@ What the app does:
 
 - Saved data stays on the device, and leaves it only inside a request the person makes. Planning with "I'll drive and park" sends the saved parking spots (names and positions); Take me home sends the parked car's position.
 - Trip and search requests reach the HopReady API, which keeps no locations, addresses or search text (logs exclude them).
+- An open trip map sends the TfNSW trip identifiers of its bus, train and metro services every 15 seconds, to show where their vehicles are. They carry no place, are not logged and are not kept, so they add no data type to either option below (ADR-0013).
 - The API sends positions and search text to Transport for NSW and Apple Maps, server to server, without any identifier. Place names stay with the API.
 - From the phone itself, Apple receives map tile requests (the area on screen) and, in live mode, iOS reverse-geocoding requests for the current location.
 - Searches carry the location rounded to about 1 km when location access was granted.

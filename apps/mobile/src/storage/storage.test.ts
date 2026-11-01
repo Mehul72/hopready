@@ -402,6 +402,11 @@ describe('live data consent', () => {
     expect(hasLiveDataConsent({ liveDataConsent: otherVersion })).toBe(false);
   });
 
+  it('asks again everyone who agreed before live vehicle positions were sent', () => {
+    expect(LIVE_DATA_CONSENT_VERSION).toBe(2);
+    expect(hasLiveDataConsent({ liveDataConsent: { version: 1, acceptedAt: NOW } })).toBe(false);
+  });
+
   it('is forgotten with everything else by delete all data', () => {
     const { storage } = freshStorage();
     storage.settings.acceptLiveDataConsent(new Date(NOW));

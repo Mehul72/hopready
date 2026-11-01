@@ -76,9 +76,10 @@ Design (recorded in ADR-0013 in step 7):
       files: apps/mobile/src/components/trip-map.tsx, apps/mobile/src/features/shared/map-screen.tsx, apps/mobile/src/features/shared/live-positions-panel.tsx, apps/mobile/src/features/itinerary/itinerary-screen.tsx, apps/mobile/src/features/itinerary/vehicle-text.ts, tests
       done when: component tests show a marker per located service that the camera does not re-frame for, each panel state in words and for VoiceOver, positions older than 5 minutes shown as out of date without a marker, tapping a row framing that vehicle, and sample positions labelled in demo mode; `pnpm --filter @hopready/mobile test`, typecheck and lint pass
       verified: app 770 tests pass (21 new: 16 wording, 3 map, 2 screen), typecheck, lint and format clean. The screen test plans a demo commute, opens its live map from the timeline, finds the vehicle placed and labelled as a sample, and taps its row to move the map. Not yet seen on a simulator; that is step 9
-- [ ] 7. Privacy explanation, decision record and docs
-      files: apps/mobile/src/features/consent/live-data-consent-screen.tsx, the consent version constant, site/privacy/index.html, docs/decisions/0013-live-vehicle-positions.md, docs/providers.md, docs/design/routing.md, docs/PROGRESS.md
+- [x] 7. Privacy explanation, decision record and docs
+      files: apps/mobile/src/features/consent/live-data-consent-screen.tsx, apps/mobile/src/storage/settings.ts, site/privacy/index.html, docs/decisions/0013-live-vehicle-positions.md, docs/providers.md, docs/design/routing.md, docs/testing.md, docs/release.md, docs/PROGRESS.md
       done when: the consent screen and the privacy page say the same new line, the version is bumped with its tests updated, ADR-0013 records the design and what would reverse it, and `pnpm check` passes
+      verified: `pnpm check` passes (core 347, API 391 with 8 live tests skipped, app 771), formatting clean. LIVE_DATA_CONSENT_VERSION is 2, with a test that an agreement to version 1 is asked again
 - [ ] 8. Staging deploy and live checks
       done when: staging is deployed; a bus, a Sydney Trains and a Metro service from real plans come back `located`; a bus 20 to 40 minutes out is checked for a trip id and a position; CPU per vehicles request is measured on staging and recorded here, with the Free or Paid answer it implies
 - [ ] 9. Walk-through and TestFlight
@@ -93,6 +94,7 @@ Design (recorded in ADR-0013 in step 7):
 ## Log
 
 - 2026-11-01 Plan written from the research workflow (wf_9396733f-7ee) and the live probe. Feeds saved under the session scratchpad for the recordings in step 2.
+- 2026-11-01 Step 7: release.md's App Privacy notes gained the trip map's request; it carries no place and nothing is kept, so neither answer option changes. The PROGRESS log row waits for the staging results in step 8.
 - 2026-11-01 Step 6: the badge uses the theme's onModeColour, which the theme's contrast tests already hold to 4.5:1 on every mode colour in both schemes, instead of a new colour pairing. The live map link is offered only when a service runs on bus, train or metro; the panel still lists other services and says they have no live positions.
 - 2026-11-01 Step 5: legs are asked about whether or not TfNSW marked them live, because buses appear in the feed under their trip id before the trip planner flags them (150 such buses on 2026-11-01). The query does not retry; the next poll 15 s later is the retry.
 - 2026-11-01 Step 4: the feed name in diagnostics would have been dropped silently, because the logger writes only allowlisted fields; `feed` was added to LogFields with a test. The runbook gained a "live positions are unavailable" entry.
