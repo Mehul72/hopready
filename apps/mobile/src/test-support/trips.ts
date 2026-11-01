@@ -66,7 +66,7 @@ function transitLeg(
   to: Place,
   start: string,
   minutes: number,
-  service: { name: string; mode: TransitMode; realtime: boolean },
+  service: { name: string; mode: TransitMode; realtime: boolean; tripId?: string | null },
 ): Leg {
   const end = addMinutes(start, minutes);
   return {
@@ -87,7 +87,7 @@ function transitLeg(
     stopCount: null,
     cancelled: false,
     alerts: [],
-    realtimeTripId: null,
+    realtimeTripId: service.tripId ?? null,
   };
 }
 
@@ -97,6 +97,8 @@ export interface ItineraryOptions {
   service?: string;
   mode?: TransitMode;
   realtime?: boolean;
+  // TfNSW's trip id for the service, which live vehicle positions are looked up by.
+  tripId?: string;
 }
 
 // Walk 10 min, ride 40 min, walk 5 min.
@@ -105,6 +107,7 @@ export function transitItinerary({
   service = 'M1',
   mode = 'metro',
   realtime = false,
+  tripId,
 }: ItineraryOptions): Itinerary {
   const boardAt = addMinutes(departAt, 10);
   const alightAt = addMinutes(boardAt, 40);
@@ -116,6 +119,7 @@ export function transitItinerary({
         name: service,
         mode,
         realtime,
+        tripId,
       }),
       walkLeg('walk-to-office', PLACES.chatswoodStation, PLACES.chatswoodOffice, alightAt, 5),
     ],
@@ -265,7 +269,10 @@ export function planResponse(
 }
 
 // Walk 10 min, metro 40 min to Chatswood, wait 5 min, then bus 10 min to the office.
-export function metroThenBusItinerary({ departAt }: Pick<ItineraryOptions, 'departAt'>): Itinerary {
+export function metroThenBusItinerary({
+  departAt,
+  tripIds,
+}: Pick<ItineraryOptions, 'departAt'> & { tripIds?: [string, string] }): Itinerary {
   const boardAt = addMinutes(departAt, 10);
   const busAt = addMinutes(boardAt, 45);
   return buildItinerary({
@@ -276,11 +283,13 @@ export function metroThenBusItinerary({ departAt }: Pick<ItineraryOptions, 'depa
         name: 'M1',
         mode: 'metro',
         realtime: false,
+        tripId: tripIds?.[0],
       }),
       transitLeg(PLACES.chatswoodStation, PLACES.chatswoodOffice, busAt, 10, {
         name: '545',
         mode: 'bus',
         realtime: false,
+        tripId: tripIds?.[1],
       }),
     ],
   });

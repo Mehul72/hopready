@@ -1,4 +1,10 @@
-import type { Coordinate, PlanRequest, PlanResponse } from '@hopready/core';
+import type {
+  Coordinate,
+  PlanRequest,
+  PlanResponse,
+  TrackedService,
+  VehiclesResponse,
+} from '@hopready/core';
 
 import { type HttpTransport, requestJson } from './http';
 import {
@@ -7,6 +13,7 @@ import {
   type PlaceSearchResults,
   placeSearchResponseSchema,
   planResponseForThisAppSchema,
+  vehiclesResponseForThisAppSchema,
 } from './schemas';
 
 // The server accepts 2 to 80 characters. Shorter text returns no results without a request, and
@@ -19,6 +26,7 @@ export const API_ROUTES = {
   plan: '/v1/plan',
   placeSearch: '/v1/places/search',
   carParks: '/v1/carparks',
+  vehicles: '/v1/vehicles',
 } as const;
 
 export interface ApiClient {
@@ -31,6 +39,11 @@ export interface ApiClient {
     signal?: AbortSignal,
   ) => Promise<PlaceSearchResults>;
   carParks: (signal?: AbortSignal) => Promise<CarParkListing>;
+  // The services go in a POST body, so what someone is riding never sits in a URL.
+  vehicles: (
+    services: readonly TrackedService[],
+    signal?: AbortSignal,
+  ) => Promise<VehiclesResponse>;
 }
 
 export function createApiClient(transport: HttpTransport): ApiClient {
@@ -62,6 +75,14 @@ export function createApiClient(transport: HttpTransport): ApiClient {
         method: 'GET',
         path: API_ROUTES.carParks,
         schema: carParksResponseSchema,
+        signal,
+      }),
+    vehicles: (services, signal) =>
+      requestJson(transport, {
+        method: 'POST',
+        path: API_ROUTES.vehicles,
+        body: { services },
+        schema: vehiclesResponseForThisAppSchema,
         signal,
       }),
   };

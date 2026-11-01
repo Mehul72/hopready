@@ -53,7 +53,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 }
 
 // Every failure reaches the screen as an ApiError, so it can switch on `kind`.
-async function asApiResult<T>(request: Promise<T>): Promise<T> {
+export async function asApiResult<T>(request: Promise<T>): Promise<T> {
   try {
     return await request;
   } catch (error) {

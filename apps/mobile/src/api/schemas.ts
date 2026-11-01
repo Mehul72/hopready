@@ -8,6 +8,9 @@ import {
   placeSchema,
   planResponseSchema,
   REJECTION_REASONS,
+  SERVING_TRIPS,
+  VEHICLE_STATUSES,
+  vehiclesResponseSchema,
 } from '@hopready/core';
 import { z } from 'zod';
 
@@ -106,3 +109,34 @@ export const planResponseForThisAppSchema = z.preprocess((raw) => {
       : rejected,
   };
 }, planResponseSchema);
+
+const KNOWN_VEHICLE_STATUSES = new Set<string>(VEHICLE_STATUSES);
+const KNOWN_SERVING_TRIPS = new Set<string>(SERVING_TRIPS);
+
+// POST /v1/vehicles. The server can gain vehicle statuses before every phone has the update, so an
+// unknown status reads as 'unavailable' (no position, no claim about why), and an unknown
+// servingTrip as 'this-trip'. Everything else is checked as strictly as the server's schema.
+export const vehiclesResponseForThisAppSchema = z.preprocess((raw) => {
+  if (!isRecord(raw) || !Array.isArray(raw.vehicles)) return raw;
+  return {
+    ...raw,
+    vehicles: raw.vehicles.map((vehicle) => {
+      if (!isRecord(vehicle) || typeof vehicle.status !== 'string') return vehicle;
+      if (!KNOWN_VEHICLE_STATUSES.has(vehicle.status)) {
+        return {
+          mode: vehicle.mode,
+          realtimeTripId: vehicle.realtimeTripId,
+          status: 'unavailable',
+        };
+      }
+      if (
+        vehicle.status === 'located' &&
+        typeof vehicle.servingTrip === 'string' &&
+        !KNOWN_SERVING_TRIPS.has(vehicle.servingTrip)
+      ) {
+        return { ...vehicle, servingTrip: 'this-trip' };
+      }
+      return vehicle;
+    }),
+  };
+}, vehiclesResponseSchema);

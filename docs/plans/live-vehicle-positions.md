@@ -68,9 +68,10 @@ Design (recorded in ADR-0013 in step 7):
       files: apps/api/src/app.ts, apps/api/src/rate-limit.ts, apps/api/src/worker.ts, apps/api/src/logger.ts, apps/api/wrangler.jsonc, apps/api/README.md, apps/api/.dev.vars.example, docs/runbook.md, tests
       done when: route tests cover validation, duplicates, the per-install rate limit, not-configured, demo mode and a feed failure answering `unavailable` per service; the wrangler test keeps the new limiter in step in both environments; `pnpm --filter @hopready/api test`, typecheck and lint pass
       verified: API 391 tests pass (11 route, 1 log), typecheck, lint and format clean; the Node server in demo mode answered `not-located` and `not-tracked` over HTTP, 400 for an empty list, and its log never held the trip id
-- [ ] 5. App data: client, trip service and polling
-      files: apps/mobile/src/api/client.ts, apps/mobile/src/api/schemas.ts, apps/mobile/src/trip/trip-service.ts, apps/mobile/src/trip/vehicle-positions.ts, tests
+- [x] 5. App data: client, trip service and polling
+      files: apps/mobile/src/api/client.ts, apps/mobile/src/api/schemas.ts, apps/mobile/src/trip/trip-service.ts, apps/mobile/src/trip/vehicle-positions.ts, apps/mobile/src/trip/queries.ts, apps/mobile/src/test-support/trips.ts, apps/mobile/README.md, tests
       done when: tests show which legs are asked about (transit legs with a trip id that have not ended), polling every 15 s only while the screen is focused and the app active, an unknown status read as `unavailable`, and demo mode never calling the API
+      verified: app 749 tests pass (18 new: 5 trip service, 10 polling and selection, 3 client), typecheck and lint clean. Services more than an hour ahead are listed but not asked about; cancelled services are left out
 - [ ] 6. App UI: markers, the live positions panel and the way in
       files: apps/mobile/src/components/trip-map.tsx, apps/mobile/src/features/shared/map-screen.tsx, apps/mobile/src/features/itinerary/itinerary-screen.tsx, apps/mobile/src/features/itinerary/vehicle-text.ts, tests
       done when: component tests show a marker per located service that the camera does not re-frame for, each panel state in words and for VoiceOver, positions older than 5 minutes shown as out of date without a marker, tapping a row framing that vehicle, and sample positions labelled in demo mode; `pnpm --filter @hopready/mobile test`, typecheck and lint pass
@@ -91,6 +92,7 @@ Design (recorded in ADR-0013 in step 7):
 ## Log
 
 - 2026-11-01 Plan written from the research workflow (wf_9396733f-7ee) and the live probe. Feeds saved under the session scratchpad for the recordings in step 2.
+- 2026-11-01 Step 5: legs are asked about whether or not TfNSW marked them live, because buses appear in the feed under their trip id before the trip planner flags them (150 such buses on 2026-11-01). The query does not retry; the next poll 15 s later is the retry.
 - 2026-11-01 Step 4: the feed name in diagnostics would have been dropped silently, because the logger writes only allowlisted fields; `feed` was added to LogFields with a test. The runbook gained a "live positions are unavailable" entry.
 - 2026-11-01 Step 3: after a failed refresh a feed is left alone for 15 s, or as long as TfNSW's Retry-After asks up to 60 s, so a TfNSW outage costs one try per feed per window, not one per lookup. Budgets are checked before each feed fetch rather than around `locate`, so answers from a copy already held cost nothing even when a budget is spent. Reports older than 30 minutes read as not located.
 - 2026-11-01 Step 2: a generator-based decoder took 1.2 ms warm and 11 ms of process CPU cold on the full Sunday bus feed (M5 Pro). A cursor that allocates no field objects takes 0.38 ms warm and 7.5 to 8.3 ms process CPU (3 ms wall) cold. Kept the cursor. Whether Workers counts helper threads stays open for step 8.

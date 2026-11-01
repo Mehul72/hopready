@@ -394,3 +394,61 @@ describe('live data agreement', () => {
     expect((await failureOf(client.plan(planRequest()))).kind).toBe('not-configured');
   });
 });
+
+describe('vehicles', () => {
+  const BUS = { mode: 'bus', realtimeTripId: '2703224' } as const;
+  const located = {
+    ...BUS,
+    status: 'located',
+    position: { lat: -33.89204, lon: 151.25021 },
+    bearingDegrees: 78,
+    observedAt: '2026-10-26T20:54:50.000Z',
+    servingTrip: 'this-trip',
+  };
+
+  it('posts the services in the body, never the URL, and parses the answer', async () => {
+    const fetch = scriptedFetch(async () =>
+      jsonResponse(200, { mode: 'live', checkedAt: NOW.toISOString(), vehicles: [located] }),
+    );
+
+    const answer = await clientWith(fetch).vehicles([BUS]);
+
+    expect(answer.vehicles).toEqual([located]);
+    const [request] = fetch.requests;
+    expect(request?.url).toBe(`${BASE_URL}${API_ROUTES.vehicles}`);
+    expect(request?.url).not.toContain(BUS.realtimeTripId);
+    expect(request?.init.method).toBe('POST');
+    expect(JSON.parse(String(request?.init.body))).toEqual({ services: [BUS] });
+  });
+
+  it('reads a status this app does not know yet as unavailable, keeping the rest', async () => {
+    const fetch = scriptedFetch(async () =>
+      jsonResponse(200, {
+        mode: 'live',
+        checkedAt: NOW.toISOString(),
+        vehicles: [
+          { ...BUS, status: 'arriving', position: { lat: -33.9, lon: 151.2 } },
+          { ...located, realtimeTripId: '2534597', servingTrip: 'some-later-meaning' },
+        ],
+      }),
+    );
+
+    const answer = await clientWith(fetch).vehicles([BUS]);
+
+    expect(answer.vehicles).toEqual([
+      { ...BUS, status: 'unavailable' },
+      { ...located, realtimeTripId: '2534597', servingTrip: 'this-trip' },
+    ]);
+  });
+
+  it('refuses an answer whose known fields are wrong', async () => {
+    const fetch = scriptedFetch(async () =>
+      jsonResponse(200, {
+        mode: 'live',
+        checkedAt: NOW.toISOString(),
+        vehicles: [{ ...located, bearingDegrees: 400 }],
+      }),
+    );
+    expect((await failureOf(clientWith(fetch).vehicles([BUS]))).kind).toBe('invalid-response');
+  });
+});

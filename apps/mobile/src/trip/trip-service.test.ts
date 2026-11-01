@@ -3,6 +3,8 @@ import {
   type Coordinate,
   type PlanRequest,
   savedParkingSpotSchema,
+  type TrackedService,
+  type VehiclesResponse,
 } from '@hopready/core';
 import { createDemoProviders, DEMO_PLACES } from '@hopready/core/fixtures';
 
@@ -47,6 +49,14 @@ function fakeApi(failure?: ApiError, mode: ApiMode = 'live'): jest.Mocked<ApiCli
     ),
     carParks: jest.fn((signal?: AbortSignal): Promise<CarParkListing> =>
       answer({ mode, carParks: [], notices: [] }),
+    ),
+    vehicles: jest.fn(
+      (services: readonly TrackedService[], signal?: AbortSignal): Promise<VehiclesResponse> =>
+        answer({
+          mode,
+          checkedAt: NOW.toISOString(),
+          vehicles: services.map((service) => ({ ...service, status: 'not-located' as const })),
+        }),
     ),
   };
 }
@@ -267,5 +277,71 @@ describe('demo scenarios in store builds', () => {
 
     expect(withAllowedDemoScenario(chosen, false)).toEqual({ demoMode: true, demoScenario: null });
     expect(withAllowedDemoScenario(chosen, true)).toBe(chosen);
+  });
+});
+
+describe('vehicle positions', () => {
+  const BUS: TrackedService = { mode: 'bus', realtimeTripId: '2703224' };
+  const TRAIN: TrackedService = { mode: 'train', realtimeTripId: '814P.1417.150.2.A.8.91974280' };
+
+  it('asks the API in live mode, once per service, with the caller signal', async () => {
+    const api = fakeApi();
+    const signal = new AbortController().signal;
+
+    const answer = await serviceWith(api, { demoMode: false, demoScenario: null }).locateVehicles(
+      [BUS, TRAIN, BUS],
+      { signal },
+    );
+
+    expect(api.vehicles).toHaveBeenCalledWith([BUS, TRAIN], signal);
+    expect(answer.mode).toBe('live');
+    expect(answer.vehicles).toHaveLength(2);
+  });
+
+  it('passes a live failure through, never answering from the demo timetable', async () => {
+    const api = fakeApi(new ApiError('offline'));
+    await expect(
+      serviceWith(api, { demoMode: false, demoScenario: null }).locateVehicles([BUS]),
+    ).rejects.toMatchObject({ kind: 'offline' });
+    expect(createDemoProvidersSpy).not.toHaveBeenCalled();
+  });
+
+  it('answers from the demo timetable in demo mode without calling the API', async () => {
+    const api = fakeApi();
+    const answer = await serviceWith(api, { demoMode: true, demoScenario: null }).locateVehicles([
+      BUS,
+      { mode: 'ferry', realtimeTripId: 'demo-ferry' },
+    ]);
+
+    expect(api.vehicles).not.toHaveBeenCalled();
+    expect(answer).toEqual({
+      mode: 'demo',
+      checkedAt: NOW.toISOString(),
+      vehicles: [
+        { ...BUS, status: 'not-located' },
+        { mode: 'ferry', realtimeTripId: 'demo-ferry', status: 'not-tracked' },
+      ],
+    });
+  });
+
+  it('refuses a request the server would refuse before sending anything', async () => {
+    const api = fakeApi();
+    const service = serviceWith(api, { demoMode: false, demoScenario: null });
+
+    await expect(service.locateVehicles([])).rejects.toMatchObject({ kind: 'rejected' });
+    await expect(
+      service.locateVehicles([{ mode: 'bus', realtimeTripId: 'has space' }]),
+    ).rejects.toMatchObject({ kind: 'rejected' });
+    expect(api.vehicles).not.toHaveBeenCalled();
+  });
+
+  it('passes on the mode the API answered in', async () => {
+    const onApiAnswer = jest.fn();
+    await serviceWith(
+      fakeApi(undefined, 'demo'),
+      { demoMode: false, demoScenario: null },
+      onApiAnswer,
+    ).locateVehicles([BUS]);
+    expect(onApiAnswer).toHaveBeenCalledWith('demo');
   });
 });

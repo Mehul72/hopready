@@ -11,6 +11,11 @@ import {
   ProviderError,
   type ProviderFailure,
   systemClock,
+  toIso,
+  type TrackedService,
+  uniqueTrackedServices,
+  vehiclesRequestSchema,
+  type VehiclesResponse,
 } from '@hopready/core';
 import { createDemoProviders } from '@hopready/core/fixtures';
 
@@ -47,6 +52,11 @@ export interface TripService {
     options?: RequestOptions,
   ) => Promise<PlaceSearchResults>;
   listCarParks: (options?: RequestOptions) => Promise<CarParkListing>;
+  // Where the vehicles running these services are now. Demo answers come from the demo timetable.
+  locateVehicles: (
+    services: readonly TrackedService[],
+    options?: RequestOptions,
+  ) => Promise<VehiclesResponse>;
 }
 
 export interface TripServiceDependencies {
@@ -186,6 +196,17 @@ export function createTripService(dependencies: TripServiceDependencies): TripSe
       if (currentMode() === 'live') return fromApi(await api.carParks(signal));
       const providers = demoProviders();
       return inDemo(signal, () => demoCarParkListing(providers.carParks, signal));
+    },
+    locateVehicles: async (services, { signal } = {}) => {
+      const parsed = vehiclesRequestSchema.safeParse({ services: uniqueTrackedServices(services) });
+      if (!parsed.success) throw new ApiError('rejected', { cause: parsed.error });
+      const checked = parsed.data.services;
+      if (currentMode() === 'live') return fromApi(await api.vehicles(checked, signal));
+      const providers = demoProviders();
+      const vehicles = await inDemo(signal, () =>
+        providers.vehicles.locate(checked, signal ?? new AbortController().signal),
+      );
+      return { mode: 'demo', checkedAt: toIso(clock.now()), vehicles };
     },
   };
 }
