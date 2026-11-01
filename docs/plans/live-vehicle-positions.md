@@ -1,7 +1,7 @@
 # Plan: live vehicle positions on the trip map
 
 Status: in progress
-Branch: feat/live-vehicles
+Branch: feat/live-vehicles, merged into main on 2026-11-01
 
 ## Goal
 
@@ -108,6 +108,7 @@ Risk: medium. `/v1/vehicles` is new and no shipped build calls it, but the same 
 
 ## Log
 
+- 2026-11-01 Merged into `main` by fast-forward at the owner's request, after CI passed on the branch head. Step 10, the next build, still waits for the owner.
 - 2026-11-01 Plan written from the research workflow (wf_9396733f-7ee) and the live probe. Feeds saved under the session scratchpad for the recordings in step 2.
 - 2026-11-01 Claim check before reporting build 10 (wf_2a5b05b4-b0c, a refuter per claim group): the delivery and owner-doc claims held, and the evidence claims apart from a side note on which screens share the clipped Done button. It found a heading arrow drawn north-up when the map had been turned before the first vehicle appeared, because the map's heading was read only while a vehicle was shown; it is now read after every camera move, with a test that failed before the fix. Arrows still catch up only when a turn ends. A reviewer and a skeptic then found the panel's first cap, a third of the screen, hid the third service on a 667 pt iPhone SE at the default size; it is now two fifths, with rows flush as in build 10. Left as known, low: five services on 896 to 956 pt phones, or three on an SE when two rows wrap, can leave one wholly hidden with no sign the panel scrolls; flashing the scroll indicators when the list overflows would close it. Also corrected: the TestFlight checklist's label names; this plan's answer of "Yes" to the 10 ms question, which quoted 66 ms; and ADR-0013's four fetches a minute, which a lost shared fetch can exceed while the requests that start fetches keep being cancelled.
 - 2026-11-01 After build 10: at the largest text size the panel left the map about 161 pt tall, because only its rows were capped at a third of the screen while the heading and caption sat outside the cap. The whole panel is now capped and scrolls as one, with a test that pins the cap and the heading's place. On the simulator at that size in dark appearance the map became about 382 pt and the panel 291 pt; with the later two-fifths cap they are 324 pt and 349 pt. At the default size the panel's top edge sits on the same pixel row as in build 10 for a one-service trip; trips with more services were not run on the simulator. The first checks, from 7.03 pm, hung while the Mac slept and were rerun from 7.51 pm. The fix reaches phones with the next build.
