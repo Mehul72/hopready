@@ -40,8 +40,10 @@ final class HopReadyJourneyTests: HopReadyTestCase {
   }
 
   // The trip's own map shows where its services' vehicles are, from the demo timetable. Demo
-  // services carry a trip id only within about 90 minutes, so before 10 am, when the trip is asked
-  // for 10:00, the way in may not be offered yet; the test then says so rather than failing.
+  // services carry a trip id only within about 90 minutes, and a quarter of demo metro trips never
+  // do, as with real services that report only timetable times. So before 10 am, when the trip is
+  // asked for 10:00, or when the chosen service is one of those, the way in is not offered; the
+  // test then says so rather than failing.
   func testTheTripMapShowsWhereItsServicesAre() throws {
     planDriveAndParkTrip()
     let option = parkAndRideOption()
@@ -51,7 +53,8 @@ final class HopReadyJourneyTests: HopReadyTestCase {
 
     let liveMap = element("see-live-positions")
     guard liveMap.waitForExistence(timeout: 5) else {
-      throw XCTSkip("The demo trip's services start too far ahead for live positions")
+      throw XCTSkip(
+        "The demo trip's services have no trip id: too far ahead, or timetable-only demo services")
     }
     scrollListTo(liveMap)
     liveMap.tap()
