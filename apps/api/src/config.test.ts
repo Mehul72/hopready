@@ -22,7 +22,7 @@ describe('loadConfig', () => {
         'APPLE_MAPS_KEY_ID',
         'APPLE_MAPS_PRIVATE_KEY',
       ],
-      dailyCallBudgets: { tfnsw: 50_000, appleMaps: 20_000 },
+      dailyCallBudgets: { tfnsw: 50_000, tfnswRealtime: 10_000, appleMaps: 20_000 },
       planDeadlineMs: 12_000,
     });
   });
@@ -33,6 +33,7 @@ describe('loadConfig', () => {
       HOPREADY_MODE: 'demo',
       LOG_LEVEL: 'warn',
       TFNSW_DAILY_CALL_BUDGET: '40000',
+      TFNSW_REALTIME_DAILY_CALL_BUDGET: '5000',
       APPLE_MAPS_DAILY_CALL_BUDGET: '15000',
       PLAN_DEADLINE_MS: '12000',
     });
@@ -47,7 +48,7 @@ describe('loadConfig', () => {
         privateKey: ALL_KEYS.APPLE_MAPS_PRIVATE_KEY,
       },
       missingSettings: [],
-      dailyCallBudgets: { tfnsw: 40_000, appleMaps: 15_000 },
+      dailyCallBudgets: { tfnsw: 40_000, tfnswRealtime: 5_000, appleMaps: 15_000 },
       planDeadlineMs: 12_000,
     });
   });

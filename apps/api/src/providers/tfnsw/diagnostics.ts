@@ -1,3 +1,5 @@
+import type { ProviderFailure } from '@hopready/core';
+
 // What the TfNSW adapters left out of a response, and why, so drift in TfNSW's data shows up in logs and
 // metrics instead of as quietly missing options. Events never carry places, coordinates or search text.
 export type TfnswDiagnostic =
@@ -28,7 +30,11 @@ export type TfnswDiagnostic =
   // The one-call list of every car park could not be read or fetched, so car parks were asked for
   // one at a time instead.
   | { kind: 'full-list-unavailable' }
-  | { kind: 'full-list-entries-unreadable'; count: number };
+  | { kind: 'full-list-entries-unreadable'; count: number }
+  // Vehicles in a live position feed with no trip, no usable position or no report time.
+  | { kind: 'vehicles-dropped'; reason: 'incomplete'; count: number }
+  // A live position feed could not be fetched or read. Trip ids are never included.
+  | { kind: 'vehicle-feed-unavailable'; feed: string; reason: ProviderFailure };
 
 export type DiagnosticSink = (diagnostic: TfnswDiagnostic) => void;
 

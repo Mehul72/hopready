@@ -22,7 +22,7 @@ export interface ApiConfig {
   appleMaps: AppleMapsSettings | null;
   // Names of the provider settings that are not set. Values never leave this module.
   missingSettings: string[];
-  dailyCallBudgets: { tfnsw: number; appleMaps: number };
+  dailyCallBudgets: { tfnsw: number; tfnswRealtime: number; appleMaps: number };
   planDeadlineMs: number;
 }
 
@@ -57,6 +57,8 @@ const envSchema = z.object({
   APPLE_MAPS_PRIVATE_KEY: optionalText,
   LOG_LEVEL: z.preprocess(blankAsUnset, z.enum(LOG_LEVELS).default('info')),
   TFNSW_DAILY_CALL_BUDGET: wholeNumber(1, 10_000_000, 50_000),
+  // Counted inside TFNSW_DAILY_CALL_BUDGET. Three feeds fetched every 15 s for 14 hours.
+  TFNSW_REALTIME_DAILY_CALL_BUDGET: wholeNumber(1, 10_000_000, 10_000),
   APPLE_MAPS_DAILY_CALL_BUDGET: wholeNumber(1, 10_000_000, 20_000),
   // Below the app's 15 s request timeout, so a partial plan still reaches the phone.
   PLAN_DEADLINE_MS: wholeNumber(1_000, 60_000, 12_000),
@@ -97,6 +99,7 @@ export function loadConfig(env: unknown): ApiConfig {
     missingSettings,
     dailyCallBudgets: {
       tfnsw: settings.TFNSW_DAILY_CALL_BUDGET,
+      tfnswRealtime: settings.TFNSW_REALTIME_DAILY_CALL_BUDGET,
       appleMaps: settings.APPLE_MAPS_DAILY_CALL_BUDGET,
     },
     planDeadlineMs: settings.PLAN_DEADLINE_MS,

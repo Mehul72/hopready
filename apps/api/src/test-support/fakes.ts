@@ -18,6 +18,9 @@ import {
   type TransitLeg,
   type TransitProvider,
   type TransitQuery,
+  type TrackedService,
+  type VehicleLocator,
+  type VehicleLookup,
 } from '@hopready/core';
 
 import { createApp, type ClientAddressResolver } from '../app';
@@ -69,7 +72,7 @@ export function testConfig(overrides: Partial<ApiConfig> = {}): ApiConfig {
     tfnsw: { apiKey: 'tfnsw-test-key-not-real' },
     appleMaps: null,
     missingSettings: [],
-    dailyCallBudgets: { tfnsw: 50_000, appleMaps: 20_000 },
+    dailyCallBudgets: { tfnsw: 50_000, tfnswRealtime: 10_000, appleMaps: 20_000 },
     planDeadlineMs: 20_000,
     ...overrides,
   };
@@ -290,11 +293,35 @@ export function fakeCarParks(options: {
   };
 }
 
+export interface FakeVehicles extends VehicleLocator {
+  requests: (readonly TrackedService[])[];
+}
+
+// Answers every service it is asked about with what `answer` says, and keeps what it was asked.
+export function fakeVehicles(
+  answer: (service: TrackedService) => VehicleLookup | Promise<VehicleLookup> = (service) => ({
+    ...service,
+    status: 'not-located',
+  }),
+  name: VehicleLocator['name'] = 'tfnsw-realtime',
+): FakeVehicles {
+  const requests: (readonly TrackedService[])[] = [];
+  return {
+    name,
+    requests,
+    locate: async (services) => {
+      requests.push(services);
+      return Promise.all(services.map((service) => answer(service)));
+    },
+  };
+}
+
 export const NO_PROVIDERS: ProviderSet = {
   transit: null,
   driving: null,
   carParks: null,
   places: [],
+  vehicles: null,
 };
 
 export interface TestAppOptions {

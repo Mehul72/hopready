@@ -13,6 +13,7 @@ import {
   fakeCarParks,
   fakeDriving,
   fakePlaces,
+  fakeVehicles,
   fakeTransit,
   parramattaToWynyard,
   planRequest,
@@ -42,6 +43,7 @@ function demoProviders(): DemoProviders {
     places: fakePlaces('demo-fixture', async () => [
       suggestion('Wynyard Station', -33.8659, 151.2058, 'stop'),
     ]),
+    vehicles: fakeVehicles(undefined, 'demo-fixture'),
   };
 }
 
@@ -65,10 +67,11 @@ function factories() {
     path: [from, to],
   }));
   const places = fakePlaces('apple-maps', async () => []);
+  const vehicles = fakeVehicles();
   const spies = {
     createTfnswProviders: vi.fn<ProviderFactories['createTfnswProviders']>((options) => {
       tfnswFetch = options.fetchImpl;
-      return { transit, stops, carParks };
+      return { transit, stops, carParks, vehicles };
     }),
     createAppleMapsProviders: vi.fn<ProviderFactories['createAppleMapsProviders']>(() => ({
       driving,
@@ -188,6 +191,34 @@ describe('live mode', () => {
     await runtime.flushBudgets();
 
     expect(ledger.add).toHaveBeenCalledWith('tfnsw', '2026-10-26', 1);
+  });
+
+  it('counts live position requests against the realtime cap and the TfNSW budget', async () => {
+    const ledger: BudgetLedger = {
+      add: vi.fn<BudgetLedger['add']>(async (_budget, _day, calls) => calls),
+    };
+    const { runtime, spies, network } = runtimeFor(ALL_KEYS, { ledger });
+    const options = spies.createTfnswProviders.mock.calls[0]![0];
+
+    await options.beforeVehicleFetch?.();
+    await options.vehicleFetchImpl?.('https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/buses');
+    await runtime.flushBudgets();
+
+    expect(network).toHaveBeenCalledTimes(1);
+    expect(ledger.add).toHaveBeenCalledWith('tfnsw-realtime', '2026-10-26', 1);
+    expect(ledger.add).toHaveBeenCalledWith('tfnsw', '2026-10-26', 1);
+  });
+
+  it('refuses live position fetches once the realtime cap is spent, leaving planning its share', async () => {
+    const { runtime, spies } = runtimeFor({ ...ALL_KEYS, TFNSW_REALTIME_DAILY_CALL_BUDGET: '1' });
+    const options = spies.createTfnswProviders.mock.calls[0]![0];
+
+    await options.vehicleFetchImpl?.('https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/buses');
+    await expect(options.beforeVehicleFetch?.()).rejects.toMatchObject({
+      provider: 'tfnsw-realtime',
+      failure: 'rate-limited',
+    });
+    expect((await postJson(runtime.app, '/v1/plan', planRequest())).status).toBe(200);
   });
 
   it('keeps the other providers when one adapter cannot be created', async () => {

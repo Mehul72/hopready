@@ -4,9 +4,10 @@ import type {
   DrivingProvider,
   PlaceSearchProvider,
   TransitProvider,
+  VehicleLocator,
 } from '@hopready/core';
 
-import { DailyCallBudget, type BudgetLedger } from './budget';
+import { DailyCallBudget, type BudgetLedger, type BudgetName } from './budget';
 import type { ApiConfig } from './config';
 import { errorLogFields, type Logger } from './logger';
 import {
@@ -32,12 +33,14 @@ export interface TfnswDiagnosticEvent {
   systemMessageCodes?: readonly number[];
   facilityIds?: readonly string[];
   ageHours?: number;
+  feed?: string;
 }
 
 export interface TfnswProviders {
   transit: TransitProvider;
   stops: PlaceSearchProvider;
   carParks: CarParkProvider;
+  vehicles: VehicleLocator;
 }
 
 export interface AppleMapsProviders {
@@ -49,6 +52,10 @@ export interface LiveProviderFactories {
   createTfnswProviders(options: {
     apiKey: string;
     fetchImpl?: FetchImplementation;
+    // The live position feeds' requests go through this instead, so they count against the
+    // realtime cap as well, and their fetches ask beforeVehicleFetch first.
+    vehicleFetchImpl?: FetchImplementation;
+    beforeVehicleFetch?: () => Promise<void>;
     clock?: Clock;
     onDiagnostic?: (event: TfnswDiagnosticEvent) => void;
   }): TfnswProviders;
@@ -66,6 +73,7 @@ export interface DemoProviders {
   driving: DrivingProvider;
   carParks: CarParkProvider;
   places: PlaceSearchProvider;
+  vehicles: VehicleLocator;
 }
 
 export interface ProviderFactories extends LiveProviderFactories {
@@ -74,6 +82,7 @@ export interface ProviderFactories extends LiveProviderFactories {
 
 export interface ProviderBudgets {
   tfnsw: DailyCallBudget;
+  tfnswRealtime: DailyCallBudget;
   appleMaps: DailyCallBudget;
 }
 
@@ -82,7 +91,7 @@ export function createProviderBudgets(
   options: { clock: Clock; ledger: BudgetLedger | null; logger: Logger },
 ): ProviderBudgets {
   const { clock, ledger, logger } = options;
-  const budget = (name: 'tfnsw' | 'apple-maps', dailyLimit: number) =>
+  const budget = (name: BudgetName, dailyLimit: number) =>
     new DailyCallBudget({
       name,
       dailyLimit,
@@ -101,12 +110,17 @@ export function createProviderBudgets(
     });
   return {
     tfnsw: budget('tfnsw', config.dailyCallBudgets.tfnsw),
+    tfnswRealtime: budget('tfnsw-realtime', config.dailyCallBudgets.tfnswRealtime),
     appleMaps: budget('apple-maps', config.dailyCallBudgets.appleMaps),
   };
 }
 
 export async function flushProviderBudgets(budgets: ProviderBudgets): Promise<void> {
-  await Promise.all([budgets.tfnsw.flush(), budgets.appleMaps.flush()]);
+  await Promise.all([
+    budgets.tfnsw.flush(),
+    budgets.tfnswRealtime.flush(),
+    budgets.appleMaps.flush(),
+  ]);
 }
 
 // The fetch the adapters send through, so every request they make is counted, retries included.
@@ -127,7 +141,13 @@ export function budgetedFetch(
 // unreadable or stale points at drift in TfNSW's data and is worth a look.
 // Omissions that happen by design: modes the traveller excluded or HopReady cannot show, and real
 // car parks outside the area HopReady covers (Kiama). They are logged as information, not warnings.
-const EXPECTED_TFNSW_OMISSIONS = new Set(['excluded-mode', 'unsupported-mode', 'outside-coverage']);
+// A vehicle or two without a trip or a position is normal in the live feeds, so that is information too.
+const EXPECTED_TFNSW_OMISSIONS = new Set([
+  'excluded-mode',
+  'unsupported-mode',
+  'outside-coverage',
+  'incomplete',
+]);
 
 function logTfnswDiagnostic(logger: Logger, event: TfnswDiagnosticEvent): void {
   const expected =
@@ -141,6 +161,7 @@ function logTfnswDiagnostic(logger: Logger, event: TfnswDiagnosticEvent): void {
     codes: event.productClasses ?? event.systemMessageCodes,
     facilityIds: event.facilityIds,
     ageHours: event.ageHours,
+    feed: event.feed,
   };
   if (expected) logger.info('tfnsw data left out', fields);
   else logger.warn('tfnsw data left out', fields);
@@ -186,6 +207,15 @@ export function buildLiveProviders(
             apiKey: tfnswSettings.apiKey,
             clock,
             fetchImpl: budgetedFetch(budgets.tfnsw, options.fetchImpl),
+            vehicleFetchImpl: budgetedFetch(
+              budgets.tfnswRealtime,
+              budgetedFetch(budgets.tfnsw, options.fetchImpl),
+            ),
+            // The realtime cap first, so planning's share is never touched once it is spent.
+            beforeVehicleFetch: async () => {
+              await budgets.tfnswRealtime.ensureAvailable('tfnsw-realtime');
+              await budgets.tfnsw.ensureAvailable('tfnsw-realtime');
+            },
             onDiagnostic: (event) => logTfnswDiagnostic(logger, event),
           }),
         logger,
@@ -217,6 +247,9 @@ export function buildLiveProviders(
     driving: apple && interceptDriving(apple.driving, appleBudget),
     carParks: tfnsw && interceptCarParks(tfnsw.carParks, tfnswBudget),
     places,
+    // Budgets are checked before each feed fetch instead (beforeVehicleFetch): an answer from a feed
+    // already held costs no call.
+    vehicles: tfnsw && tfnsw.vehicles,
   };
 }
 
@@ -231,5 +264,6 @@ export function buildDemoProviders(
     driving: demo.driving,
     carParks: demo.carParks,
     places: [demo.places],
+    vehicles: demo.vehicles,
   };
 }

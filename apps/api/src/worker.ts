@@ -28,6 +28,7 @@ export interface Env {
   APPLE_MAPS_PRIVATE_KEY?: string;
   LOG_LEVEL?: string;
   TFNSW_DAILY_CALL_BUDGET?: string;
+  TFNSW_REALTIME_DAILY_CALL_BUDGET?: string;
   APPLE_MAPS_DAILY_CALL_BUDGET?: string;
   PLAN_DEADLINE_MS?: string;
   PLAN_RATE_LIMITER: RateLimit;

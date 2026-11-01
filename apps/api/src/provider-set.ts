@@ -4,6 +4,7 @@ import type {
   PlaceSearchProvider,
   ProviderName,
   TransitProvider,
+  VehicleLocator,
 } from '@hopready/core';
 
 import type { DailyCallBudget } from './budget';
@@ -17,10 +18,17 @@ export interface ProviderSet {
   carParks: CarParkProvider | null;
   // In merge order: stops first, then addresses and places.
   places: PlaceSearchProvider[];
+  vehicles: VehicleLocator | null;
 }
 
 export type ProviderOperation =
-  'planJourneys' | 'estimateDrives' | 'routeDrive' | 'listFacilities' | 'occupancy' | 'search';
+  | 'planJourneys'
+  | 'estimateDrives'
+  | 'routeDrive'
+  | 'listFacilities'
+  | 'occupancy'
+  | 'search'
+  | 'locate';
 
 export interface ProviderCall {
   provider: ProviderName;
@@ -93,6 +101,19 @@ export function interceptPlaces(
   };
 }
 
+export function interceptVehicles(
+  provider: VehicleLocator,
+  intercept: ProviderInterceptor,
+): VehicleLocator {
+  return {
+    name: provider.name,
+    locate: (services, signal) =>
+      intercept({ provider: provider.name, operation: 'locate' }, () =>
+        provider.locate(services, signal),
+      ),
+  };
+}
+
 export function interceptProviderSet(
   providers: ProviderSet,
   intercept: ProviderInterceptor,
@@ -102,6 +123,7 @@ export function interceptProviderSet(
     driving: providers.driving && interceptDriving(providers.driving, intercept),
     carParks: providers.carParks && interceptCarParks(providers.carParks, intercept),
     places: providers.places.map((provider) => interceptPlaces(provider, intercept)),
+    vehicles: providers.vehicles && interceptVehicles(providers.vehicles, intercept),
   };
 }
 

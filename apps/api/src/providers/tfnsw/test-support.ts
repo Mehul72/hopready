@@ -121,7 +121,7 @@ export function syntheticVehicleEntity(index: number, vehicle: SyntheticVehicle)
 export function syntheticVehicleFeed(
   vehicles: readonly SyntheticVehicle[],
   options: { headerTimestampSeconds?: number } = {},
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
   const header = protobufBytes(1, [
     ...protobufBytes(1, utf8('2.0')),
     ...(options.headerTimestampSeconds === undefined
@@ -136,6 +136,6 @@ export function syntheticVehicleFeed(
 
 const RECORDINGS_DIRECTORY = new URL('./__recordings__/', import.meta.url);
 
-export function loadRecordedFeed(fileName: string): Uint8Array {
+export function loadRecordedFeed(fileName: string): Uint8Array<ArrayBuffer> {
   return new Uint8Array(readFileSync(new URL(fileName, RECORDINGS_DIRECTORY)));
 }

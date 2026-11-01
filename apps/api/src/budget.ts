@@ -1,7 +1,9 @@
 import { ProviderError, type Clock, type ProviderName } from '@hopready/core';
 
 // One budget per provider account, because the provider's daily quota is per account or key.
-export const BUDGET_NAMES = ['tfnsw', 'apple-maps'] as const;
+// tfnsw-realtime is a cap inside tfnsw: live vehicle positions are polled while maps are open, and
+// must never use up the calls trip planning needs. Its requests count against both.
+export const BUDGET_NAMES = ['tfnsw', 'tfnsw-realtime', 'apple-maps'] as const;
 // The most calls the ledger accepts in one report. A larger backlog, built up while the ledger
 // was unreachable, goes over several flushes instead of being refused every time.
 export const MAX_CALLS_PER_LEDGER_REPORT = 10_000;
