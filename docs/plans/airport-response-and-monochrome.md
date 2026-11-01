@@ -1,6 +1,6 @@
 # Plan: airport journeys and monochrome appearance
 
-Status: in progress
+Status: done
 Branch: feat/rebrand
 
 ## Goal
@@ -26,7 +26,7 @@ New routing strategies, new providers, public App Store release and tester acces
       done when: contrast tests pass and both appearances are inspected in the native app.
 - [x] 3. Run full checks, deploy and verify the live journey.
       done when: repository checks pass, the deployed API returns transit and drive-and-park options for the reported trip, and existing control trips remain valid.
-- [ ] 4. Commit, push and publish the corrected app.
+- [x] 4. Commit, push and publish the corrected app.
       done when: CI passes and Apple confirms the exact new build is valid and in internal beta testing.
 
 ## Log
@@ -45,3 +45,5 @@ New routing strategies, new providers, public App Store release and tester acces
 - 2026-11-01: Full `pnpm check` passed (325 core, 332 API, 731 mobile tests; eight credential-gated live tests skipped). Deployed API fix `6c8ef5c` to the TestFlight API, Worker `fa88cec2-8250-494d-a88d-346d2a702e5f`. A fresh plan from the reported address to Airport T1 returned ten options across drive-only, transit-only and park-and-ride with no unavailable strategies. Kellyville Station to Central also returned ten options across all three strategies with no provider failures. Health reports all providers configured.
 
 - 2026-11-01: Native build, light and dark main-screen journeys, and maximum-text dark planner check all passed. Inspected both planners and results plus light Settings; backgrounds, cards, information badges and controls are monochrome. Refreshed the nine light captures and four large-text captures, and added dark planner/results references. Restored simulator defaults.
+
+- 2026-11-01: Pushed API fix `6c8ef5c` and monochrome appearance `c4053bd`. CI passed on the exact app source. Production build 0.1.0 (9), EAS `2c160891-bbe0-4b7d-b545-809c7fc8f3c4`, is confirmed `VALID` and `IN_BETA_TESTING` by Apple.
