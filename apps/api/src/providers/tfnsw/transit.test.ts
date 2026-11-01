@@ -312,6 +312,27 @@ describe('TfNSW trip mapping', () => {
     expect(journeys[0]!.legs[0]?.to.coordinate).toEqual({ lat: -33.691812, lon: 150.924168 });
   });
 
+  it.each([', Platform 2', 'Platform 2', ''])(
+    'uses the full station name when the short name is %j',
+    async (shortName) => {
+      type Journeys = {
+        journeys: { legs: { destination: { name: string; disassembledName: string } }[] }[];
+      };
+      const body = loadFixtureCopy<Journeys>(ROUSE_HILL_TRIP);
+      body.journeys = [body.journeys[0]!];
+      const airport = body.journeys[0]!.legs[1]!.destination;
+      airport.name = 'International Airport Station, Platform 2, Mascot';
+      airport.disassembledName = shortName;
+
+      const { journeys } = await plan(body, query());
+      const bus = transitLegs(journeys[0]!.legs)[0]!;
+
+      expect(bus.to.name).toBe('International Airport Station, Mascot');
+      expect(bus.arrivalPlatform).toBe('Platform 2');
+      expect(findContinuityIssues(journeys[0]!.legs)).toEqual([]);
+    },
+  );
+
   it('turns TfNSW interchanges into walk legs that join the services in time and place', async () => {
     const { journeys } = await rouseHillToNorthSydney();
     const legs = journeys[0]!.legs;

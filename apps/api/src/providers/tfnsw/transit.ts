@@ -420,18 +420,24 @@ function placeFromLocation(location: TripLocation): Place | null {
 }
 
 function splitPlatform(location: TripLocation): { name: string | null; platform: string | null } {
-  const name = nonEmptyText(location.disassembledName, location.name);
-  if (!name || location.type !== 'platform') return { name, platform: null };
-  const segments = name.split(',').map((segment) => segment.trim());
-  let platformStart = segments.length;
-  while (platformStart > 1 && PLATFORM_SEGMENT.test(segments[platformStart - 1]!)) {
-    platformStart -= 1;
+  if (location.type !== 'platform') {
+    return { name: nonEmptyText(location.disassembledName, location.name), platform: null };
   }
-  if (platformStart === segments.length) return { name, platform: null };
-  return {
-    name: segments.slice(0, platformStart).join(', '),
-    platform: segments.slice(platformStart).join(', '),
-  };
+
+  let platform: string | null = null;
+  // TfNSW sometimes shortens the airport station name to ", Platform 2". Its full name still
+  // identifies the station, with the locality after the platform label.
+  for (const candidate of [location.disassembledName, location.name]) {
+    const segments = (candidate ?? '').split(',').map((segment) => segment.trim());
+    platform ??= nonEmptyText(
+      segments.filter((segment) => PLATFORM_SEGMENT.test(segment)).join(', '),
+    );
+    const name = nonEmptyText(
+      segments.filter((segment) => segment && !PLATFORM_SEGMENT.test(segment)).join(', '),
+    );
+    if (name) return { name, platform };
+  }
+  return { name: null, platform };
 }
 
 function serviceFrom(transportation: Transportation): TransitLeg['service'] | null {
