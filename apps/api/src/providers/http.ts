@@ -2,19 +2,32 @@ import { ProviderError, type ProviderFailure, type ProviderName } from '@hopread
 
 export type FetchImplementation = (input: string, init?: RequestInit) => Promise<Response>;
 
-export interface ProviderRequest<T> {
+interface RequestOptions {
   provider: ProviderName;
   url: string;
   init?: RequestInit;
   signal: AbortSignal;
-  // Throws when the body is not the expected shape (for example a zod parse).
-  parse: (body: unknown) => T;
   // Only idempotent requests may set this. One retry, after a short random pause.
   retryOnce?: boolean;
   // Lets a provider read its own error conventions, such as TfNSW's X-Error-Detail header.
   classifyFailure?: (response: Response) => ProviderFailure | null;
   fetchImpl?: FetchImplementation;
 }
+
+export interface ProviderRequest<T> extends RequestOptions {
+  // Throws when the body is not the expected shape (for example a zod parse).
+  parse: (body: unknown) => T;
+}
+
+export interface BinaryProviderRequest<T> extends RequestOptions {
+  // Throws when the bytes are not the expected format.
+  parse: (body: Uint8Array) => T;
+  // A body larger than this is refused unread, so a runaway response cannot use up memory.
+  maxBytes: number;
+}
+
+// Reads a successful response's body, or throws a ProviderError saying why it could not.
+type BodyReader<Body> = (response: Response, request: RequestOptions) => Promise<Body>;
 
 const RETRY_BASE_DELAY_MS = 150;
 const RETRY_JITTER_MS = 150;
@@ -51,13 +64,29 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-export async function requestJson<T>(request: ProviderRequest<T>): Promise<T> {
+export function requestJson<T>(request: ProviderRequest<T>): Promise<T> {
+  return requestWithRetry(request, readJsonBody, request.parse);
+}
+
+export function requestBytes<T>(request: BinaryProviderRequest<T>): Promise<T> {
+  return requestWithRetry(
+    request,
+    (response, options) => readBytesBody(response, options, request.maxBytes),
+    request.parse,
+  );
+}
+
+async function requestWithRetry<Body, T>(
+  request: RequestOptions,
+  readBody: BodyReader<Body>,
+  parse: (body: Body) => T,
+): Promise<T> {
   const attempts = request.retryOnce ? 2 : 1;
   let lastError: ProviderError | undefined;
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      return await attemptRequest(request);
+      return await attemptRequest(request, readBody, parse);
     } catch (error) {
       if (!(error instanceof ProviderError)) throw error;
       lastError = error;
@@ -75,7 +104,11 @@ export async function requestJson<T>(request: ProviderRequest<T>): Promise<T> {
   );
 }
 
-async function attemptRequest<T>(request: ProviderRequest<T>): Promise<T> {
+async function attemptRequest<Body, T>(
+  request: RequestOptions,
+  readBody: BodyReader<Body>,
+  parse: (body: Body) => T,
+): Promise<T> {
   const fetchImpl = request.fetchImpl ?? fetch;
   let response: Response;
   try {
@@ -116,20 +149,39 @@ async function attemptRequest<T>(request: ProviderRequest<T>): Promise<T> {
     );
   }
 
-  let body: unknown;
+  const body = await readBody(response, request);
   try {
-    body = await response.json();
+    return parse(body);
   } catch (error) {
-    // The timer can fire while a large body is still arriving. That is a slow provider, worth a
-    // retry, not one that sent bad data.
-    if (request.signal.aborted) {
-      throw new ProviderError(
-        request.provider,
-        'timeout',
-        `${request.provider} did not finish answering in time`,
-        { status: response.status, cause: error },
-      );
-    }
+    throw new ProviderError(
+      request.provider,
+      'malformed-response',
+      `${request.provider} sent a response in an unexpected shape`,
+      { status: response.status, cause: error },
+    );
+  }
+}
+
+// The timer can fire while a large body is still arriving. That is a slow provider, worth a retry,
+// not one that sent bad data.
+function unfinishedBody(
+  response: Response,
+  request: RequestOptions,
+  cause: unknown,
+): ProviderError {
+  return new ProviderError(
+    request.provider,
+    'timeout',
+    `${request.provider} did not finish answering in time`,
+    { status: response.status, cause },
+  );
+}
+
+async function readJsonBody(response: Response, request: RequestOptions): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (error) {
+    if (request.signal.aborted) throw unfinishedBody(response, request, error);
     throw new ProviderError(
       request.provider,
       'malformed-response',
@@ -140,15 +192,58 @@ async function attemptRequest<T>(request: ProviderRequest<T>): Promise<T> {
       },
     );
   }
+}
 
-  try {
-    return request.parse(body);
-  } catch (error) {
-    throw new ProviderError(
+async function readBytesBody(
+  response: Response,
+  request: RequestOptions,
+  maxBytes: number,
+): Promise<Uint8Array> {
+  const tooLarge = () =>
+    new ProviderError(
       request.provider,
       'malformed-response',
-      `${request.provider} sent a response in an unexpected shape`,
+      `${request.provider} sent more than ${maxBytes} bytes`,
+      { status: response.status },
+    );
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    throw tooLarge();
+  }
+  if (!response.body) return new Uint8Array(0);
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw tooLarge();
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    if (request.signal.aborted) throw unfinishedBody(response, request, error);
+    // A connection that drops mid-body is a provider that could not be reached, worth a retry.
+    throw new ProviderError(
+      request.provider,
+      'unavailable',
+      `${request.provider} stopped answering part way through`,
       { status: response.status, cause: error },
     );
   }
+
+  const body = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
 }

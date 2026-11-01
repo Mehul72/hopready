@@ -56,9 +56,10 @@ Design (recorded in ADR-0013 in step 7):
       files: packages/core/src/vehicles.ts, packages/core/src/providers.ts, packages/core/src/model.ts, packages/core/src/geo.ts, packages/core/src/fixtures/vehicle-locator.ts, packages/core/src/fixtures/index.ts, tests beside them
       done when: request and response schemas, the `VehicleLocator` interface and the demo locator exist; core tests cover a demo service before, during and after its run, a non-demo id, an unknown mode and schema limits; `pnpm --filter @hopready/core test` and typecheck pass
       verified: core 347 tests pass (22 new), core lint clean, core, API and app typecheck clean
-- [ ] 2. GTFS-realtime decoder and binary TfNSW requests
+- [x] 2. GTFS-realtime decoder and binary TfNSW requests
       files: apps/api/src/providers/tfnsw/gtfs-realtime.ts, apps/api/src/providers/http.ts, apps/api/src/providers/tfnsw/client.ts, trimmed real feeds in `apps/api/src/providers/tfnsw/__recordings__`, tests
       done when: the recorded bus, train and metro feeds decode to the trip ids seen on 2026-11-01, including the prior-trip flag; truncated, oversized and wrong-type input fails as malformed-response; binary requests share the gate, retry and failure mapping of JSON ones
+      verified: API 358 tests pass (36 new: 16 decoder, 7 binary request, 3 client), lint, typecheck and format clean; recordings 21 KB in total
 - [ ] 3. Vehicle position provider with a shared copy per feed
       files: apps/api/src/providers/tfnsw/vehicle-positions.ts, apps/api/src/providers/tfnsw/index.ts, apps/api/src/budget.ts, apps/api/src/config.ts, apps/api/src/composition.ts, tests
       done when: tests show one upstream fetch per feed per 15 s however many lookups arrive, a stale copy up to 2 minutes old answering a failed refresh, `unavailable` past that, the size cap, the 8 s timeout, and calls counted against both budgets with the realtime cap refusing first
@@ -88,4 +89,5 @@ Design (recorded in ADR-0013 in step 7):
 ## Log
 
 - 2026-11-01 Plan written from the research workflow (wf_9396733f-7ee) and the live probe. Feeds saved under the session scratchpad for the recordings in step 2.
+- 2026-11-01 Step 2: a generator-based decoder took 1.2 ms warm and 11 ms of process CPU cold on the full Sunday bus feed (M5 Pro). A cursor that allocates no field objects takes 0.38 ms warm and 7.5 to 8.3 ms process CPU (3 ms wall) cold. Kept the cursor. Whether Workers counts helper threads stays open for step 8.
 - 2026-11-01 Step 1: adding `tfnsw-realtime` to ProviderName broke the planner, which treats every provider name as a leg source (planner.ts driveLeg). It was added to DATA_SOURCES too; no leg is ever sent with it, so older apps are unaffected. The demo locator avoids `findLastIndex`, unused elsewhere, because it runs on the phone in demo mode.

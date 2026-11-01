@@ -222,3 +222,57 @@ describe('createTfnswClient', () => {
     },
   );
 });
+
+describe('createTfnswClient getBytes', () => {
+  function getFeed(client: ReturnType<typeof clientWith>, signal = neverAborted()) {
+    return client.getBytes({
+      provider: 'tfnsw-realtime',
+      path: '/v1/gtfs/vehiclepos/buses',
+      parse: (body) => body.length,
+      maxBytes: 1_000,
+      signal,
+    });
+  }
+
+  it('asks for protobuf with the key in the Authorization header and nothing in the URL', async () => {
+    const fetchImpl = fakeFetch(() => new Response(new Uint8Array([1, 2, 3])));
+
+    expect(await getFeed(clientWith(fetchImpl))).toBe(3);
+    const [request] = fetchImpl.requests;
+    expect(request?.url.toString()).toBe(
+      'https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/buses',
+    );
+    expect(request?.headers.get('authorization')).toBe(`apikey ${API_KEY}`);
+    expect(request?.headers.get('accept')).toBe('application/x-google-protobuf');
+  });
+
+  it('reads TfNSW’s over-quota answer as rate-limited and holds the gate as JSON calls do', async () => {
+    const gate = new RateGate({ requestsPerSecond: 100 });
+    const holdFor = vi.spyOn(gate, 'holdFor');
+    const fetchImpl = fakeFetch(
+      () =>
+        new Response(null, {
+          status: 403,
+          headers: { 'X-Error-Detail': 'Account Over Quota Limit', 'Retry-After': '20' },
+        }),
+    );
+
+    const error = await errorFrom(getFeed(clientWith(fetchImpl, gate)));
+    expect(error).toMatchObject({ provider: 'tfnsw-realtime', failure: 'rate-limited' });
+    expect(holdFor).toHaveBeenCalledWith(20_000);
+  });
+
+  it('shares the gate with JSON calls', async () => {
+    const fetchImpl = fakeFetch((url) =>
+      url.pathname.includes('gtfs')
+        ? new Response(new Uint8Array([1]))
+        : jsonResponse({ greeting: 'hi' }),
+    );
+    const client = clientWith(fetchImpl, new RateGate({ requestsPerSecond: 1, maxQueueMs: 0 }));
+    await getGreeting(client);
+
+    const error = await errorFrom(getFeed(client));
+    expect(error.failure).toBe('rate-limited');
+    expect(fetchImpl.requests).toHaveLength(1);
+  });
+});

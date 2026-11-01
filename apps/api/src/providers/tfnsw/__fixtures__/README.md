@@ -43,3 +43,14 @@ responses in the unit tests.
    the real format, and keep the recordings for the parser tests.
 
 Recordings contain data from Transport for NSW, licensed under CC BY 4.0.
+
+## Vehicle position recordings
+
+`../__recordings__/vehiclepos-buses.pb`, `vehiclepos-sydneytrains.pb` and `vehiclepos-metro.pb` are
+real GTFS-realtime Vehicle Positions feeds from `/v1/gtfs/vehiclepos/buses`,
+`/v2/gtfs/vehiclepos/sydneytrains` and `/v2/gtfs/vehiclepos/metro`, saved on Sunday 1 November 2026
+at 14:41 AEDT. The full feeds held 1,263, 217 and 24 vehicles (242 KB, 40 KB and 7 KB). They were
+trimmed with `scripts/trim-vehicle-feed.ts`, which copies the header and whole vehicle entries byte
+for byte, keeping the services of two Trip Planner plans made in the same minute (buses 380 and 333
+from Bondi Junction, a T1 from Central), ten buses still finishing their previous trip, and a sample
+of the rest. `gtfs-realtime.test.ts` reads them.

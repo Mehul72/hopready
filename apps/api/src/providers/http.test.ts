@@ -2,7 +2,7 @@ import { ProviderError } from '@hopready/core';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
-import { failureForStatus, requestJson, type FetchImplementation } from './http';
+import { failureForStatus, requestBytes, requestJson, type FetchImplementation } from './http';
 
 const greetingSchema = z.object({ greeting: z.string() });
 const parseGreeting = (body: unknown) => greetingSchema.parse(body);
@@ -156,5 +156,100 @@ describe('failureForStatus', () => {
     [404, 'rejected-request'],
   ])('maps HTTP %i to %s', (status, failure) => {
     expect(failureForStatus(status)).toBe(failure);
+  });
+});
+
+describe('requestBytes', () => {
+  const bytesRequest = {
+    provider: 'tfnsw-realtime' as const,
+    url: 'https://example.test/v1/feed',
+    parse: (body: Uint8Array) => [...body],
+    maxBytes: 8,
+  };
+  const signal = () => new AbortController().signal;
+
+  function streamOf(...chunks: number[][]): ReadableStream<Uint8Array> {
+    return new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(new Uint8Array(chunk));
+        controller.close();
+      },
+    });
+  }
+
+  it('returns the parsed bytes of a body sent in pieces', async () => {
+    const result = await requestBytes({
+      ...bytesRequest,
+      signal: signal(),
+      fetchImpl: respondWith(new Response(streamOf([1, 2, 3], [4, 5]))),
+    });
+    expect(result).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('refuses a body declared larger than the limit without reading it', async () => {
+    const response = new Response(streamOf([1]), { headers: { 'content-length': '9' } });
+    await expect(
+      requestBytes({ ...bytesRequest, signal: signal(), fetchImpl: respondWith(response) }),
+    ).rejects.toMatchObject({ failure: 'malformed-response' });
+  });
+
+  it('stops reading a body that grows past the limit', async () => {
+    const response = new Response(streamOf([1, 2, 3, 4, 5], [6, 7, 8, 9]));
+    await expect(
+      requestBytes({ ...bytesRequest, signal: signal(), fetchImpl: respondWith(response) }),
+    ).rejects.toMatchObject({ failure: 'malformed-response' });
+  });
+
+  it('reads a parse failure as a malformed response', async () => {
+    await expect(
+      requestBytes({
+        ...bytesRequest,
+        parse: () => {
+          throw new Error('not protobuf');
+        },
+        signal: signal(),
+        fetchImpl: respondWith(new Response(streamOf([1]))),
+      }),
+    ).rejects.toMatchObject({ failure: 'malformed-response' });
+  });
+
+  it('retries once after a server error, as JSON requests do', async () => {
+    const fetchImpl = respondWith(new Response(null, { status: 503 }), new Response(streamOf([7])));
+    const result = await requestBytes({
+      ...bytesRequest,
+      retryOnce: true,
+      signal: signal(),
+      fetchImpl,
+    });
+    expect(result).toEqual([7]);
+    expect(fetchImpl.calls).toBe(2);
+  });
+
+  it('reads a connection that drops part way through as unavailable', async () => {
+    const dropping = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1]));
+        controller.error(new TypeError('network connection was lost'));
+      },
+    });
+    await expect(
+      requestBytes({
+        ...bytesRequest,
+        signal: signal(),
+        fetchImpl: respondWith(new Response(dropping)),
+      }),
+    ).rejects.toMatchObject({ failure: 'unavailable' });
+  });
+
+  it('maps HTTP failures the same way as JSON requests', async () => {
+    await expect(
+      requestBytes({
+        ...bytesRequest,
+        signal: signal(),
+        fetchImpl: respondWith(
+          new Response(null, { status: 429, headers: { 'retry-after': '30' } }),
+        ),
+      }),
+    ).rejects.toMatchObject({ failure: 'rate-limited', retryAfterSeconds: 30 });
   });
 });

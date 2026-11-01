@@ -1,6 +1,6 @@
 import { ProviderError, type ProviderFailure, type ProviderName } from '@hopready/core';
 
-import { requestJson, type FetchImplementation } from '../http';
+import { requestBytes, requestJson, type FetchImplementation } from '../http';
 import { RateGateFullError, type RateGate } from './rate-gate';
 
 export const TFNSW_API_ORIGIN = 'https://api.transport.nsw.gov.au';
@@ -31,8 +31,18 @@ export interface TfnswRequest<T> {
   signal: AbortSignal;
 }
 
+export interface TfnswBinaryRequest<T> {
+  provider: ProviderName;
+  path: string;
+  parse: (body: Uint8Array) => T;
+  maxBytes: number;
+  signal: AbortSignal;
+}
+
 export interface TfnswClient {
   get<T>(request: TfnswRequest<T>): Promise<T>;
+  // For the GTFS-realtime feeds, which answer in protobuf only.
+  getBytes<T>(request: TfnswBinaryRequest<T>): Promise<T>;
 }
 
 export interface TfnswClientOptions {
@@ -46,10 +56,12 @@ export function createTfnswClient(options: TfnswClientOptions): TfnswClient {
     // The key itself is never echoed, not even in this message.
     throw new Error('The TfNSW API key is empty or has characters that cannot be sent in a header');
   }
-  const headers = { Authorization: `apikey ${options.apiKey}`, Accept: 'application/json' };
+  const authorization = `apikey ${options.apiKey}`;
+  const jsonHeaders = { Authorization: authorization, Accept: 'application/json' };
+  const protobufHeaders = { Authorization: authorization, Accept: 'application/x-google-protobuf' };
   const { gate } = options;
   // Workers reject fetch called as a method of another object, so the default is wrapped, not stored.
-  const send: FetchImplementation =
+  const sendRequest: FetchImplementation =
     options.fetchImpl ?? ((input: string, init?: RequestInit) => fetch(input, init));
 
   async function takeSlot(provider: ProviderName, signal: AbortSignal): Promise<void> {
@@ -70,44 +82,70 @@ export function createTfnswClient(options: TfnswClientOptions): TfnswClient {
     }
   }
 
+  // The first attempt takes its slot here so a full queue reads as rate-limited. The single retry
+  // in http.ts queues for its own slot, so the retry is rate limited too.
+  async function throughGate<T>(
+    provider: ProviderName,
+    signal: AbortSignal,
+    send: (fetchImpl: FetchImplementation) => Promise<T>,
+  ): Promise<T> {
+    await takeSlot(provider, signal);
+    let attempts = 0;
+    const sendThroughGate: FetchImplementation = async (input, init) => {
+      attempts += 1;
+      if (attempts > 1) await gate.acquire(signal);
+      return sendRequest(input, init);
+    };
+
+    try {
+      return await send(sendThroughGate);
+    } catch (error) {
+      if (
+        error instanceof ProviderError &&
+        error.failure === 'rate-limited' &&
+        error.retryAfterSeconds !== undefined
+      ) {
+        gate.holdFor(error.retryAfterSeconds * 1_000);
+      }
+      throw error;
+    }
+  }
+
   return {
-    async get<T>(request: TfnswRequest<T>): Promise<T> {
+    get<T>(request: TfnswRequest<T>): Promise<T> {
       const url = new URL(request.path, TFNSW_API_ORIGIN);
       for (const [name, value] of Object.entries(request.params)) {
         url.searchParams.set(name, value);
       }
-
-      // The first attempt takes its slot here so a full queue reads as rate-limited. requestJson's
-      // single retry queues for its own slot, so the retry is rate limited too.
-      await takeSlot(request.provider, request.signal);
-      let attempts = 0;
-      const sendThroughGate: FetchImplementation = async (input, init) => {
-        attempts += 1;
-        if (attempts > 1) await gate.acquire(request.signal);
-        return send(input, init);
-      };
-
-      try {
-        return await requestJson({
+      return throughGate(request.provider, request.signal, (fetchImpl) =>
+        requestJson({
           provider: request.provider,
           url: url.toString(),
-          init: { method: 'GET', headers },
+          init: { method: 'GET', headers: jsonHeaders },
           signal: request.signal,
           parse: request.parse,
           retryOnce: true,
           classifyFailure: classifyTfnswFailure,
-          fetchImpl: sendThroughGate,
-        });
-      } catch (error) {
-        if (
-          error instanceof ProviderError &&
-          error.failure === 'rate-limited' &&
-          error.retryAfterSeconds !== undefined
-        ) {
-          gate.holdFor(error.retryAfterSeconds * 1_000);
-        }
-        throw error;
-      }
+          fetchImpl,
+        }),
+      );
+    },
+
+    getBytes<T>(request: TfnswBinaryRequest<T>): Promise<T> {
+      const url = new URL(request.path, TFNSW_API_ORIGIN);
+      return throughGate(request.provider, request.signal, (fetchImpl) =>
+        requestBytes({
+          provider: request.provider,
+          url: url.toString(),
+          init: { method: 'GET', headers: protobufHeaders },
+          signal: request.signal,
+          parse: request.parse,
+          maxBytes: request.maxBytes,
+          retryOnce: true,
+          classifyFailure: classifyTfnswFailure,
+          fetchImpl,
+        }),
+      );
     },
   };
 }
