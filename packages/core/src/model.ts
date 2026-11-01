@@ -43,9 +43,12 @@ export const TRANSIT_MODES = [
 export const transitModeSchema = z.enum(TRANSIT_MODES);
 export type TransitMode = z.infer<typeof transitModeSchema>;
 
+// Every ProviderName is a source, so a leg can name the provider that timed it. No leg comes from
+// tfnsw-realtime, which only answers where vehicles are.
 export const DATA_SOURCES = [
   'tfnsw-trip-planner',
   'tfnsw-car-park',
+  'tfnsw-realtime',
   'apple-maps',
   'google-routes',
   'hopready',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { haversineMetres, isWithinGreaterSydney } from './geo';
+import { bearingDegrees, haversineMetres, isWithinGreaterSydney } from './geo';
 
 const TOWN_HALL = { lat: -33.8732, lon: 151.2061 };
 const CHATSWOOD = { lat: -33.7969, lon: 151.1803 };
@@ -40,5 +40,26 @@ describe('isWithinGreaterSydney', () => {
     ['Melbourne', { lat: -37.8136, lon: 144.9631 }],
   ])('rejects %s', (_name, point) => {
     expect(isWithinGreaterSydney(point)).toBe(false);
+  });
+});
+
+describe('bearingDegrees', () => {
+  it('reads 0 due north, 90 due east, 180 due south and 270 due west', () => {
+    const centre = { lat: -33.87, lon: 151.2 };
+    expect(bearingDegrees(centre, { lat: -33.8, lon: 151.2 })).toBeCloseTo(0, 5);
+    expect(bearingDegrees(centre, { lat: -33.87, lon: 151.3 })).toBeCloseTo(90, 0);
+    expect(bearingDegrees(centre, { lat: -33.95, lon: 151.2 })).toBeCloseTo(180, 5);
+    expect(bearingDegrees(centre, { lat: -33.87, lon: 151.1 })).toBeCloseTo(270, 0);
+  });
+
+  it('stays below 360', () => {
+    const bearing = bearingDegrees({ lat: -33.87, lon: 151.2 }, { lat: -33.8, lon: 151.19999 });
+    expect(bearing).toBeGreaterThan(359);
+    expect(bearing).toBeLessThan(360);
+  });
+
+  it('points from Town Hall north-northwest towards Chatswood', () => {
+    expect(bearingDegrees(TOWN_HALL, CHATSWOOD)).toBeGreaterThan(330);
+    expect(bearingDegrees(TOWN_HALL, CHATSWOOD)).toBeLessThan(350);
   });
 });

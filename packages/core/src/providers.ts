@@ -9,12 +9,18 @@ import type {
   ServiceAlert,
   TransitMode,
 } from './model';
+import type { TrackedService, VehicleLookup } from './vehicles';
 
 // Adapters translate one provider into these shapes so the planner never sees provider formats,
 // and a provider can be replaced without touching routing rules.
 
 export type ProviderName =
-  'tfnsw-trip-planner' | 'tfnsw-car-park' | 'apple-maps' | 'google-routes' | 'demo-fixture';
+  | 'tfnsw-trip-planner'
+  | 'tfnsw-car-park'
+  | 'tfnsw-realtime'
+  | 'apple-maps'
+  | 'google-routes'
+  | 'demo-fixture';
 
 export type ProviderFailure =
   | 'timeout'
@@ -119,6 +125,13 @@ export interface CarParkProvider {
   readonly name: ProviderName;
   listFacilities(signal: AbortSignal): Promise<CarParkFacility[]>;
   occupancy(facilityIds: readonly string[], signal: AbortSignal): Promise<Map<string, Occupancy>>;
+}
+
+// Finds the vehicles running services, one answer per service in the order given. A feed that
+// cannot be read answers 'unavailable' for its services rather than failing the whole call.
+export interface VehicleLocator {
+  readonly name: ProviderName;
+  locate(services: readonly TrackedService[], signal: AbortSignal): Promise<VehicleLookup[]>;
 }
 
 export interface PlaceSuggestion {

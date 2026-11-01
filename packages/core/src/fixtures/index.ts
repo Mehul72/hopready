@@ -5,12 +5,14 @@ import {
   type DrivingProvider,
   type PlaceSearchProvider,
   type TransitProvider,
+  type VehicleLocator,
 } from '../providers';
 import { createDemoCarParkProvider } from './car-park-provider';
 import { createDemoDrivingProvider } from './driving-provider';
 import { createDemoPlaceSearchProvider } from './place-search-provider';
 import { demoScenarioSchema, type DemoScenario } from './scenarios';
 import { createDemoTransitProvider } from './transit-provider';
+import { createDemoVehicleLocator } from './vehicle-locator';
 
 // The demo world: a small Greater Sydney network on real stops with generated, clearly labelled
 // timetables, plus drive, car park and place search models. It runs the same planner as live mode,
@@ -30,6 +32,7 @@ export interface DemoProviders {
   driving: DrivingProvider;
   carParks: CarParkProvider;
   places: PlaceSearchProvider;
+  vehicles: VehicleLocator;
 }
 
 export interface DemoProviderOptions {
@@ -46,5 +49,6 @@ export function createDemoProviders(options: DemoProviderOptions = {}): DemoProv
     driving: createDemoDrivingProvider(),
     carParks: createDemoCarParkProvider({ clock, scenario }),
     places: createDemoPlaceSearchProvider(),
+    vehicles: createDemoVehicleLocator({ clock, scenario }),
   };
 }
