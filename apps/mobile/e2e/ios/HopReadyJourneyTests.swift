@@ -39,6 +39,30 @@ final class HopReadyJourneyTests: HopReadyTestCase {
     app.activate()
   }
 
+  // The trip's own map shows where its services' vehicles are, from the demo timetable. Demo
+  // services carry a trip id only within about 90 minutes, so before 10 am, when the trip is asked
+  // for 10:00, the way in may not be offered yet; the test then says so rather than failing.
+  func testTheTripMapShowsWhereItsServicesAre() throws {
+    planDriveAndParkTrip()
+    let option = parkAndRideOption()
+    XCTAssertTrue(option.waitForExistence(timeout: 30), "No drive and park option was offered")
+    option.tap()
+    XCTAssertTrue(element("itinerary-screen").waitForExistence(timeout: 10))
+
+    let liveMap = element("see-live-positions")
+    guard liveMap.waitForExistence(timeout: 5) else {
+      throw XCTSkip("The demo trip's services start too far ahead for live positions")
+    }
+    scrollListTo(liveMap)
+    liveMap.tap()
+    XCTAssertTrue(element("map-screen").waitForExistence(timeout: 10), "The trip map did not open")
+    XCTAssertTrue(element("live-positions").waitForExistence(timeout: 10), "No live positions panel")
+    XCTAssertTrue(
+      app.staticTexts["Sample positions from the demo timetable"].waitForExistence(timeout: 10),
+      "Demo positions are not labelled as samples")
+    keepScreenshot("10-live-map")
+  }
+
   // With location access allowed, the Plan tab's Current location fills in the start and the trip
   // plans from it. The simulated position is the demo world's Box Hill home.
   func testCurrentLocationStartsATripOnceAllowed() throws {

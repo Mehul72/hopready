@@ -67,6 +67,18 @@ describe('createDemoVehicleLocator', () => {
     expect(vehicle.bearingDegrees).toBeLessThan(360);
   });
 
+  it('moves a vehicle on to the next pair of stops once it passes the second', async () => {
+    const trip = busTrip();
+    const [, second, third] = trip.direction.calls.map((call) => call.stop.coordinate);
+    const [, secondMs, thirdMs] = trip.timesMs;
+    const [lookup] = await locateAt(secondMs! + (thirdMs! - secondMs!) / 2, [serviceOf(trip)]);
+    const vehicle = located(lookup);
+
+    const fromSecond = haversineMetres(second!, vehicle.position);
+    const toThird = haversineMetres(vehicle.position, third!);
+    expect(fromSecond + toThird).toBeCloseTo(haversineMetres(second!, third!), -1);
+  });
+
   it('shows a vehicle waiting at its first stop up to 10 minutes before it leaves', async () => {
     const trip = busTrip();
     const first = trip.direction.calls[0]!.stop.coordinate;

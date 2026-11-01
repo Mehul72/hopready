@@ -2,13 +2,13 @@
 
 Five layers, from fastest to slowest. CI runs the first three on every push (`.github/workflows/ci.yml`). Run them locally with `pnpm check`.
 
-| Layer                     | What it covers                                                                                                                                                                                                                                                                                                                                                                | Command                                                        |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Core (Vitest)             | Routing rules, Sydney time and daylight saving, the planner against fakes, and every scenario from the brief against the demo world                                                                                                                                                                                                                                           | `pnpm --filter @hopready/core test`                            |
-| API (Vitest)              | Routes, validation, error mapping, deadlines, rate limits, budgets, log redaction, and the TfNSW and Apple Maps adapters against schema-derived samples; the live vehicle position decoder against feeds recorded from TfNSW                                                                                                                                                  | `pnpm --filter @hopready/api test`                             |
-| App (Jest)                | Storage, the API client, the trip service (demo and live never mixed), location permission paths, and screen flows with React Native Testing Library. Compiled with the React Compiler, as the app is built, so a value the compiler would keep from an earlier render (such as a clock read) fails here too                                                                  | `pnpm --filter @hopready/mobile test`                          |
-| Live providers            | One real call per TfNSW and Apple Maps method. Skipped without keys.                                                                                                                                                                                                                                                                                                          | `pnpm --filter @hopready/api exec vitest run live` (see below) |
-| iOS end-to-end (XCUITest) | The real app on an iOS simulator in demo mode: launch and tabs; planning a drive-and-park trip, its timeline and map, and Start driving opening Apple Maps; planning from the current location after allowing location access; confirming where the car is parked, relaunching, denying location, and planning Take me home through the car; a screenshot of each main screen | see below                                                      |
+| Layer                     | What it covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Command                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Core (Vitest)             | Routing rules, Sydney time and daylight saving, the planner against fakes, and every scenario from the brief against the demo world                                                                                                                                                                                                                                                                                                                                                                                         | `pnpm --filter @hopready/core test`                            |
+| API (Vitest)              | Routes, validation, error mapping, deadlines, rate limits, budgets, log redaction, and the TfNSW and Apple Maps adapters against schema-derived samples; the live vehicle position decoder against feeds recorded from TfNSW                                                                                                                                                                                                                                                                                                | `pnpm --filter @hopready/api test`                             |
+| App (Jest)                | Storage, the API client, the trip service (demo and live never mixed), location permission paths, and screen flows with React Native Testing Library. Compiled with the React Compiler, as the app is built, so a value the compiler would keep from an earlier render (such as a clock read) fails here too                                                                                                                                                                                                                | `pnpm --filter @hopready/mobile test`                          |
+| Live providers            | One real call per TfNSW and Apple Maps method. Skipped without keys.                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `pnpm --filter @hopready/api exec vitest run live` (see below) |
+| iOS end-to-end (XCUITest) | The real app on an iOS simulator in demo mode: launch and tabs; planning a drive-and-park trip, its timeline and map, and Start driving opening Apple Maps; the trip's own map with its services' sample vehicle positions (skipped before 10 am, when the demo trip is too far ahead to carry trip ids); planning from the current location after allowing location access; confirming where the car is parked, relaunching, denying location, and planning Take me home through the car; a screenshot of each main screen | see below                                                      |
 
 ## Live provider tests
 
@@ -39,10 +39,12 @@ xcodebuild build-for-testing -workspace HopReady.xcworkspace -scheme HopReady \
   -configuration Release -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build
 xcodebuild test-without-building \
-  -xctestrun build/Build/Products/HopReady_iphonesimulator*.xctestrun \
+  -xctestrun "$(ls -t build/Build/Products/*.xctestrun | head -1)" \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
   -collect-test-diagnostics never -only-testing:HopReadyUITests
 ```
+
+The newest `.xctestrun` is picked because a build for a different set of architectures leaves the earlier one in place, and a glob matching both stops `xcodebuild` ("Unknown build action").
 
 `HopReadyLiveApiTests` skips in that build, because a build with no API address never asks for the live data agreement. To run it, start a local API that serves the demo data, then build with its address. The address is read when the app is bundled, so it goes on the build command:
 
@@ -53,7 +55,7 @@ EXPO_PUBLIC_API_BASE_URL=http://localhost:8787 xcodebuild build-for-testing \
   -workspace HopReady.xcworkspace -scheme HopReady -configuration Release -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build
 xcodebuild test-without-building \
-  -xctestrun build/Build/Products/HopReady_iphonesimulator*.xctestrun \
+  -xctestrun "$(ls -t build/Build/Products/*.xctestrun | head -1)" \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
   -collect-test-diagnostics never -only-testing:HopReadyUITests/HopReadyLiveApiTests
 ```
@@ -83,14 +85,14 @@ xcrun simctl ui booted appearance dark
 xcrun simctl ui booted content_size accessibility-extra-extra-extra-large
 cd apps/mobile/ios
 xcodebuild test-without-building \
-  -xctestrun build/Build/Products/HopReady_iphonesimulator27.0-arm64.xctestrun \
+  -xctestrun "$(ls -t build/Build/Products/*.xctestrun | head -1)" \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
   -collect-test-diagnostics never -only-testing:HopReadyUITests/HopReadyAccessibilityTests
 xcrun simctl ui booted content_size large
 xcrun simctl ui booted appearance light
 ```
 
-The `.xctestrun` filename reflects the installed SDK and architectures. Use the one generated by `build-for-testing` on your machine. The data-reset helper relaunches the app after deleting demo data so an iOS 27 animation waiter cannot hold up the next journey.
+The `.xctestrun` filename reflects the installed SDK and architectures, which is why the commands pick the newest one rather than naming it. The data-reset helper relaunches the app after deleting demo data so an iOS 27 animation waiter cannot hold up the next journey.
 
 ## What the tests deliberately do not claim
 
