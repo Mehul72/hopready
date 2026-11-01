@@ -232,3 +232,77 @@ describe('budget guard and counted fetch together', () => {
     expect(guarded.name).toBe('tfnsw-trip-planner');
   });
 });
+
+describe('DailyCallBudget when the ledger never answers', () => {
+  // On Workers the day's first sync ends, unsettled, with the request that started it, if that
+  // request is cancelled. A ledger whose answer never comes stands in for that here.
+  function silentLedger() {
+    const calls: number[] = [];
+    const ledger: BudgetLedger = {
+      add: vi.fn((_budget: BudgetName, _day: string, callsReported: number) => {
+        calls.push(callsReported);
+        return new Promise<number>(() => undefined);
+      }),
+    };
+    return { ledger, calls };
+  }
+
+  it('holds a check up for at most 1.5 s, then goes on with the isolate’s own count', async () => {
+    vi.useFakeTimers();
+    try {
+      const { subject } = budget({ dailyLimit: 10, ledger: silentLedger().ledger });
+      let decided = false;
+      const check = subject.ensureAvailable('tfnsw-trip-planner').then(() => {
+        decided = true;
+      });
+      await vi.advanceTimersByTimeAsync(1_499);
+      expect(decided).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await check;
+      expect(decided).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts the first sync again once the lost one is 10 s old', async () => {
+    vi.useFakeTimers();
+    try {
+      const { ledger } = silentLedger();
+      const { subject, clock } = budget({ dailyLimit: 10, ledger });
+      const first = subject.ensureAvailable('tfnsw-trip-planner');
+      await vi.advanceTimersByTimeAsync(1_500);
+      await first;
+      expect(ledger.add).toHaveBeenCalledTimes(1);
+
+      const soon = subject.ensureAvailable('tfnsw-trip-planner');
+      await vi.advanceTimersByTimeAsync(1_500);
+      await soon;
+      expect(ledger.add).toHaveBeenCalledTimes(1);
+
+      clock.advanceMs(10_001);
+      const later = subject.ensureAvailable('tfnsw-trip-planner');
+      await vi.advanceTimersByTimeAsync(1_500);
+      await later;
+      expect(ledger.add).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still refuses once the isolate’s own count reaches the limit', async () => {
+    vi.useFakeTimers();
+    try {
+      const { subject } = budget({ dailyLimit: 1, ledger: silentLedger().ledger });
+      const first = useOnce(subject);
+      await vi.advanceTimersByTimeAsync(1_500);
+      await first;
+      const refused = subject.ensureAvailable('tfnsw-trip-planner');
+      const outcome = expect(refused).rejects.toMatchObject({ failure: 'rate-limited' });
+      await vi.advanceTimersByTimeAsync(1_500);
+      await outcome;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

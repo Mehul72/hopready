@@ -210,6 +210,17 @@ describe('live mode', () => {
     expect(ledger.add).toHaveBeenCalledWith('tfnsw', '2026-10-26', 1);
   });
 
+  it('refuses live position fetches once the TfNSW budget itself is spent', async () => {
+    const { runtime, spies } = runtimeFor({ ...ALL_KEYS, TFNSW_DAILY_CALL_BUDGET: '1' });
+    const options = spies.createTfnswProviders.mock.calls[0]![0];
+
+    expect((await postJson(runtime.app, '/v1/plan', planRequest())).status).toBe(200);
+    await expect(options.beforeVehicleFetch?.()).rejects.toMatchObject({
+      provider: 'tfnsw-realtime',
+      failure: 'rate-limited',
+    });
+  });
+
   it('refuses live position fetches once the realtime cap is spent, leaving planning its share', async () => {
     const { runtime, spies } = runtimeFor({ ...ALL_KEYS, TFNSW_REALTIME_DAILY_CALL_BUDGET: '1' });
     const options = spies.createTfnswProviders.mock.calls[0]![0];

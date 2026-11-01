@@ -9,7 +9,7 @@ import {
   type VehicleLookup,
 } from '@hopready/core';
 
-import { callProvider, type LateOutcomeHandler } from '../../deadline';
+import { callProvider, runWithDeadline, type LateOutcomeHandler } from '../../deadline';
 import { asProviderError, type TfnswClient } from './client';
 import type { DiagnosticSink } from './diagnostics';
 import { decodeVehiclePositions, type VehicleFeed } from './gtfs-realtime';
@@ -36,6 +36,10 @@ export interface VehicleFeedLimits {
   maxWaitAfterFailureMs: number;
   // The feeds answered in 0.15 s on 2026-11-01; a fetch this slow is a stuck connection.
   timeoutMs: number;
+  // The longest a lookup waits on a fetch another request started, and the age past which that
+  // fetch is taken as lost. On Workers a fetch and its timers end with the request that started
+  // them, so a traveller who closes the map mid-fetch would otherwise leave it pending for good.
+  sharedFetchLimitMs: number;
   // The Sunday afternoon bus feed was 242 KB; this leaves room for a weekday peak many times larger.
   maxFeedBytes: number;
   // An older report says where a vehicle was, not where it is. Non-timetabled trains sit in the
@@ -49,6 +53,7 @@ export const DEFAULT_VEHICLE_FEED_LIMITS: VehicleFeedLimits = {
   waitAfterFailureMs: 15_000,
   maxWaitAfterFailureMs: 60_000,
   timeoutMs: 5_000,
+  sharedFetchLimitMs: 6_000,
   maxFeedBytes: 4 * 1024 * 1024,
   maxReportAgeMs: 30 * 60_000,
 };
@@ -69,9 +74,14 @@ interface FeedCopy {
   fetchedAtMs: number;
 }
 
+interface FeedFetch {
+  promise: Promise<FeedCopy>;
+  startedAtMs: number;
+}
+
 interface FeedState {
   copy: FeedCopy | null;
-  inFlight: Promise<FeedCopy> | null;
+  inFlight: FeedFetch | null;
   // No fetch before this time, after a failure.
   notBeforeMs: number;
 }
@@ -132,20 +142,40 @@ export class TfnswVehicleLocator implements VehicleLocator {
     if (state.copy && this.#nowMs() - state.copy.fetchedAtMs < this.#limits.freshForMs) {
       return state.copy;
     }
-    if (!state.inFlight && this.#nowMs() < state.notBeforeMs) return this.#usable(state.copy);
+    const nowMs = this.#nowMs();
+    const lost =
+      state.inFlight && nowMs - state.inFlight.startedAtMs > this.#limits.sharedFetchLimitMs;
+    if (lost) state.inFlight = null;
+    if (!state.inFlight && nowMs < state.notBeforeMs) return this.#usable(state.copy);
     // The shared fetch carries no single request's signal, so one traveller leaving cannot cancel
-    // it for the rest. Its own timeout bounds it.
-    state.inFlight ??= this.#fetch(mode, state).finally(() => {
-      state.inFlight = null;
-    });
+    // it for the rest. Each waiter bounds its own wait, with a timer of its own.
+    const attempt = state.inFlight ?? this.#startFetch(mode, state);
     try {
-      return await state.inFlight;
+      return await runWithDeadline(() => attempt.promise, {
+        deadlineMs: this.#limits.sharedFetchLimitMs,
+        onLateOutcome: () => undefined,
+      });
     } catch {
       return this.#usable(state.copy);
     }
   }
 
-  async #fetch(mode: FeedMode, state: FeedState): Promise<FeedCopy> {
+  #startFetch(mode: FeedMode, state: FeedState): FeedFetch {
+    const attempt: FeedFetch = {
+      promise: this.#fetch(mode, state, () => state.inFlight === attempt).finally(() => {
+        if (state.inFlight === attempt) state.inFlight = null;
+      }),
+      startedAtMs: this.#nowMs(),
+    };
+    // A fetch nobody waits for any more must not surface as an unhandled rejection.
+    attempt.promise.catch(() => undefined);
+    state.inFlight = attempt;
+    return attempt;
+  }
+
+  // `isCurrent` is false once a newer fetch has replaced this one; its failure then changes nothing,
+  // and its feed is kept only if it is newer than the copy held.
+  async #fetch(mode: FeedMode, state: FeedState, isCurrent: () => boolean): Promise<FeedCopy> {
     try {
       await this.#options.beforeFetch?.();
       const feed = await callProvider(
@@ -156,6 +186,9 @@ export class TfnswVehicleLocator implements VehicleLocator {
             path: VEHICLE_FEED_PATHS[mode],
             parse: decodeVehiclePositions,
             maxBytes: this.#limits.maxFeedBytes,
+            // The next refresh, 15 s later, is the retry; retrying here would double the calls a
+            // TfNSW outage costs.
+            retryOnce: false,
             signal,
           }),
         {
@@ -164,8 +197,8 @@ export class TfnswVehicleLocator implements VehicleLocator {
         },
       );
       const copy = { feed, fetchedAtMs: this.#nowMs() };
-      state.copy = copy;
-      state.notBeforeMs = 0;
+      if (!state.copy || state.copy.fetchedAtMs <= copy.fetchedAtMs) state.copy = copy;
+      if (isCurrent()) state.notBeforeMs = 0;
       if (feed.skipped > 0) {
         this.#options.report({
           kind: 'vehicles-dropped',
@@ -176,7 +209,7 @@ export class TfnswVehicleLocator implements VehicleLocator {
       return copy;
     } catch (error) {
       const failure = asProviderError(error, PROVIDER);
-      state.notBeforeMs = this.#nowMs() + this.#waitAfter(failure);
+      if (isCurrent()) state.notBeforeMs = this.#nowMs() + this.#waitAfter(failure);
       this.#options.report({
         kind: 'vehicle-feed-unavailable',
         feed: mode,

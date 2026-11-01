@@ -281,8 +281,12 @@ Sydney Trains' does. `observedAt` is when the vehicle reported the position. `se
 TfNSW key (503 `not-configured`).
 
 Each isolate keeps one decoded copy of each feed, fetched only when asked for and at most once
-every 15 seconds. After a failed fetch it waits 15 seconds, or as long as TfNSW's `Retry-After` asks
-up to a minute, and answers from its last copy while that is under two minutes old.
+every 15 seconds, without a retry (the next refresh is the retry). After a failed fetch it waits 15
+seconds, or as long as TfNSW's `Retry-After` asks up to a minute, and answers from its last copy while
+that is under two minutes old. A lookup waits at most 6 seconds on a fetch another request started:
+on Workers a fetch ends with the request that began it, so one still pending after 6 seconds is
+taken as lost and replaced. A feed with no header time (an empty body, an error page) is refused
+rather than read as a network with no vehicles.
 
 ### `GET /v1/carparks`
 
@@ -397,7 +401,9 @@ that has started may finish its requests, so the count can pass the budget by wh
 
 On Workers the count is shared through the `ProviderBudget` Durable Object (SQLite storage, placed
 in Oceania). Each isolate checks its in-memory count, learns the shared total on its first check
-of the day, and reports its requests after each response. Isolates can overshoot by the requests
+of the day, and reports its requests after each response. A check waits at most 1.5 seconds for
+that first total and otherwise goes on with the isolate's own count; a first sync still pending
+after 10 seconds, lost with a cancelled request, is started again. Isolates can overshoot by the requests
 they send between reports. On Node the process count is the whole count.
 
 ## Logging and privacy

@@ -1,5 +1,5 @@
 import { ProviderError, type TrackedService, type VehicleLookup } from '@hopready/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { FetchImplementation } from '../http';
 import { createTfnswClient } from './client';
@@ -27,7 +27,10 @@ interface Harness {
   respond: (handler: (path: string) => Response | Promise<Response>) => void;
 }
 
-function harness(options: Partial<TfnswVehicleLocatorOptions> = {}): Harness {
+function harness(
+  options: Partial<TfnswVehicleLocatorOptions> = {},
+  gate = new RateGate({ requestsPerSecond: 100 }),
+): Harness {
   let nowMs = FEED_TIME_MS + 5_000;
   const fetches: string[] = [];
   const diagnostics: TfnswDiagnostic[] = [];
@@ -41,7 +44,7 @@ function harness(options: Partial<TfnswVehicleLocatorOptions> = {}): Harness {
   const locator = new TfnswVehicleLocator({
     client: createTfnswClient({
       apiKey: 'test-key-0123456789abcdef',
-      gate: new RateGate({ requestsPerSecond: 100 }),
+      gate,
       fetchImpl,
     }),
     clock: { now: () => new Date(nowMs) },
@@ -150,8 +153,8 @@ describe('TfnswVehicleLocator', () => {
 
     advance(DEFAULT_VEHICLE_FEED_LIMITS.usableForMs);
     expect(statusesOf(await locator.locate([BUS_380], signal))).toEqual(['unavailable']);
-    // The first fetch, then two refreshes of a try and one retry each.
-    expect(fetches).toHaveLength(5);
+    // The first fetch, then one try per refresh: the next refresh is the retry.
+    expect(fetches).toHaveLength(3);
   });
 
   it('leaves a failed feed alone for 15 seconds instead of trying on every lookup', async () => {
@@ -171,14 +174,67 @@ describe('TfnswVehicleLocator', () => {
   });
 
   it('waits as long as TfNSW asks after a rate limit, up to a minute', async () => {
-    const { locator, fetches, advance, respond } = harness();
+    // The gate's own hold uses real time; with it out of the way, only the locator's wait counts.
+    const gate = new RateGate({ requestsPerSecond: 100 });
+    vi.spyOn(gate, 'holdFor').mockImplementation(() => undefined);
     const signal = new AbortController().signal;
-    respond(() => new Response(null, { status: 429, headers: { 'Retry-After': '600' } }));
+    for (const [retryAfterSeconds, expectedWaitMs] of [
+      [30, 30_000],
+      [600, DEFAULT_VEHICLE_FEED_LIMITS.maxWaitAfterFailureMs],
+    ] as const) {
+      const { locator, fetches, advance, respond } = harness({}, gate);
+      respond(
+        () =>
+          new Response(null, {
+            status: 429,
+            headers: { 'Retry-After': String(retryAfterSeconds) },
+          }),
+      );
+      await locator.locate([BUS_380], signal);
+      advance(expectedWaitMs - 1);
+      await locator.locate([BUS_380], signal);
+      expect(fetches).toHaveLength(1);
+      advance(1);
+      await locator.locate([BUS_380], signal);
+      expect(fetches).toHaveLength(2);
+    }
+  });
 
-    await locator.locate([BUS_380], signal);
-    advance(DEFAULT_VEHICLE_FEED_LIMITS.maxWaitAfterFailureMs - 1);
-    await locator.locate([BUS_380], signal);
-    expect(fetches).toHaveLength(1);
+  it('stops waiting on a fetch another request started once it is overdue, and replaces it', async () => {
+    // On Workers a fetch dies with the request that started it; a hung budget check stands in here.
+    let calls = 0;
+    const { locator, fetches, advance } = harness({
+      beforeFetch: () => {
+        calls += 1;
+        return calls === 1 ? new Promise<void>(() => undefined) : Promise.resolve();
+      },
+      limits: { sharedFetchLimitMs: 30 },
+    });
+    const signal = new AbortController().signal;
+
+    expect(statusesOf(await locator.locate([BUS_380], signal))).toEqual(['unavailable']);
+    expect(fetches).toEqual([]);
+
+    advance(31);
+    expect(statusesOf(await locator.locate([BUS_380], signal))).toEqual(['located']);
+    expect(calls).toBe(2);
+    expect(fetches).toEqual([VEHICLE_FEED_PATHS.bus]);
+  });
+
+  it('lets a lookup join a fetch still within its time rather than start another', async () => {
+    let release = () => undefined as void;
+    const { locator, fetches, advance } = harness({
+      beforeFetch: () => new Promise<void>((resolve) => (release = resolve)),
+      limits: { sharedFetchLimitMs: 5_000 },
+    });
+    const signal = new AbortController().signal;
+    const first = locator.locate([BUS_380], signal);
+    advance(1_000);
+    const second = locator.locate([BUS_380], signal);
+    release();
+    expect(statusesOf(await first)).toEqual(['located']);
+    expect(statusesOf(await second)).toEqual(['located']);
+    expect(fetches).toEqual([VEHICLE_FEED_PATHS.bus]);
   });
 
   it('refuses a feed larger than the cap', async () => {

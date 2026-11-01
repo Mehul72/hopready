@@ -36,6 +36,8 @@ export interface TfnswBinaryRequest<T> {
   path: string;
   parse: (body: Uint8Array) => T;
   maxBytes: number;
+  // One retry after a network failure or a 5xx, as JSON requests get, unless the caller polls anyway.
+  retryOnce?: boolean;
   signal: AbortSignal;
 }
 
@@ -141,7 +143,7 @@ export function createTfnswClient(options: TfnswClientOptions): TfnswClient {
           signal: request.signal,
           parse: request.parse,
           maxBytes: request.maxBytes,
-          retryOnce: true,
+          retryOnce: request.retryOnce ?? true,
           classifyFailure: classifyTfnswFailure,
           fetchImpl,
         }),

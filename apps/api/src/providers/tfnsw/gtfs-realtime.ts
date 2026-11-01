@@ -170,6 +170,10 @@ export function decodeVehiclePositions(feed: Uint8Array): VehicleFeed {
     }
   }
 
+  // TfNSW stamps every snapshot. An empty body or one with no time is an error page or a cut-off
+  // answer, not a network with no vehicles, and must not replace a good copy.
+  if (feedTimestampMs === null) throw new GtfsRealtimeDecodeError('The feed has no header time');
+
   const fixes = new Map<string, VehicleFix>();
   let skipped = 0;
   for (const vehicle of vehicles) {

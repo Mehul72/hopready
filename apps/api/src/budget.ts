@@ -1,5 +1,7 @@
 import { ProviderError, type Clock, type ProviderName } from '@hopready/core';
 
+import { DeadlineExceededError, runWithDeadline } from './deadline';
+
 // One budget per provider account, because the provider's daily quota is per account or key.
 // tfnsw-realtime is a cap inside tfnsw: live vehicle positions are polled while maps are open, and
 // must never use up the calls trip planning needs. Its requests count against both.
@@ -10,6 +12,12 @@ export const MAX_CALLS_PER_LEDGER_REPORT = 10_000;
 export type BudgetName = (typeof BUDGET_NAMES)[number];
 
 const MS_PER_DAY = 86_400_000;
+// The longest a check waits for the shared count. A slower ledger is not waited for: the isolate
+// carries on with its own count, as when the ledger fails, and uses the answer when it lands.
+const FIRST_SYNC_WAIT_MS = 1_500;
+// A first sync still pending after this is taken as lost and started again. On Workers it ends,
+// unsettled, with the request that started it, such as a trip map closed mid-request.
+const FIRST_SYNC_LOST_MS = 10_000;
 
 // Budget days follow UTC dates. Neither provider documents when its daily quota resets, so the
 // defaults stay well under the documented quotas instead of relying on a particular reset time.
@@ -59,7 +67,7 @@ export class DailyCallBudget {
   readonly dailyLimit: number;
   readonly #options: DailyCallBudgetOptions;
   #day: BudgetDay;
-  #firstSync: Promise<void> | null = null;
+  #firstSync: { done: Promise<void>; startedAtMs: number } | null = null;
 
   constructor(options: DailyCallBudgetOptions) {
     this.name = options.name;
@@ -72,7 +80,7 @@ export class DailyCallBudget {
   async ensureAvailable(provider: ProviderName): Promise<void> {
     let day = this.#today();
     if (this.#options.ledger && !day.synced) {
-      await this.#syncOnce(day);
+      await this.#waitForFirstSync(day);
       day = this.#today();
     }
     if (this.#knownTotal(day) < this.dailyLimit) return;
@@ -146,21 +154,35 @@ export class DailyCallBudget {
     };
   }
 
-  // Learns the shared total once per isolate and day. If the ledger cannot answer, the isolate
-  // carries on with its own count and tries again on the next flush.
-  #syncOnce(day: BudgetDay): Promise<void> {
+  // Learns the shared total once per isolate and day, shared by every check that arrives meanwhile.
+  // Each check waits for it with a timer of its own, so a sync lost with another request's ending
+  // cannot hold this one up. If the ledger cannot answer, the isolate carries on with its own count
+  // and tries again on the next flush.
+  async #waitForFirstSync(day: BudgetDay): Promise<void> {
     const ledger = this.#options.ledger;
-    if (!ledger) return Promise.resolve();
-    this.#firstSync ??= ledger.add(this.name, day.key, 0).then(
-      (total) => {
-        day.sharedTotal = Math.max(day.sharedTotal, total);
-        day.synced = true;
-      },
-      (error: unknown) => {
-        day.synced = true;
-        this.#options.onLedgerError(error);
-      },
-    );
-    return this.#firstSync;
+    if (!ledger) return;
+    const nowMs = this.#options.clock.now().getTime();
+    if (!this.#firstSync || nowMs - this.#firstSync.startedAtMs > FIRST_SYNC_LOST_MS) {
+      const done = ledger.add(this.name, day.key, 0).then(
+        (total) => {
+          day.sharedTotal = Math.max(day.sharedTotal, total);
+          day.synced = true;
+        },
+        (error: unknown) => {
+          day.synced = true;
+          this.#options.onLedgerError(error);
+        },
+      );
+      this.#firstSync = { done, startedAtMs: nowMs };
+    }
+    const { done } = this.#firstSync;
+    try {
+      await runWithDeadline(() => done, {
+        deadlineMs: FIRST_SYNC_WAIT_MS,
+        onLateOutcome: () => undefined,
+      });
+    } catch (error) {
+      if (!(error instanceof DeadlineExceededError)) throw error;
+    }
   }
 }

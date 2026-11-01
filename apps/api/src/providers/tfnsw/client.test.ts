@@ -262,6 +262,22 @@ describe('createTfnswClient getBytes', () => {
     expect(holdFor).toHaveBeenCalledWith(20_000);
   });
 
+  it('makes one attempt when the caller polls anyway', async () => {
+    const fetchImpl = fakeFetch(() => new Response(null, { status: 503 }));
+    const error = await errorFrom(
+      clientWith(fetchImpl).getBytes({
+        provider: 'tfnsw-realtime',
+        path: '/v1/gtfs/vehiclepos/buses',
+        parse: (body) => body.length,
+        maxBytes: 1_000,
+        retryOnce: false,
+        signal: neverAborted(),
+      }),
+    );
+    expect(error.failure).toBe('unavailable');
+    expect(fetchImpl.requests).toHaveLength(1);
+  });
+
   it('shares the gate with JSON calls', async () => {
     const fetchImpl = fakeFetch((url) =>
       url.pathname.includes('gtfs')

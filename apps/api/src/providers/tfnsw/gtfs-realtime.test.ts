@@ -80,10 +80,9 @@ describe('decodeVehiclePositions on built feeds', () => {
     expect(feed.fixes.get('a')?.observedAtMs).toBe(1_000_000);
   });
 
-  it('leaves out a vehicle with no time at all, no trip, or no usable position', () => {
+  it('leaves out a vehicle with no trip or no usable position', () => {
     const feed = decodeVehiclePositions(
       syntheticVehicleFeed([
-        { tripId: 'no-time', ...at },
         { ...at, timestampSeconds: 5 },
         { tripId: 'null-island', lat: 0, lon: 0, timestampSeconds: 5 },
         { tripId: 'no-position', timestampSeconds: 5 },
@@ -91,18 +90,20 @@ describe('decodeVehiclePositions on built feeds', () => {
       ]),
     );
     expect([...feed.fixes.keys()]).toEqual(['kept']);
-    expect(feed.skipped).toBe(4);
+    expect(feed.skipped).toBe(3);
   });
 
-  it('keeps the later of two reports for one trip', () => {
-    const feed = decodeVehiclePositions(
-      syntheticVehicleFeed([
-        { tripId: 'a', lat: -33.8, lon: 151.1, timestampSeconds: 20 },
-        { tripId: 'a', lat: -33.9, lon: 151.2, timestampSeconds: 10 },
-      ]),
-    );
-    expect(feed.fixes.get('a')?.observedAtMs).toBe(20_000);
-    expect(feed.fixes.get('a')?.position.lat).toBeCloseTo(-33.8, 5);
+  it('keeps the later of two reports for one trip, whichever comes first', () => {
+    const earlier = { tripId: 'a', lat: -33.9, lon: 151.2, timestampSeconds: 10 };
+    const later = { tripId: 'a', lat: -33.8, lon: 151.1, timestampSeconds: 20 };
+    for (const order of [
+      [later, earlier],
+      [earlier, later],
+    ]) {
+      const feed = decodeVehiclePositions(syntheticVehicleFeed(order));
+      expect(feed.fixes.get('a')?.observedAtMs).toBe(20_000);
+      expect(feed.fixes.get('a')?.position.lat).toBeCloseTo(-33.8, 5);
+    }
   });
 
   it('ignores a deleted vehicle', () => {
@@ -142,19 +143,35 @@ describe('decodeVehiclePositions on built feeds', () => {
       ...[0x51, 1, 2, 3, 4, 5, 6, 7, 8], // field 10 as fixed64
       ...protobufVarint(5, 7),
     ];
+    const header = protobufBytes(1, protobufVarint(3, 1_000));
     const feed = decodeVehiclePositions(
-      new Uint8Array([...protobufBytes(2, protobufBytes(4, vehicle)), ...protobufVarint(99, 1)]),
+      new Uint8Array([
+        ...header,
+        ...protobufBytes(2, protobufBytes(4, vehicle)),
+        ...protobufVarint(99, 1),
+      ]),
     );
     expect(feed.fixes.size).toBe(0);
     expect(feed.skipped).toBe(1);
   });
 
-  it('reads an empty feed as no vehicles', () => {
-    expect(decodeVehiclePositions(new Uint8Array(0))).toEqual({
-      feedTimestampMs: null,
+  it('reads a stamped feed with no vehicles as a network with none running', () => {
+    expect(decodeVehiclePositions(syntheticVehicleFeed([]))).toEqual({
+      feedTimestampMs: 1_793_504_502_000,
       fixes: new Map(),
       skipped: 0,
     });
+  });
+
+  it('refuses an empty body or a feed with no time, which cannot be told from an error page', () => {
+    expect(() => decodeVehiclePositions(new Uint8Array(0))).toThrow(GtfsRealtimeDecodeError);
+    expect(() =>
+      decodeVehiclePositions(
+        syntheticVehicleFeed([{ tripId: 'a', lat: -33.87, lon: 151.21, timestampSeconds: 5 }], {
+          headerTimestampSeconds: null,
+        }),
+      ),
+    ).toThrow(GtfsRealtimeDecodeError);
   });
 });
 

@@ -118,15 +118,20 @@ export function syntheticVehicleEntity(index: number, vehicle: SyntheticVehicle)
   ]);
 }
 
+// The feed's own time unless the test asks for a header without one (null).
+export const SYNTHETIC_FEED_TIME_SECONDS = 1_793_504_502;
+
 export function syntheticVehicleFeed(
   vehicles: readonly SyntheticVehicle[],
-  options: { headerTimestampSeconds?: number } = {},
+  options: { headerTimestampSeconds?: number | null } = {},
 ): Uint8Array<ArrayBuffer> {
+  const headerTimestampSeconds =
+    options.headerTimestampSeconds === undefined
+      ? SYNTHETIC_FEED_TIME_SECONDS
+      : options.headerTimestampSeconds;
   const header = protobufBytes(1, [
     ...protobufBytes(1, utf8('2.0')),
-    ...(options.headerTimestampSeconds === undefined
-      ? []
-      : protobufVarint(3, options.headerTimestampSeconds)),
+    ...(headerTimestampSeconds === null ? [] : protobufVarint(3, headerTimestampSeconds)),
   ]);
   return new Uint8Array([
     ...header,
