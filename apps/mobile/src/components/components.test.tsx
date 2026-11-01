@@ -20,7 +20,9 @@ import { ModeIcon } from './mode-icon';
 import { SegmentedControl } from './segmented-control';
 import { Stepper } from './stepper';
 import { TimingBadge } from './timing-badge';
-import { TripMap } from './trip-map';
+import { createRef } from 'react';
+
+import { TripMap, type TripMapHandle, type VehicleMarker } from './trip-map';
 
 describe('Disclosure', () => {
   it('announces its state and only exposes its controls while expanded', async () => {
@@ -344,5 +346,55 @@ describe('TripMap', () => {
 
     expect(map).toHaveProp('scrollEnabled', false);
     expect(map).toHaveProp('zoomEnabled', false);
+  });
+});
+
+describe('TripMap with live vehicles', () => {
+  const itinerary = parkAndRideItinerary({ departAt: '2026-10-26T21:00:00.000Z' });
+  const bus: VehicleMarker = {
+    key: 'bus|2703224|3',
+    mode: 'bus',
+    coordinate: { lat: -33.892, lon: 151.25 },
+    bearingDegrees: 78,
+    accessibilityLabel: 'Bus 380. Updated 20 seconds ago',
+    onPreviousTrip: false,
+  };
+
+  it('labels each vehicle for VoiceOver after the trip’s own markers', async () => {
+    await render(<TripMap itinerary={itinerary} vehicles={[bus]} />);
+    const labels = screen
+      .getAllByTestId('map-marker')
+      .map((marker) => marker.props.accessibilityLabel);
+    expect(labels.at(-1)).toBe('Bus 380. Updated 20 seconds ago');
+  });
+
+  it('leaves vehicles out of the framing, so an update never moves the camera', async () => {
+    const { rerender } = await render(<TripMap itinerary={itinerary} vehicles={[bus]} />);
+    const framedTimes = fitToCoordinates.mock.calls.length;
+    const framed = fitToCoordinates.mock.calls.at(-1)?.[0] as { latitude: number }[];
+    expect(framed.some((point) => point.latitude === bus.coordinate.lat)).toBe(false);
+
+    await rerender(
+      <TripMap
+        itinerary={itinerary}
+        vehicles={[{ ...bus, coordinate: { lat: -33.893, lon: 151.252 } }]}
+      />,
+    );
+    expect(fitToCoordinates.mock.calls.length).toBe(framedTimes);
+  });
+
+  it('moves the camera to a vehicle when asked', async () => {
+    const ref = createRef<TripMapHandle>();
+    await render(<TripMap ref={ref} itinerary={itinerary} vehicles={[bus]} />);
+    animateToRegion.mockClear();
+
+    ref.current?.showCoordinate(bus.coordinate);
+
+    expect(animateToRegion).toHaveBeenCalledWith({
+      latitude: -33.892,
+      longitude: 151.25,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    });
   });
 });

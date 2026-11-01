@@ -28,6 +28,7 @@ import {
   planResponse,
   transitItinerary,
 } from '@/test-support/trips';
+import { animateToRegion } from '@/test-support/mocks/react-native-maps';
 import { tripService } from '@/trip';
 
 import { APPLE_ATTRIBUTION, DEMO_ATTRIBUTION, TFNSW_ATTRIBUTION } from './data-attribution';
@@ -893,5 +894,40 @@ describe('a trip home after the car changes', () => {
     expect(screen.queryByRole('button', { name: 'Open the Car tab' })).not.toBeOnTheScreen();
     await userEvent.setup().press(screen.getByRole('button', { name: 'Open the Plan tab' }));
     expect(screen).toHavePathname('/');
+  });
+});
+
+describe('live vehicle positions', () => {
+  it('opens the map with where the trip’s services are, and moves to one when asked', async () => {
+    const itinerary = firstWithStrategy(await planDemoCommute(), 'transit-only');
+    const legIndex = itinerary.legs.findIndex((leg) => leg.kind === 'transit');
+    const firstService = itinerary.legs[legIndex];
+    if (firstService?.kind !== 'transit') throw new Error('Expected a public transport leg');
+    expect(firstService.realtimeTripId).not.toBeNull();
+    // A minute after the first service leaves, the demo timetable has its vehicle between stops.
+    freezeClockAt(new Date(Date.parse(firstService.start) + 60_000));
+    await renderApp(`/itinerary/${itinerary.id}`);
+
+    await userEvent.setup().press(screen.getByTestId('see-live-positions'));
+
+    expect(await screen.findByTestId('live-positions')).toBeOnTheScreen();
+    expect(screen.getByText('Sample positions from the demo timetable')).toBeOnTheScreen();
+    const row = screen.getByTestId(`live-position-${legIndex}`);
+    await waitFor(() => expect(row).toHaveTextContent(/Sample position · Updated just now/));
+    // The map carries a marker for the vehicle, read the same way as its row.
+    expect(
+      within(screen.getByTestId('full-map')).getByLabelText(/Sample position\. Updated just now$/),
+    ).toBeOnTheScreen();
+
+    animateToRegion.mockClear();
+    await userEvent.setup().press(row);
+    expect(animateToRegion).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no live map for a trip with no public transport', async () => {
+    const driveOnly = firstWithStrategy(await planDemoCommute(), 'drive-only');
+    await renderApp(`/itinerary/${driveOnly.id}`);
+    expect(screen.getByTestId('itinerary-screen')).toBeOnTheScreen();
+    expect(screen.queryByTestId('see-live-positions')).toBeNull();
   });
 });

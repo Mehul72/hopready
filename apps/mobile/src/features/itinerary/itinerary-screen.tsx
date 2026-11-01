@@ -6,6 +6,7 @@ import { planSession } from '@/state';
 import { appStorage, isSamePlace, useFavouriteRoutes } from '@/storage';
 import { SPACING } from '@/theme';
 import { useTripHomeOutOfDate } from '@/trip';
+import { trackedLegsOf } from '@/trip/vehicle-positions';
 
 import { concernSummaries } from '../results/route-summary';
 import { routeLabelFor } from '../saved/place-labels';
@@ -20,6 +21,7 @@ import { useCurrentMinute } from './use-current-minute';
 import { type DisplayedTrip, useDisplayedTrip } from './use-displayed-trip';
 import { useStaleCheckAt } from './use-stale-check-at';
 import { useStartDriving } from './use-start-driving';
+import { hasLiveMap, liveMapLinkLabel } from './vehicle-text';
 
 const MAP_MIN_HEIGHT = 180;
 const MAP_MAX_HEIGHT = 280;
@@ -196,6 +198,7 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
   if (!trip) return <TripNotFound />;
 
   const { itinerary } = trip;
+  const trackedLegs = trackedLegsOf(itinerary, nowMs);
   const lastLeg = itinerary.legs[itinerary.legs.length - 1];
   const legAlertIds = new Set(
     itinerary.legs
@@ -250,6 +253,18 @@ export function ItineraryScreen({ itineraryId }: { itineraryId: string }) {
         style={{ height: mapHeight }}>
         <TripMap itinerary={itinerary} interactive={false} style={styles.fill} />
       </MapCard>
+      {hasLiveMap(trackedLegs) ? (
+        <Button
+          variant="secondary"
+          symbol="location.fill"
+          label={liveMapLinkLabel(trackedLegs)}
+          accessibilityHint="Opens the map with where each vehicle is now"
+          onPress={() =>
+            router.navigate({ pathname: '/map', params: { for: 'trip', id: itineraryId } })
+          }
+          testID="see-live-positions"
+        />
+      ) : null}
       <TripShortcuts trip={trip} />
       <AppText variant="title3" accessibilityRole="header" style={styles.heading}>
         Steps

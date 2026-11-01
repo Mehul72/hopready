@@ -1,11 +1,11 @@
-import type { Coordinate } from '@hopready/core';
+import type { Coordinate, TransitMode } from '@hopready/core';
 import { type SFSymbol, SymbolView } from 'expo-symbols';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import MapView, { type LatLng, Marker, Polyline, type Region } from 'react-native-maps';
 
 import { useHasLocationPermission } from '@/location';
-import { useTheme } from '@/theme';
+import { LEG_VISUALS, useTheme } from '@/theme';
 
 import { AppText } from './app-text';
 import {
@@ -15,7 +15,28 @@ import {
   type TripMapContent,
 } from './trip-map-model';
 
+// A vehicle running one of the trip's services, where TfNSW's live feed last put it.
+export interface VehicleMarker {
+  key: string;
+  mode: TransitMode;
+  coordinate: Coordinate;
+  bearingDegrees: number | null;
+  // Spoken by VoiceOver: the service and how old the position is.
+  accessibilityLabel: string;
+  // Still finishing the trip before this one; drawn fainter.
+  onPreviousTrip: boolean;
+}
+
+export interface TripMapHandle {
+  // Moves the camera to a point, such as a vehicle the traveller asked to see.
+  showCoordinate: (coordinate: Coordinate) => void;
+}
+
 export type TripMapProps = TripMapContent & {
+  // Drawn over the trip but left out of its framing: the camera would otherwise move on every
+  // update and fight the traveller's panning.
+  vehicles?: readonly VehicleMarker[];
+  ref?: Ref<TripMapHandle>;
   style?: StyleProp<ViewStyle>;
   // Height of a sheet or panel covering the bottom of the map. The route is framed above it and
   // Apple's logo and legal link move up with it: they must stay visible (Apple DPLA Attachment 6).
@@ -66,6 +87,31 @@ export function regionFor(coordinates: readonly Coordinate[]): Region | undefine
   };
 }
 
+// The vehicle in its mode's colour with the mode's symbol, and a small arrow pointing the way it is
+// heading when the feed says. The symbol, not the colour, tells the modes apart, and the symbol's
+// colour on the mode colour is held to WCAG AA by the theme's contrast tests.
+function VehicleBadge({ vehicle }: { vehicle: VehicleMarker }) {
+  const { modeColours, onModeColour } = useTheme();
+  const fill = modeColours[vehicle.mode];
+  return (
+    <View style={[styles.vehicle, vehicle.onPreviousTrip && styles.previousTrip]}>
+      {vehicle.bearingDegrees === null ? null : (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.headingTrack,
+            { transform: [{ rotate: `${vehicle.bearingDegrees}deg` }] },
+          ]}>
+          <SymbolView name="arrowtriangle.up.fill" tintColor={fill} size={10} />
+        </View>
+      )}
+      <View style={[styles.badge, { backgroundColor: fill, borderColor: onModeColour }]}>
+        <SymbolView name={LEG_VISUALS[vehicle.mode].symbol} tintColor={onModeColour} size={14} />
+      </View>
+    </View>
+  );
+}
+
 function MarkerBadge({ kind }: { kind: MapMarkerKind }) {
   const { colours } = useTheme();
   if (kind === 'car-park') {
@@ -92,7 +138,15 @@ function MarkerBadge({ kind }: { kind: MapMarkerKind }) {
 // options, or a set of places. Show it on every screen that shows Apple drive times or Apple
 // search results: Apple's terms only allow that data next to an Apple map.
 export function TripMap(props: TripMapProps) {
-  const { style, bottomInset = 0, accessibilityLabel, interactive = true, testID } = props;
+  const {
+    style,
+    bottomInset = 0,
+    accessibilityLabel,
+    interactive = true,
+    testID,
+    vehicles = [],
+    ref,
+  } = props;
   const theme = useTheme();
   const mapRef = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -107,6 +161,13 @@ export function TripMap(props: TripMapProps) {
     if (itineraries) return buildMapModel({ itineraries, selectedItineraryId });
     return buildMapModel({ points: points ?? [] });
   }, [itinerary, itineraries, selectedItineraryId, points]);
+
+  useImperativeHandle(ref, () => ({
+    showCoordinate: (coordinate) => {
+      const region = regionFor([coordinate]);
+      if (region) mapRef.current?.animateToRegion(region);
+    },
+  }));
 
   // Re-frame whenever the content or the covered area changes; the map is a native view, so
   // this is synchronising with it rather than deriving React state.
@@ -170,6 +231,17 @@ export function TripMap(props: TripMapProps) {
             <MarkerBadge kind={item.kind} />
           </Marker>
         ))}
+        {vehicles.map((vehicle) => (
+          <Marker
+            // A stable key lets MapKit move the marker to its new position instead of redrawing it.
+            key={vehicle.key}
+            coordinate={toLatLng(vehicle.coordinate)}
+            anchor={{ x: 0.5, y: 0.5 }}
+            accessibilityLabel={vehicle.accessibilityLabel}
+            testID={`vehicle-${vehicle.key}`}>
+            <VehicleBadge vehicle={vehicle} />
+          </Marker>
+        ))}
       </MapView>
       {/* VoiceOver cannot describe drawn routes, so a summary sits over the map. It does not
           take touches, and the markers and Apple's legal link stay reachable by swiping. */}
@@ -197,5 +269,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  vehicle: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previousTrip: {
+    opacity: 0.6,
+  },
+  headingTrack: {
+    alignItems: 'center',
   },
 });
