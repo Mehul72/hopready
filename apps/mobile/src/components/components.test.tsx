@@ -405,6 +405,25 @@ describe('TripMap with live vehicles', () => {
     expect(arrow()).toHaveStyle({ transform: [{ rotate: '348deg' }] });
   });
 
+  it('remembers a turn made before any vehicle appeared, so the first arrow points true', async () => {
+    const { rerender } = await render(<TripMap itinerary={itinerary} vehicles={[]} />);
+    getCamera.mockResolvedValueOnce({
+      center: { latitude: -33.9, longitude: 151.2 },
+      heading: 90,
+      pitch: 0,
+      zoom: 12,
+    });
+    await act(async () => {
+      screen.getByTestId('map-view').props.onRegionChangeComplete();
+    });
+
+    await rerender(<TripMap itinerary={itinerary} vehicles={[bus]} />);
+
+    expect(screen.getByTestId(`vehicle-heading-${bus.key}`)).toHaveStyle({
+      transform: [{ rotate: '348deg' }],
+    });
+  });
+
   it('moves the camera to a vehicle when asked', async () => {
     const ref = createRef<TripMapHandle>();
     await render(<TripMap ref={ref} itinerary={itinerary} vehicles={[bus]} />);

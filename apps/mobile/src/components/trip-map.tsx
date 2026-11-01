@@ -224,9 +224,9 @@ export function TripMap(props: TripMapProps) {
         rotateEnabled={interactive}
         onMapReady={() => setMapReady(true)}
         onRegionChangeComplete={() => {
-          if (vehicles.length === 0) return;
-          // A camera that cannot be read leaves the arrows as they were; they are a hint, and the
-          // markers themselves stay in the right places.
+          // Read after every move, with or without vehicles, so an arrow first drawn after the map
+          // was turned points true. A camera that cannot be read leaves the arrows as they were;
+          // they are a hint, and the markers themselves stay in the right places.
           mapRef.current
             ?.getCamera()
             .then((camera) => setMapHeadingDegrees(camera.heading ?? 0))
