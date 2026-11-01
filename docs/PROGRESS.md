@@ -7,7 +7,7 @@ Read this first when picking the work up. Step-level plans are in docs/plans/, t
 - `main` carries everything, including live vehicle positions on the trip map (ADR-0013), merged from `feat/live-vehicles` on 2026-11-01 at the owner's request, by fast-forward and without a pull request.
 - TestFlight build 0.1.0 (10), from `d029a8c`, is with internal testers. Like every build so far it talks to the staging API, Worker `83f8055f`, which serves live positions.
 - After build 10, two fixes went in on the trip map: the live positions panel's height at the largest text sizes, and heading arrows drawn north-up when the map was turned before the first vehicle appeared. They reach phones with the next build.
-- The privacy page's live positions line reaches the web only once GitHub Pages is enabled (OWNER-ACTIONS item 14); until then the Pages workflow fails on every push to `site/`.
+- The support and privacy pages are live at https://mehul72.github.io/hopready/ (GitHub Pages enabled 2026-11-01), the same as `site/` on `main`, live positions line included.
 - Still open before public launch: the production API deploy, Workers Paid (OWNER-ACTIONS item 11), the Apple place ID question (item 22), and the on-device checklist in docs/release.md.
 
 ### Status on 2026-10-26, early afternoon AEDT
