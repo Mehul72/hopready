@@ -7,7 +7,12 @@ import {
   type Occupancy,
 } from '@hopready/core';
 
-import { callProvider, type LateOutcomeHandler } from './deadline';
+import {
+  callProvider,
+  runWithDeadline,
+  toProviderError,
+  type LateOutcomeHandler,
+} from './deadline';
 
 export interface CarParkWithOccupancy extends CarParkFacility {
   occupancy: Occupancy;
@@ -31,6 +36,10 @@ const OCCUPANCY_NOT_CHECKED: Occupancy = {
   reason: 'Space counts are checked when you plan a trip.',
 };
 
+// On Workers a fetch, and the timer bounding it, end with the request that started it. A request
+// joining that fetch waits this much longer than the fetch's own timeout, on a timer of its own.
+const SHARED_FETCH_GRACE_MS = 1_000;
+
 // Facilities for the "which car park did you use?" picker. One cached copy per isolate, and one
 // upstream fetch at a time however many requests arrive while it runs.
 export class CarParkCatalogue {
@@ -39,7 +48,7 @@ export class CarParkCatalogue {
   readonly #timeoutMs: number;
   readonly #onLateOutcome: LateOutcomeHandler;
   #cached: { listing: CarParkListing; expiresAtMs: number } | null = null;
-  #inFlight: Promise<CarParkListing> | null = null;
+  #inFlight: { listing: Promise<CarParkListing>; startedAtMs: number } | null = null;
 
   constructor(options: {
     clock: Clock;
@@ -58,11 +67,37 @@ export class CarParkCatalogue {
     if (this.#cached && nowMs < this.#cached.expiresAtMs) {
       return { listing: this.#cached.listing, cache: 'hit' };
     }
-    // The shared fetch carries no single request's signal, so one caller leaving cannot cancel it for the rest.
-    this.#inFlight ??= this.#fetch(provider).finally(() => {
-      this.#inFlight = null;
-    });
-    return { listing: await this.#inFlight, cache: 'miss' };
+    // The shared fetch carries no single request's signal, so one caller leaving cannot cancel it
+    // for the rest. One still pending past the waiting limit was lost with its request: replaced.
+    const limitMs = this.#timeoutMs + SHARED_FETCH_GRACE_MS;
+    if (this.#inFlight && nowMs - this.#inFlight.startedAtMs > limitMs) this.#inFlight = null;
+    const attempt = this.#inFlight ?? this.#start(provider, nowMs);
+    try {
+      const listing = await runWithDeadline(() => attempt.listing, {
+        deadlineMs: limitMs,
+        onLateOutcome: this.#onLateOutcome,
+      });
+      return { listing, cache: 'miss' };
+    } catch (error) {
+      throw toProviderError(error, provider.name);
+    }
+  }
+
+  #start(
+    provider: CarParkProvider,
+    nowMs: number,
+  ): { listing: Promise<CarParkListing>; startedAtMs: number } {
+    const attempt = {
+      listing: this.#fetch(provider).finally(() => {
+        if (this.#inFlight === attempt) this.#inFlight = null;
+      }),
+      startedAtMs: nowMs,
+    };
+    // A fetch nobody waits for any more must not surface as an unhandled rejection; its waiters
+    // already got their answer, and the next request starts afresh.
+    attempt.listing.catch(() => undefined);
+    this.#inFlight = attempt;
+    return attempt;
   }
 
   async #fetch(provider: CarParkProvider): Promise<CarParkListing> {
