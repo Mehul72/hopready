@@ -28,6 +28,9 @@ export function LivePositionsPanel({ rows, checkedAt, demo, onShow }: LivePositi
       : 'Live positions from Transport for NSW';
 
   return (
+    // Two fifths of the screen at most, heading included, so the map stays usable even at the
+    // largest text sizes; what does not fit scrolls. A third left room for only two services on
+    // the smallest iPhones at the default size.
     <View
       style={[
         styles.panel,
@@ -35,17 +38,19 @@ export function LivePositionsPanel({ rows, checkedAt, demo, onShow }: LivePositi
           backgroundColor: colours.surface,
           borderColor: colours.separator,
           paddingBottom: Math.max(bottom, SPACING.md),
+          maxHeight: height * 0.4,
         },
       ]}
       testID="live-positions">
-      <AppText variant="headline" accessibilityRole="header">
-        Live positions
-      </AppText>
-      <AppText variant="footnote" tone="secondary">
-        {caption}
-      </AppText>
-      {/* A third of the screen at most, so the map stays the larger part even at large text sizes. */}
-      <ScrollView style={{ maxHeight: height / 3 }}>
+      <ScrollView testID="live-positions-list">
+        <View style={styles.heading}>
+          <AppText variant="headline" accessibilityRole="header">
+            Live positions
+          </AppText>
+          <AppText variant="footnote" tone="secondary">
+            {caption}
+          </AppText>
+        </View>
         {rows.map((row) => (
           <ListRow
             key={row.key}
@@ -69,6 +74,9 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
+  },
+  heading: {
     gap: SPACING.xs,
+    marginBottom: SPACING.xs,
   },
 });
