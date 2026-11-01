@@ -74,6 +74,8 @@ Maestro is not used. Installing it was refused by the permission policy in the s
 
 ## Large text and dark appearance
 
+Reference captures include the [light planner](screenshots/01-plan.jpg), [dark planner](screenshots/dark/01-plan.jpg) and [dark results](screenshots/dark/02-results.jpg). They use the monochrome appearance introduced on 2026-11-01.
+
 `HopReadyAccessibilityTests` opens the timing and travel disclosures and checks the main action is reachable. Run it at the largest text size in dark appearance, inspect its four kept screenshots, then restore the simulator defaults:
 
 ```sh

@@ -41,12 +41,12 @@ const ROUTE = [
   }),
 ];
 
-const GRADIENT_TOP = [248, 249, 245];
-const GRADIENT_BOTTOM = [226, 231, 222];
-export const BRAND_COLOUR_HEX = '#3D6650';
-const ICON_BACKGROUND_HEX = '#F3F5EF';
-const MARK_COLOUR = [61, 102, 80];
-const DARK_MARK_COLOUR = [218, 229, 214];
+const GRADIENT_TOP = [255, 255, 255];
+const GRADIENT_BOTTOM = [255, 255, 255];
+export const BRAND_COLOUR_HEX = '#1C1C1C';
+const ICON_BACKGROUND_HEX = '#FFFFFF';
+const MARK_COLOUR = [28, 28, 28];
+const DARK_MARK_COLOUR = [245, 245, 245];
 
 function glyphSvg(colour = BRAND_COLOUR_HEX) {
   return `<svg width="${CANVAS}" height="${CANVAS}" viewBox="0 0 ${CANVAS} ${CANVAS}" fill="none" xmlns="http://www.w3.org/2000/svg">
