@@ -26,7 +26,7 @@ What is true, checked on 2026-11-01 (a live probe and a research workflow whose 
 
 1. The app shows, on a followed or viewed trip's full map, where the vehicles of that trip's own services are, polled every 15 s while the map is on screen and the app is in front. No other vehicles, no background updates.
 2. `POST /v1/vehicles` takes up to 8 services as `{ mode, realtimeTripId }` and answers each `located` (position, bearing or null, report time, whether the vehicle is still finishing its previous trip), `not-located`, `not-tracked` or `unavailable`. POST so what someone rides never sits in a URL; trip ids are never logged.
-3. Each Worker isolate keeps one decoded copy of each feed, fetched only when a lookup needs it and at most once every 15 s, one fetch at a time, with no retry. After a failure it waits 15 s, or TfNSW's `Retry-After` up to a minute, and answers from its last copy while that is under 2 minutes old. Each lookup waits at most 6 s on a fetch another request started, with its own timer, and a fetch pending longer is replaced; the daily budget's first sync is bounded the same way (1.5 s per check, restarted after 10 s).
+3. Each Worker isolate keeps one decoded copy of each feed, fetched only when a lookup needs it and at most once every 15 s while fetches finish (see the amendment under Consequences), one fetch at a time, with no retry. After a failure it waits 15 s, or TfNSW's `Retry-After` up to a minute, and answers from its last copy while that is under 2 minutes old. Each lookup waits at most 6 s on a fetch another request started, with its own timer, and a fetch pending longer is replaced; the daily budget's first sync is bounded the same way (1.5 s per check, restarted after 10 s).
 4. A decoder written for the purpose reads only the trip id, position, bearing, report time and TfNSW's prior-trip flag (extension 1007, field 4), with a 4 MB cap and a 5 s timeout.
 5. The mode picks the feed (bus, train, metro). Every other mode answers `not-tracked`, so the plan response did not change.
 6. Feed requests count against the TfNSW budget and a cap of their own (`TFNSW_REALTIME_DAILY_CALL_BUDGET`, 10,000 a day), checked before each fetch, so polling never takes the calls planning needs.
@@ -70,7 +70,7 @@ What is true, checked on 2026-11-01 (a live probe and a research workflow whose 
 ### Positive
 
 - "Where is my bus" works for Sydney buses, Sydney Trains and Metro from the trip map, in live and demo mode, with no change to how trips are planned.
-- TfNSW calls stay bounded however many people watch: at most four a minute per feed per isolate, inside a daily cap that leaves planning at least 40,000.
+- TfNSW calls stay bounded however many people watch: at most four a minute per feed per isolate, inside a daily cap that leaves planning at least 40,000. Amended 2026-11-01, after the review fix that replaces a lost shared fetch: while the requests that start fetches keep being cancelled before their fetch finishes, a feed can be fetched every 6 s, about ten a minute, still inside the cap.
 - A TfNSW feed outage shows as "could not get its position" per service, with the rest of the trip untouched.
 
 ### Negative

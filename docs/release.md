@@ -34,7 +34,7 @@ The app checks every API answer against a schema and refuses an answer it cannot
 Before the first upload, list `Frameworks/` inside the production build (`unzip -l HopReady.ipa | grep Frameworks/`). Apple requires a privacy manifest, and a signature, for SDKs on its list of commonly used third-party SDKs. HopReady removed `expo-image` so SDWebImage is no longer included. Hermes (`hermesvm.framework`) is also on Apple's list and the React Native build of it carries no manifest of its own; if App Store Connect answers the upload with ITMS-91061 naming it, update Expo and React Native to the latest patch release before working around it.
 
 1. Run `pnpm check` on the commit being built, and the XCUITest journeys on the iOS simulator (docs/testing.md).
-2. The production API is deployed, and `GET /v1/health` reports `transit`, `driving` and `carParks` as `configured`.
+2. The production API is deployed, and `GET /v1/health` reports `transit`, `driving`, `carParks`, `places` and `vehicles` as `configured`.
 3. `EXPO_PUBLIC_API_BASE_URL` for the production profile points at that API.
 4. Version and build number: `app.config.ts` version is set, and EAS auto-increments the build number (`appVersionSource: remote`).
 5. Build, then submit. Wait until App Store Connect shows the build as **Ready to Submit** or **Testing**, not **Processing**.
@@ -52,7 +52,8 @@ Before the first upload, list `Frameworks/` inside the production build (`unzip 
    - the largest text size;
    - VoiceOver on the results and trip screens.
    - an option over a limit (set the walking limit to 5 minutes): it is listed with a mark on the results and trip screens, not hidden;
-   - Car parks considered on the results screen, with a station and estimate for each car park.
+   - Car parks considered on the results screen, with a station and estimate for each car park;
+   - a trip with a bus, train or metro leaving within the hour: "See where your bus is" ("See where your train is", "See where your metro is", or "See where your services are" for a mix) on its timeline opens the map with a row for each service. A service TfNSW does not list yet reads "Not on its way yet" with no marker, which is expected: usual for a train or metro until its trip starts, and common for a bus. Once a row says "Updated", its marker is on the map and moves as new reports arrive, and tapping the row moves the map to it. A report over 5 minutes old reads "Last seen ... it may have moved since" with no marker, which is also expected.
 9. Do not invite external testers or submit for review without the owner's approval.
 
 Before the first public release, also:

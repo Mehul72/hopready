@@ -94,6 +94,29 @@ xcrun simctl ui booted appearance light
 
 The `.xctestrun` filename reflects the installed SDK and architectures, which is why the commands pick the newest one rather than naming it. The data-reset helper relaunches the app after deleting demo data so an iOS 27 animation waiter cannot hold up the next journey.
 
+The live map journey stops in the place search at the largest text size: the first result is so tall that its centre sits under the keyboard, inside the results list, where XCUITest's scrolling cannot reach it. The other journeys that search for a place were not tried at that size. To see a later screen at the largest size, run its journey at the default size and raise the text size from the Mac when the log shows the tap that opens it. This is how the live positions panel was checked in dark appearance on 2026-11-01:
+
+```sh
+cd apps/mobile/ios
+xcrun simctl ui booted content_size large
+xcrun simctl ui booted appearance dark
+script -q /dev/null xcodebuild test-without-building \
+  -xctestrun "$(ls -t build/Build/Products/*.xctestrun | head -1)" \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -collect-test-diagnostics never \
+  -resultBundlePath build/live-map-largest-text.xcresult \
+  -only-testing:HopReadyUITests/HopReadyJourneyTests/testTheTripMapShowsWhereItsServicesAre |
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+    case "$line" in *'Tap "see-live-positions" Button'*)
+      xcrun simctl ui booted content_size accessibility-extra-extra-extra-large ;;
+    esac
+  done
+xcrun simctl ui booted content_size large
+xcrun simctl ui booted appearance light
+```
+
+`script` runs `xcodebuild` in a terminal, so each log line can be acted on as it arrives; the switch landed about three seconds before the journey kept its screenshot, which `xcrun xcresulttool export attachments` takes out of the result bundle. If the journey skips because the demo trip has no trip id, the switch never happens; run it again a few minutes later. Keep the Mac awake for the run: a sleeping Mac stalls XCUITest for minutes at a time, and a tap can time out.
+
 ## What the tests deliberately do not claim
 
 - The TfNSW samples are built from the published schema, not recorded. Recorded responses replace them once a key exists (see `apps/api/src/providers/tfnsw/__fixtures__/README.md`).
