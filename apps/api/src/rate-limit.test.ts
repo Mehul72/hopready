@@ -38,6 +38,7 @@ describe('SlidingWindowRateLimiter', () => {
         plan: { limit: 1, periodSeconds: 60 },
         places: { limit: 1, periodSeconds: 60 },
         carparks: { limit: 1, periodSeconds: 60 },
+        vehicles: { limit: 1, periodSeconds: 60 },
         ip: { limit: 1, periodSeconds: 60 },
       },
     });
@@ -57,6 +58,7 @@ describe('SlidingWindowRateLimiter', () => {
         plan: { limit: 1, periodSeconds: 60 },
         places: { limit: 1, periodSeconds: 60 },
         carparks: { limit: 1, periodSeconds: 60 },
+        vehicles: { limit: 1, periodSeconds: 60 },
         ip: { limit: 1, periodSeconds: 60 },
       },
     });
@@ -78,7 +80,13 @@ describe('WorkersRateLimiter', () => {
     const plan = binding(false);
     const places = binding(true);
     const limiter = new WorkersRateLimiter({
-      bindings: { plan, places, carparks: binding(true), ip: binding(true) },
+      bindings: {
+        plan,
+        places,
+        carparks: binding(true),
+        vehicles: binding(true),
+        ip: binding(true),
+      },
       onLateOutcome: vi.fn(),
     });
 
@@ -96,7 +104,7 @@ describe('WorkersRateLimiter', () => {
   it('gives up on a binding that does not answer, so the app can let the request through', async () => {
     const stuck: RateLimitBinding = { limit: () => never() };
     const limiter = new WorkersRateLimiter({
-      bindings: { plan: stuck, places: stuck, carparks: stuck, ip: stuck },
+      bindings: { plan: stuck, places: stuck, carparks: stuck, vehicles: stuck, ip: stuck },
       onLateOutcome: vi.fn(),
       timeoutMs: 20,
     });

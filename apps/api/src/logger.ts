@@ -41,6 +41,8 @@ export interface LogFields {
   codes?: readonly number[];
   facilityIds?: readonly string[];
   ageHours?: number;
+  // Which live position feed, by mode ('bus', 'train', 'metro'). Never a trip id.
+  feed?: string;
 }
 
 export interface LogEntry {
@@ -129,6 +131,7 @@ const FIELD_SANITIZERS = {
   codes: numberList,
   facilityIds: textList,
   ageHours: finiteNumber,
+  feed: text,
 } satisfies Record<keyof LogFields, FieldSanitizer>;
 
 function isLogField(name: string): name is keyof LogFields {

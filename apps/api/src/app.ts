@@ -5,8 +5,12 @@ import {
   planTrip as corePlanTrip,
   ProviderError,
   type Clock,
+  toIso,
+  uniqueTrackedServices,
+  vehiclesRequestSchema,
   type Coordinate,
   type PlanRequest,
+  type VehiclesResponse,
 } from '@hopready/core';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { methodNotAllowed } from 'hono/method-not-allowed';
@@ -31,6 +35,7 @@ import {
   interceptCarParks,
   interceptPlaces,
   interceptProviderSet,
+  interceptVehicles,
   loggingInterceptor,
   type ProviderSet,
 } from './provider-set';
@@ -49,6 +54,7 @@ export const SERVICE_NAME = 'hopready-api';
 
 const PLAN_BODY_MAX_BYTES = 32 * 1024;
 const PLACE_SEARCH_BODY_MAX_BYTES = 4 * 1024;
+const VEHICLES_BODY_MAX_BYTES = 4 * 1024;
 const PLACE_PROVIDER_TIMEOUT_MS = 5_000;
 // The facility list changes rarely; ten minutes keeps a busy picker to a handful of TfNSW requests.
 const CAR_PARK_LIST_CACHE_TTL_MS = 10 * 60_000;
@@ -249,6 +255,7 @@ export function createApp(deps: AppDeps) {
         driving: providers.driving ? 'configured' : 'missing',
         carParks: providers.carParks ? 'configured' : 'missing',
         places: providers.places.length > 0 ? 'configured' : 'missing',
+        vehicles: providers.vehicles ? 'configured' : 'missing',
       },
     }),
   );
@@ -336,6 +343,36 @@ export function createApp(deps: AppDeps) {
       results: outcome.results,
       unavailable: outcome.failures.map((failure) => failure.provider),
     });
+  });
+
+  // A POST, like place search, so the services someone is riding never appear in URLs or edge logs.
+  // Trip ids are not logged either: only how many vehicles were found and how many feeds failed.
+  app.post('/v1/vehicles', rateLimited('vehicles'), async (c) => {
+    const state = stateOf(c);
+    const body = await readJsonBody(c.req.raw, VEHICLES_BODY_MAX_BYTES);
+    if (!body.ok) return sendBodyError(c, body);
+    const parsed = vehiclesRequestSchema.safeParse(body.value);
+    if (!parsed.success) return sendValidationError(c, parsed.error);
+    if (!providers.vehicles) return sendError(c, 'not-configured');
+
+    const locator = interceptVehicles(providers.vehicles, loggingInterceptor(state.logger));
+    try {
+      const vehicles = await locator.locate(
+        uniqueTrackedServices(parsed.data.services),
+        c.req.raw.signal,
+      );
+      state.logFields.resultCount = vehicles.filter((v) => v.status === 'located').length;
+      state.logFields.unavailableCount = vehicles.filter((v) => v.status === 'unavailable').length;
+      const answer: VehiclesResponse = {
+        mode: config.mode,
+        checkedAt: toIso(clock.now()),
+        vehicles,
+      };
+      return c.json(answer);
+    } catch (error) {
+      if (error instanceof ProviderError) return sendProviderError(c, error);
+      throw error;
+    }
   });
 
   app.get('/v1/carparks', rateLimited('carparks'), async (c) => {

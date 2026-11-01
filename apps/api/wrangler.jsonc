@@ -39,6 +39,11 @@
       "simple": { "limit": 30, "period": 60 },
     },
     {
+      "name": "VEHICLES_RATE_LIMITER",
+      "namespace_id": "1005",
+      "simple": { "limit": 12, "period": 60 },
+    },
+    {
       "name": "IP_RATE_LIMITER",
       "namespace_id": "1004",
       "simple": { "limit": 120, "period": 60 },
@@ -74,6 +79,11 @@
           "name": "CARPARKS_RATE_LIMITER",
           "namespace_id": "1103",
           "simple": { "limit": 30, "period": 60 },
+        },
+        {
+          "name": "VEHICLES_RATE_LIMITER",
+          "namespace_id": "1105",
+          "simple": { "limit": 12, "period": 60 },
         },
         {
           "name": "IP_RATE_LIMITER",

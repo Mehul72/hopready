@@ -3,7 +3,7 @@ import type { Clock } from '@hopready/core';
 
 import { runWithDeadline, type LateOutcomeHandler } from './deadline';
 
-export const RATE_LIMIT_POLICIES = ['plan', 'places', 'carparks', 'ip'] as const;
+export const RATE_LIMIT_POLICIES = ['plan', 'places', 'carparks', 'vehicles', 'ip'] as const;
 export type RateLimitPolicy = (typeof RATE_LIMIT_POLICIES)[number];
 
 export interface RateLimitRule {
@@ -16,6 +16,8 @@ export const RATE_LIMIT_RULES: Readonly<Record<RateLimitPolicy, RateLimitRule>> 
   plan: { limit: 20, periodSeconds: 60 },
   places: { limit: 60, periodSeconds: 60 },
   carparks: { limit: 30, periodSeconds: 60 },
+  // An open trip map asks every 15 s; this leaves room for a refresh and a second screen.
+  vehicles: { limit: 12, periodSeconds: 60 },
   // Coarse backstop per address. Many phones can share one carrier address, so it stays generous.
   ip: { limit: 120, periodSeconds: 60 },
 };
@@ -25,6 +27,7 @@ export const RATE_LIMIT_BINDING_NAMES = {
   plan: 'PLAN_RATE_LIMITER',
   places: 'PLACES_RATE_LIMITER',
   carparks: 'CARPARKS_RATE_LIMITER',
+  vehicles: 'VEHICLES_RATE_LIMITER',
   ip: 'IP_RATE_LIMITER',
 } as const satisfies Record<RateLimitPolicy, string>;
 

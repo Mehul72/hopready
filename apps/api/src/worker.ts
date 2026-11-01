@@ -34,6 +34,7 @@ export interface Env {
   PLAN_RATE_LIMITER: RateLimit;
   PLACES_RATE_LIMITER: RateLimit;
   CARPARKS_RATE_LIMITER: RateLimit;
+  VEHICLES_RATE_LIMITER: RateLimit;
   IP_RATE_LIMITER: RateLimit;
   PROVIDER_BUDGET: DurableObjectNamespace;
 }
@@ -62,6 +63,7 @@ function createWorkerRuntime(env: Env): Runtime {
         plan: env[RATE_LIMIT_BINDING_NAMES.plan],
         places: env[RATE_LIMIT_BINDING_NAMES.places],
         carparks: env[RATE_LIMIT_BINDING_NAMES.carparks],
+        vehicles: env[RATE_LIMIT_BINDING_NAMES.vehicles],
         ip: env[RATE_LIMIT_BINDING_NAMES.ip],
       },
       onLateOutcome: lateOutcomeLogger(logger, 'rate limiter answered after its timeout'),

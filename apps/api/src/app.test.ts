@@ -14,6 +14,7 @@ import {
   fakeDriving,
   fakePlaces,
   fakeTransit,
+  fakeVehicles,
   INSTALL_ID,
   never,
   NOW,
@@ -63,6 +64,7 @@ describe('GET /v1/health', () => {
         driving: 'missing',
         carParks: 'missing',
         places: 'missing',
+        vehicles: 'missing',
       },
     });
     expect(transit.queries).toHaveLength(0);
@@ -732,5 +734,153 @@ describe('journey data passes through unchanged', () => {
     };
     const kinds = plan.itineraries[0]?.legs.map((leg) => leg.kind);
     expect(kinds).toEqual(['walk', 'wait', 'transit', 'walk']);
+  });
+});
+
+describe('POST /v1/vehicles', () => {
+  const BUS = { mode: 'bus', realtimeTripId: '2703224' } as const;
+  const TRAIN = { mode: 'train', realtimeTripId: '814P.1417.150.2.A.8.91974280' } as const;
+  const busLocated = {
+    ...BUS,
+    status: 'located',
+    position: { lat: -33.892, lon: 151.25 },
+    bearingDegrees: 78,
+    observedAt: '2026-10-26T21:59:50.000Z',
+    servingTrip: 'this-trip',
+  } as const;
+
+  function locatingBus() {
+    return fakeVehicles((service) =>
+      service.realtimeTripId === BUS.realtimeTripId
+        ? busLocated
+        : { ...service, status: 'not-located' },
+    );
+  }
+
+  it('answers each service, in the order asked, with the time it checked', async () => {
+    const vehicles = locatingBus();
+    const { app } = testApp({ providers: { vehicles } });
+
+    const response = await postJson(app, '/v1/vehicles', { services: [TRAIN, BUS] });
+
+    expect(response.status).toBe(200);
+    expectStandardHeaders(response);
+    expect(await response.json()).toEqual({
+      mode: 'live',
+      checkedAt: NOW,
+      vehicles: [{ ...TRAIN, status: 'not-located' }, busLocated],
+    });
+  });
+
+  it('asks about a service named twice only once', async () => {
+    const vehicles = locatingBus();
+    const { app } = testApp({ providers: { vehicles } });
+
+    const response = await postJson(app, '/v1/vehicles', { services: [BUS, TRAIN, BUS] });
+
+    expect(vehicles.requests).toEqual([[BUS, TRAIN]]);
+    expect(((await response.json()) as { vehicles: unknown[] }).vehicles).toHaveLength(2);
+  });
+
+  it.each([
+    ['no services', { services: [] }],
+    [
+      'too many services',
+      {
+        services: Array.from({ length: 9 }, (_, i) => ({ mode: 'bus', realtimeTripId: String(i) })),
+      },
+    ],
+    ['a trip id with a space', { services: [{ mode: 'bus', realtimeTripId: '27 03' }] }],
+    ['an unknown mode', { services: [{ mode: 'tram', realtimeTripId: '1' }] }],
+    ['no body fields', {}],
+  ])('refuses a request with %s, naming only the field', async (_label, body) => {
+    const vehicles = fakeVehicles();
+    const { app } = testApp({ providers: { vehicles } });
+
+    const response = await postJson(app, '/v1/vehicles', body);
+
+    expect(response.status).toBe(400);
+    const error = await errorOf(response);
+    expect(error.code).toBe('invalid-request');
+    expect(error.message).not.toContain('27 03');
+    expect(vehicles.requests).toEqual([]);
+  });
+
+  it('refuses a body that is not declared as JSON or is too large', async () => {
+    const { app } = testApp({ providers: { vehicles: fakeVehicles() } });
+
+    const notJson = await app.request('/v1/vehicles', {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain', 'X-HopReady-Install': INSTALL_ID },
+      body: JSON.stringify({ services: [BUS] }),
+    });
+    expect(notJson.status).toBe(415);
+
+    const huge = await postJson(app, '/v1/vehicles', {
+      services: [BUS],
+      padding: 'x'.repeat(5_000),
+    });
+    expect(huge.status).toBe(413);
+  });
+
+  it('answers 503 when the server has no live position feeds set up', async () => {
+    const { app } = testApp();
+    const response = await postJson(app, '/v1/vehicles', { services: [BUS] });
+    expect(response.status).toBe(503);
+    expect((await errorOf(response)).code).toBe('not-configured');
+  });
+
+  it('answers a feed that could not be read service by service, not as a failed request', async () => {
+    const vehicles = fakeVehicles((service) => ({ ...service, status: 'unavailable' }));
+    const { app, logs } = testApp({ providers: { vehicles } });
+
+    const response = await postJson(app, '/v1/vehicles', { services: [BUS] });
+
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { vehicles: unknown[] }).vehicles).toEqual([
+      { ...BUS, status: 'unavailable' },
+    ]);
+    const finished = logs.entries.find((entry) => entry.message === 'request finished');
+    expect(finished).toMatchObject({ route: '/v1/vehicles', unavailableCount: 1, resultCount: 0 });
+  });
+
+  it('maps a locator failure to the provider error answer', async () => {
+    const vehicles = fakeVehicles(() => {
+      throw new ProviderError('tfnsw-realtime', 'timeout', 'slow');
+    });
+    const { app } = testApp({ providers: { vehicles } });
+
+    const response = await postJson(app, '/v1/vehicles', { services: [BUS] });
+    expect(response.status).toBe(504);
+  });
+
+  it('turns away the 13th lookup in a minute from one install', async () => {
+    const { app, clock } = testApp({ providers: { vehicles: fakeVehicles() } });
+    for (let attempt = 1; attempt <= 12; attempt += 1) {
+      expect((await postJson(app, '/v1/vehicles', { services: [BUS] })).status).toBe(200);
+      clock.advanceMs(1_000);
+    }
+
+    const limited = await postJson(app, '/v1/vehicles', { services: [BUS] });
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0);
+  });
+
+  it('never writes the trip ids it was asked about to the logs', async () => {
+    const { app, logs } = testApp({ providers: { vehicles: locatingBus() } });
+    await postJson(app, '/v1/vehicles', { services: [BUS, TRAIN] });
+
+    const written = logs.lines().join('\n');
+    expect(written).not.toContain(BUS.realtimeTripId);
+    expect(written).not.toContain(TRAIN.realtimeTripId);
+  });
+
+  it('labels answers from the demo locator as demo', async () => {
+    const { app } = testApp({
+      config: { mode: 'demo' },
+      providers: { vehicles: fakeVehicles(undefined, 'demo-fixture') },
+    });
+    const response = await postJson(app, '/v1/vehicles', { services: [BUS] });
+    expect(((await response.json()) as { mode: string }).mode).toBe('demo');
   });
 });

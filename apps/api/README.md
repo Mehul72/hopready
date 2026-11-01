@@ -52,19 +52,20 @@ All settings are optional. A blank value counts as not set. A value that is pres
 (for example `PLAN_DEADLINE_MS=soon`) stops the server: Node exits, and the Worker answers every
 request with a 500 and logs which setting is wrong, never its value.
 
-| Name                           | Default     | What it does                                                                                      |
-| ------------------------------ | ----------- | ------------------------------------------------------------------------------------------------- |
-| `HOPREADY_MODE`                | `live`      | `live` calls real providers. `demo` serves labelled fixtures.                                     |
-| `TFNSW_API_KEY`                | not set     | Secret. Public transport, stop search and car parks.                                              |
-| `APPLE_MAPS_TEAM_ID`           | not set     | Secret. With the next two, enables drive times and address search.                                |
-| `APPLE_MAPS_KEY_ID`            | not set     | Secret. Key ID of the Apple Maps private key.                                                     |
-| `APPLE_MAPS_PRIVATE_KEY`       | not set     | Secret. The `.p8` contents. One line with `\n` between lines also works.                          |
-| `LOG_LEVEL`                    | `info`      | `debug`, `info`, `warn` or `error`.                                                               |
-| `TFNSW_DAILY_CALL_BUDGET`      | `50000`     | Most TfNSW requests per UTC day. TfNSW's default quota is 60,000 a day per key.                   |
-| `APPLE_MAPS_DAILY_CALL_BUDGET` | `20000`     | Most Apple requests per UTC day. Apple allows 25,000 a day per team.                              |
-| `PLAN_DEADLINE_MS`             | `12000`     | Longest a trip plan may take before a 504. 1,000 to 60,000. Keep it below the app's 15 s timeout. |
-| `PORT`                         | `8787`      | Node server only.                                                                                 |
-| `HOST`                         | `127.0.0.1` | Node server only.                                                                                 |
+| Name                               | Default     | What it does                                                                                      |
+| ---------------------------------- | ----------- | ------------------------------------------------------------------------------------------------- |
+| `HOPREADY_MODE`                    | `live`      | `live` calls real providers. `demo` serves labelled fixtures.                                     |
+| `TFNSW_API_KEY`                    | not set     | Secret. Public transport, stop search, car parks and live positions.                              |
+| `APPLE_MAPS_TEAM_ID`               | not set     | Secret. With the next two, enables drive times and address search.                                |
+| `APPLE_MAPS_KEY_ID`                | not set     | Secret. Key ID of the Apple Maps private key.                                                     |
+| `APPLE_MAPS_PRIVATE_KEY`           | not set     | Secret. The `.p8` contents. One line with `\n` between lines also works.                          |
+| `LOG_LEVEL`                        | `info`      | `debug`, `info`, `warn` or `error`.                                                               |
+| `TFNSW_DAILY_CALL_BUDGET`          | `50000`     | Most TfNSW requests per UTC day. TfNSW's default quota is 60,000 a day per key.                   |
+| `TFNSW_REALTIME_DAILY_CALL_BUDGET` | `10000`     | Most live position feed requests per UTC day, counted inside the TfNSW budget.                    |
+| `APPLE_MAPS_DAILY_CALL_BUDGET`     | `20000`     | Most Apple requests per UTC day. Apple allows 25,000 a day per team.                              |
+| `PLAN_DEADLINE_MS`                 | `12000`     | Longest a trip plan may take before a 504. 1,000 to 60,000. Keep it below the app's 15 s timeout. |
+| `PORT`                             | `8787`      | Node server only.                                                                                 |
+| `HOST`                             | `127.0.0.1` | Node server only.                                                                                 |
 
 Apple's 25,000 calls are shared with any MapKit JS use on the same team.
 
@@ -98,7 +99,8 @@ Reports set-up only. It makes no provider calls, so uptime checks cost no quota.
     "transit": "configured",
     "driving": "missing",
     "carParks": "configured",
-    "places": "configured"
+    "places": "configured",
+    "vehicles": "configured"
   }
 }
 ```
@@ -241,6 +243,47 @@ and at most 10 come back.
 them failed it is 503 (`provider-busy` when all were out of quota, with `Retry-After` when known,
 or `not-configured`), otherwise 502 `provider-unavailable`.
 
+### `POST /v1/vehicles`
+
+Where the vehicles running a trip's services are now, from TfNSW's GTFS-realtime Vehicle Positions
+feeds. Body: up to 8 services, each the `mode` and `realtimeTripId` of a transit leg from a plan.
+It is a POST so the services someone rides never appear in a URL or an edge log.
+
+```json
+{ "services": [{ "mode": "bus", "realtimeTripId": "2703224" }] }
+```
+
+```json
+{
+  "mode": "live",
+  "checkedAt": "2026-11-01T03:41:47.000Z",
+  "vehicles": [
+    {
+      "mode": "bus",
+      "realtimeTripId": "2703224",
+      "status": "located",
+      "position": { "lat": -33.89204, "lon": 151.25021 },
+      "bearingDegrees": 78,
+      "observedAt": "2026-11-01T03:41:32.000Z",
+      "servingTrip": "this-trip"
+    }
+  ]
+}
+```
+
+One answer per service, in the order asked, with repeats removed. `status` is `located`,
+`not-located` (the feed was read and has no vehicle for that trip now, or only a report older than
+30 minutes), `not-tracked` (no feed for the mode: only `bus`, `train` and `metro` are read) or
+`unavailable` (the feed could not be read). `bearingDegrees` is null when the feed gives none, as
+Sydney Trains' does. `observedAt` is when the vehicle reported the position. `servingTrip` is
+`previous-trip` when the vehicle is still finishing the trip before this one. A feed failure answers
+`unavailable` for its services in a 200; the whole request fails only on a bad request or without a
+TfNSW key (503 `not-configured`).
+
+Each isolate keeps one decoded copy of each feed, fetched only when asked for and at most once
+every 15 seconds. After a failed fetch it waits 15 seconds, or as long as TfNSW's `Retry-After` asks
+up to a minute, and answers from its last copy while that is under two minutes old.
+
 ### `GET /v1/carparks`
 
 The Park&Ride facilities from the TfNSW Car Park API, for the app's "which car park did you use?"
@@ -331,6 +374,7 @@ when it frees up.
 | `POST /v1/plan`          | install ID, or address without one | 20 a minute  |
 | `POST /v1/places/search` | install ID, or address without one | 60 a minute  |
 | `GET /v1/carparks`       | install ID, or address without one | 30 a minute  |
+| `POST /v1/vehicles`      | install ID, or address without one | 12 a minute  |
 | Every request            | address                            | 120 a minute |
 
 An address is an IPv4 address or an IPv6 /64. On Workers the limits use the Rate Limiting binding,
@@ -340,7 +384,10 @@ fails, requests go through and an error is logged: the limits protect quota, not
 daily budgets still cap provider use.
 
 Daily budgets cap the HTTP requests sent to each provider account: TfNSW (trip planner, stop
-search, car parks) and Apple Maps (drive times, place search). Every request an adapter sends is
+search, car parks, live positions) and Apple Maps (drive times, place search). Live position feed
+requests also count against their own cap, `TFNSW_REALTIME_DAILY_CALL_BUDGET`, so an open map never
+uses up the calls trip planning needs. That cap is checked before each feed fetch, so lookups
+answered from a copy already held still work once it is spent. Every request an adapter sends is
 counted, including retries, Apple's token exchange and the TfNSW car park adapter's one request per
 facility. Budget days follow UTC dates, because neither provider documents when its quota resets.
 Each provider call checks its budget before it starts; once the budget is spent, calls fail fast
@@ -366,7 +413,11 @@ they send between reports. On Node the process count is the whole count.
 - Routes are logged as templates. An unknown path is logged as `unmatched`, never as sent.
 - Workers invocation logs are off in `wrangler.jsonc`, because they record request URLs.
 - TfNSW adapter diagnostics (journeys, stops or car parks left out of a response) are logged as
-  `tfnsw data left out`, at `warn` when they point at unreadable or stale data.
+  `tfnsw data left out`, at `warn` when they point at unreadable or stale data. A live position
+  feed that could not be read is logged as `vehicle-feed-unavailable` with the feed and the failure.
+- The trip ids sent to `POST /v1/vehicles` are never logged, because they show what someone is
+  riding. Its `request finished` line carries only how many vehicles were found and how many were
+  unavailable.
 
 ## Deploy
 

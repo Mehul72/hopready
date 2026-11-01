@@ -64,9 +64,10 @@ Design (recorded in ADR-0013 in step 7):
       files: apps/api/src/providers/tfnsw/vehicle-positions.ts, apps/api/src/providers/tfnsw/index.ts, apps/api/src/providers/tfnsw/diagnostics.ts, apps/api/src/budget.ts, apps/api/src/config.ts, apps/api/src/composition.ts, apps/api/src/provider-set.ts, apps/api/src/worker.ts, tests
       done when: tests show one upstream fetch per feed per 15 s however many lookups arrive, a stale copy up to 2 minutes old answering a failed refresh, `unavailable` past that, the size cap, the 5 s timeout, and calls counted against both budgets with the realtime cap refusing first
       verified: API 376 tests pass (16 locator, 2 budget wiring), typecheck, lint and format clean. The timeout is 5 s, not the 8 s first written: the feeds answered in 0.15 s, and the app polls every 15 s
-- [ ] 4. `POST /v1/vehicles`
-      files: apps/api/src/app.ts, apps/api/src/rate-limit.ts, apps/api/src/worker.ts, apps/api/src/node-server.ts, apps/api/src/runtime.ts, apps/api/src/provider-set.ts, apps/api/wrangler.jsonc, apps/api/README.md, tests
+- [x] 4. `POST /v1/vehicles`
+      files: apps/api/src/app.ts, apps/api/src/rate-limit.ts, apps/api/src/worker.ts, apps/api/src/logger.ts, apps/api/wrangler.jsonc, apps/api/README.md, apps/api/.dev.vars.example, docs/runbook.md, tests
       done when: route tests cover validation, duplicates, the per-install rate limit, not-configured, demo mode and a feed failure answering `unavailable` per service; the wrangler test keeps the new limiter in step in both environments; `pnpm --filter @hopready/api test`, typecheck and lint pass
+      verified: API 391 tests pass (11 route, 1 log), typecheck, lint and format clean; the Node server in demo mode answered `not-located` and `not-tracked` over HTTP, 400 for an empty list, and its log never held the trip id
 - [ ] 5. App data: client, trip service and polling
       files: apps/mobile/src/api/client.ts, apps/mobile/src/api/schemas.ts, apps/mobile/src/trip/trip-service.ts, apps/mobile/src/trip/vehicle-positions.ts, tests
       done when: tests show which legs are asked about (transit legs with a trip id that have not ended), polling every 15 s only while the screen is focused and the app active, an unknown status read as `unavailable`, and demo mode never calling the API
@@ -90,6 +91,7 @@ Design (recorded in ADR-0013 in step 7):
 ## Log
 
 - 2026-11-01 Plan written from the research workflow (wf_9396733f-7ee) and the live probe. Feeds saved under the session scratchpad for the recordings in step 2.
+- 2026-11-01 Step 4: the feed name in diagnostics would have been dropped silently, because the logger writes only allowlisted fields; `feed` was added to LogFields with a test. The runbook gained a "live positions are unavailable" entry.
 - 2026-11-01 Step 3: after a failed refresh a feed is left alone for 15 s, or as long as TfNSW's Retry-After asks up to 60 s, so a TfNSW outage costs one try per feed per window, not one per lookup. Budgets are checked before each feed fetch rather than around `locate`, so answers from a copy already held cost nothing even when a budget is spent. Reports older than 30 minutes read as not located.
 - 2026-11-01 Step 2: a generator-based decoder took 1.2 ms warm and 11 ms of process CPU cold on the full Sunday bus feed (M5 Pro). A cursor that allocates no field objects takes 0.38 ms warm and 7.5 to 8.3 ms process CPU (3 ms wall) cold. Kept the cursor. Whether Workers counts helper threads stays open for step 8.
 - 2026-11-01 Step 1: adding `tfnsw-realtime` to ProviderName broke the planner, which treats every provider name as a leg source (planner.ts driveLeg). It was added to DATA_SOURCES too; no leg is ever sent with it, so older apps are unaffected. The demo locator avoids `findLastIndex`, unused elsewhere, because it runs on the phone in demo mode.

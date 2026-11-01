@@ -24,11 +24,18 @@ A healthy answer is `{"status":"ok", ...}` with every provider `configured`. Hea
    - a 429 without a provider means our own per-client limit.
 3. **TfNSW over quota** (`X-Error-Detail: Account Over Rate Limit/Quota`): lasts until the TfNSW daily reset. Longer term, ask TfNSW for a higher quota (free).
 4. **Apple over 25,000 calls a day:** drive times are unavailable until Apple's daily reset. Public transport options still work. Longer term, request a quota increase (form linked in docs/providers.md).
-5. **Our daily budget exhausted** (`TFNSW_DAILY_CALL_BUDGET` or `APPLE_MAPS_DAILY_CALL_BUDGET`): raise it only if the provider limit allows:
+5. **Our daily budget exhausted** (`TFNSW_DAILY_CALL_BUDGET`, `TFNSW_REALTIME_DAILY_CALL_BUDGET` or `APPLE_MAPS_DAILY_CALL_BUDGET`): raise it only if the provider limit allows. The realtime one sits inside the TfNSW one, so raise it only while the TfNSW budget has room for planning:
 
    ```sh
    npx wrangler deploy --var APPLE_MAPS_DAILY_CALL_BUDGET:22000
    ```
+
+## Symptom: the trip map says live positions are unavailable
+
+1. **Mitigate.** Nothing on HopReady's side brings back a TfNSW feed, and the rest of the trip still works. If the cause is our own cap (step 2), raise `TFNSW_REALTIME_DAILY_CALL_BUDGET` as in the budget step above.
+2. **Confirm** which it is. In Workers & Pages > hopready-api > Logs, filter `"diagnostic":"vehicle-feed-unavailable"`: `feed` names the mode and `reason` the failure (`timeout`, `unavailable`, `rate-limited`, `malformed-response`). A `daily provider call budget used up` line with `"budget":"tfnsw-realtime"` means our cap.
+3. **TfNSW outage.** Check the Real-time public transport notices on the TfNSW Open Data forum: https://opendataforum.transport.nsw.gov.au/c/real-time-public-transport/7
+4. **Verify.** Open a followed trip's map with a bus, train or metro on it: each row shows how long ago its position was updated.
 
 ## Symptom: requests fail with Cloudflare Error 1102 or 1027
 

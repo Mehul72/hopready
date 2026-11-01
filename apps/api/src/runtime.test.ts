@@ -118,6 +118,7 @@ describe('live mode', () => {
       driving: 'missing',
       carParks: 'missing',
       places: 'missing',
+      vehicles: 'missing',
     });
 
     for (const response of [
@@ -280,6 +281,25 @@ describe('TfNSW diagnostics', () => {
       }),
       expect.objectContaining({ level: 'info', reason: 'unsupported-mode', codes: [104] }),
       expect.objectContaining({ level: 'warn', facilityIds: ['26', '27'] }),
+    ]);
+  });
+
+  it('log a live position feed failure with its feed, and incomplete vehicles as information', () => {
+    const { spies, logs } = runtimeFor(ALL_KEYS);
+    const options = spies.createTfnswProviders.mock.calls[0]?.[0];
+
+    options?.onDiagnostic?.({ kind: 'vehicle-feed-unavailable', feed: 'bus', reason: 'timeout' });
+    options?.onDiagnostic?.({ kind: 'vehicles-dropped', reason: 'incomplete', count: 1 });
+
+    const diagnostics = logs.entries.filter((entry) => entry.message === 'tfnsw data left out');
+    expect(diagnostics).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        diagnostic: 'vehicle-feed-unavailable',
+        feed: 'bus',
+        reason: 'timeout',
+      }),
+      expect.objectContaining({ level: 'info', diagnostic: 'vehicles-dropped', count: 1 }),
     ]);
   });
 });

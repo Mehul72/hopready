@@ -16,6 +16,8 @@ APPLE_MAPS_PRIVATE_KEY=
 LOG_LEVEL=
 # Most requests to TfNSW per UTC day before this server stops calling TfNSW. Default: 50000.
 TFNSW_DAILY_CALL_BUDGET=
+# Most live position feed requests per UTC day, counted inside the TfNSW budget. Default: 10000.
+TFNSW_REALTIME_DAILY_CALL_BUDGET=
 # Most requests to the Apple Maps Server API per UTC day before this server stops calling Apple. Default: 20000.
 APPLE_MAPS_DAILY_CALL_BUDGET=
 # Longest a trip plan may take before the API answers 504, in milliseconds (1000 to 60000). Default: 12000,
